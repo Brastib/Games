@@ -109,6 +109,18 @@ Render legt Gratis-Dienste schlafen, wenn 15 Minuten lang keine Anfrage von auß
 Vorher wird automatisch ein Backup erstellt („vor /nb“, im Dashboard unter *System → Backups* zurückspielbar). XP werden nur nach oben übernommen.
 Danach den alten Bot vom Server entfernen, sonst läuft alles doppelt. Der Bericht steht auch im Dashboard unter *System*.
 
+### Auf dem eigenen Laptop/PC (Linux) – so läuft er gerade
+Ein Befehl im Terminal installiert alles, richtet den Autostart (systemd) und – falls `cloudflared` da ist – die Dashboard-Adresse ein:
+```bash
+curl -fsSL https://raw.githubusercontent.com/Brastib/Games/claude/discord-bot/deploy/install.sh -o install.sh && bash install.sh
+```
+Das Skript fragt Bot-Token und Dashboard-Passwort ab (landen nur in `~/etc-bot/.env`). Dashboard auf Port **3100**, damit es nicht mit dem alten Bot kollidiert.
+Update später: `bash ~/etc-bot/deploy/update.sh` · Log: `journalctl -u etc-bot -f`
+
+**Laptop-Wächter:** Alle 2 Minuten werden CPU-Temperatur, Akku und Last geprüft (Dashboard → *System → Laptop*, auch unter `/health`).
+Ab 80 °C kommt ein Notfall-Alarm, ab 90 °C stoppt der Bot die Musik, bis es wieder kühler ist (`TEMP_WARN`, `TEMP_CRIT`).
+Tipps für Dauerbetrieb: Lüftungsschlitze frei (nicht auf Bett/Decke), am besten Kühlpad; wenn das BIOS/die Hersteller-App es kann, Akku-Ladegrenze auf ~80 % – das schont den Akku im 24/7-Betrieb.
+
 ### Stabiler und besser für Musik: Oracle Cloud „Always Free“
 Dauerhaft kostenlose Linux-VM, die nie schläft (Kreditkarte nur zur Identitätsprüfung):
 ```bash
@@ -145,7 +157,7 @@ sudo npm i -g pm2 && pm2 start src/index.js --name discord-bot && pm2 save && pm
 
 ```bash
 npm install
-npm run check   # 63 Selbsttests ohne Discord: Befehle, Linkschutz, Lockdown, Temp-Voice, AutoMod, Level-Formeln, XP-Import,
+npm run check   # 64 Selbsttests ohne Discord: Befehle, Linkschutz, Lockdown, Temp-Voice, AutoMod, Level-Formeln, XP-Import,
                 # Quests, Münzen, Clips, Dashboard-API, Passwort-Login + Sperre, Eingabeprüfung, Audio-Kette (ffmpeg → Opus),
                 # Bildkarten, Wochen-Posts (Zeitplan inkl. Sommer-/Winterzeit), Rot-Schwarz-Farben
 npm start

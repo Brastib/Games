@@ -142,7 +142,12 @@ client.once(Events.ClientReady, safe('ready', async c => {
   setInterval(() => extras.updateStats(c).catch(() => {}), 10 * 60_000).unref();
   setInterval(() => { try { backups.daily(c); } catch (e) { console.error('[backup]', e); } }, 10 * 60_000).unref();
   setTimeout(() => { try { backups.daily(c); } catch (e) { console.error('[backup]', e); } }, 60_000).unref();
+  // Server ohne gespeicherte Einstellungen (z. B. frische Installation auf dem Laptop): erst einmal Ruhemodus
+  for (const g of c.guilds.cache.values()) {
+    if (!store.has('guilds', g.id)) { getConfig(g.id).quiet = true; saveConfig(g.id); console.log(`[bot] ${g.name}: noch keine Einstellungen – Ruhemodus an bis /nb.`); }
+  }
   await alert.onReady(c).catch(e => console.error('[alarm]', e));
+  require('./modules/health').start(c);
   setInterval(() => clips.cleanup(), 12 * 3_600_000).unref();
   // Mitgliederlisten laden (für Statistik, Bestenlisten, Schutz)
   if (c.options.intents.has(I.GuildMembers)) for (const g of c.guilds.cache.values()) await g.members.fetch().catch(() => {});

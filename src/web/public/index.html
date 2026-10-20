@@ -701,6 +701,7 @@ const SECTIONS = [
       ['alert.mentions', 'list', 'Diese Personen anpingen (Nutzer-IDs)', '123456789012345678'],
       ['alert.message', 'textarea', 'Alarm-Nachricht'],
     ] },
+    { title: '🌡️ Laptop', custom: 'system', note: 'Der Bot prüft alle 2 Minuten die Temperatur. Ab der Warn-Grenze kommt ein Notfall-Alarm, ab der Stopp-Grenze stoppt er die Musik, bis der Laptop abgekühlt ist.', fields: [] },
     { title: '🔕 Ruhemodus', note: 'Auf neuen Servern zählt der Bot still mit (XP, Quests), postet aber keine Level-Up- und Quest-Meldungen – damit neben dem alten Bot nichts doppelt kommt. /nb schaltet ihn automatisch aus.', fields: [['quiet', 'toggle', 'Ruhemodus an']] },
     { title: '🔄 Übernahme vom alten Bot', custom: 'migration', note: 'In Discord /nb eingeben (nur der Besitzer des Bots sieht den Befehl). Der Bot liest, was der alte Bot gepostet und eingestellt hat, zeigt einen Plan und übernimmt erst nach deinem Klick. Mit dashboard: und passwort: kommen auch alle XP mit.', fields: [] },
     { title: '💾 Backups', custom: 'backups', note: 'Täglich automatisch. Vor jeder Wiederherstellung wird der aktuelle Stand zusätzlich gesichert.', fields: [
@@ -843,6 +844,17 @@ function cardEl(card) {
 
 // ---------- Eigene Karten-Inhalte ----------
 const CUSTOM = {
+  system() {
+    const x = S.g.system || {};
+    const tiles = [
+      [x.temp != null ? `${x.temp} °C` : '–', x.temp != null ? `Temperatur · ${x.level}` : 'Keine Sensoren gefunden'],
+      [x.battery ? `${x.battery.percent} %` : '–', x.battery ? `Akku · ${{ Charging: 'lädt', Discharging: 'entlädt', Full: 'voll', 'Not charging': 'lädt nicht' }[x.battery.status] || x.battery.status}` : 'Kein Akku'],
+      [x.load != null ? `${x.load}` : '–', `Last (${x.cpus || '?'} Kerne)`],
+      [x.memUsed != null ? `${x.memUsed} %` : '–', 'Arbeitsspeicher'],
+      [`${x.warn ?? 80} °C`, 'Warnung ab'], [`${x.crit ?? 90} °C`, 'Musik-Stopp ab'],
+    ];
+    return h('div', { class: 'mstats', style: 'margin-top:12px' }, tiles.map(([v, l]) => h('div', { style: l.startsWith('Temperatur · heiß') ? 'border-color:var(--red)' : null }, h('b', {}, v), h('span', {}, l))));
+  },
   archive() {
     return h('div', { class: 'act', style: 'margin-top:12px' },
       h('button', { class: 'btn small', onclick: e => action('archiveSetup', {}, e.currentTarget) }, 'Archiv einrichten'),
@@ -1257,6 +1269,7 @@ function demoData() {
         leaderboard: { enabled: true, channel: byName('allgemein'), weekday: 0, everyDays: 1, time: '12:00', text: '🏆 **Die aktuelle Bestenliste!** Wer schreibt sich diese Runde nach oben?' },
       },
     },
+    system: { temp: 61, level: 'ok', battery: { percent: 80, status: 'Charging' }, load: 0.42, cpus: 8, memUsed: 37, warn: 80, crit: 90 },
     events: [{ id: 3, name: 'Among-Us-Abend', at: Date.now() + 2 * 86_400_000, going: 7 }, { id: 4, name: 'Minecraft-Turnier', at: Date.now() + 5 * 86_400_000, going: 12 }],
     migration: { at: Date.now() - 2 * 3_600_000, oldBot: 'Red-Sun-Bot#9965', source: 'Discord + altes Dashboard', removed: 2,
       done: ['👋 Willkommen – #willkommen · Auto-Rolle @Neu', '📈 XP & Statistik – 24 Mitglieder übernommen', '🏆 Bestenliste – #level · täglich 12:00', '🧮 Zählspiel – #counting · weiter ab 3'],

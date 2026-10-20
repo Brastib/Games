@@ -94,6 +94,7 @@ function start(client) {
     ping: Math.round(client.ws.ping), online_seit_sekunden: Math.round((Date.now() - startedAt) / 1000),
     speicher: store.kind, betrugs_domains: lf.phishingCount(), dashboard: oauthReady() || passwordReady(),
     fehlende_intents: client.limitedIntents?.map(x => x.name) || [],
+    laptop: (({ temp, level, battery, load, memUsed }) => ({ temperatur: temp, zustand: level, akku: battery, last: load, ram_prozent: memUsed }))(require('../modules/health').status()),
   });
   app.get('/health', (req, res) => res.json(status()));
 
@@ -213,6 +214,7 @@ function start(client) {
       guild: { id: guild.id, name: guild.name, icon: guild.iconURL({ size: 128 }), memberCount: guild.memberCount, ownerId: guild.ownerId },
       isOwner, config: publicConfig(cfg), channels, roles,
       migration: store.get('migrations', guild.id) || null,
+      system: (() => { const h = require('../modules/health'); return { ...h.status(), warn: h.WARN, crit: h.CRIT }; })(),
       events: require('../modules/events').list(guild.id).filter(e => !e.ended).map(e => ({ id: e.id, name: e.name, at: e.at, going: e.going.length, channelId: e.channelId })),
       warnings: (client.limitedIntents || []).map(x => `${x.name} ist im Developer Portal aus – ohne funktioniert nicht: ${x.loses}.`),
       stats: {

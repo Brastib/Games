@@ -30,6 +30,7 @@ async function join(guild, voiceChannel, textChannel) {
 async function play({ guild, member, voiceChannel, textChannel, query = '', attachment = null, front = false }) {
   const cfg = getConfig(guild.id);
   if (!cfg.music.enabled) throw new Error('Musik ist auf diesem Server ausgeschaltet.');
+  if (require('../health').tooHot()) throw new Error('🔥 Der Laptop ist gerade zu heiß – Musik ist pausiert, bis er abgekühlt ist.');
   const words = cfg.automod.badwords.words || [];
   if (filter.check([query], cfg.music.filter, words)) throw new Error('🚫 Dieser Suchbegriff ist durch den Musik-Filter gesperrt.');
   const result = await resolve(query, member.id, attachment);

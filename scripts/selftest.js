@@ -770,6 +770,28 @@ async function test(name, fn) {
     assert.deepStrictEqual(deleted, ['a1', 'a2']);
   });
 
+  await test('Laptop-Wächter: Temperatur, Akku, Musik-Stopp bei Hitze', async () => {
+    const hm = require('../src/modules/health');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sys-'));
+    const w = (f, v) => { fs.mkdirSync(path.dirname(path.join(root, f)), { recursive: true }); fs.writeFileSync(path.join(root, f), String(v)); };
+    w('hwmon/hwmon0/name', 'coretemp'); w('hwmon/hwmon0/temp1_input', 72000); w('hwmon/hwmon0/temp1_label', 'Package id 0');
+    w('hwmon/hwmon1/name', 'nvme'); w('hwmon/hwmon1/temp1_input', 95000); // SSD zählt nicht als CPU
+    w('power_supply/BAT0/capacity', 77); w('power_supply/BAT0/status', 'Charging');
+    const s = hm.snapshot(root);
+    assert.deepStrictEqual([s.temp, s.level, s.battery.percent], [72, 'ok', 77]);
+    const { players } = require('../src/modules/music/player');
+    let destroyed = 0;
+    players.set('fake', { destroy: () => { destroyed++; } });
+    const client = { guilds: { cache: new Collection() } };
+    w('hwmon/hwmon0/temp1_input', 93000);
+    assert.strictEqual((await hm.check(client, { root })).level, 'heiß');
+    assert.strictEqual(destroyed, 1, 'Musik gestoppt'); assert(hm.tooHot());
+    w('hwmon/hwmon0/temp1_input', 60000);
+    await hm.check(client, { root });
+    assert(!hm.tooHot(), 'abgekühlt');
+    players.delete('fake');
+  });
+
   console.log('\n🎨 Rot-Schwarz-Theme');
   await test('Keine blauen/grünen Buttons und Embed-Farben (außer frei wählbaren Rollen-Buttons)', () => {
     const { COLORS } = require('../src/lib/embeds');
