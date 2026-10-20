@@ -792,6 +792,25 @@ async function test(name, fn) {
     players.delete('fake');
   });
 
+  await test('Tunnel-Adresse wird erkannt und dem Besitzer per DM geschickt', async () => {
+    const http = require('http');
+    const srv = http.createServer((req, res) => { res.setHeader('content-type', 'application/json'); res.end(req.url === '/quicktunnel' ? '{"hostname":"rot-schwarz-test.trycloudflare.com"}' : '{}'); });
+    await new Promise(r => srv.listen(0, '127.0.0.1', r));
+    process.env.TUNNEL_METRICS = `127.0.0.1:${srv.address().port}`;
+    delete require.cache[require.resolve('../src/modules/tunnel')];
+    const tunnel = require('../src/modules/tunnel');
+    const dms = [];
+    const client = { application: { fetch: async () => ({ owner: { id: 'owner' } }) }, users: { fetch: async id => ({ id, send: async t => { dms.push(t); } }) } };
+    const url = await tunnel.poll(client);
+    await tunnel.poll(client);
+    srv.close(); delete process.env.TUNNEL_METRICS;
+    assert.strictEqual(url, 'https://rot-schwarz-test.trycloudflare.com');
+    assert.strictEqual(dms.length, 1, 'nur einmal pro neuer Adresse');
+    assert.match(dms[0], /rot-schwarz-test\.trycloudflare\.com/);
+    assert.strictEqual(process.env.DASHBOARD_URL, url);
+    delete process.env.DASHBOARD_URL;
+  });
+
   console.log('\n🎨 Rot-Schwarz-Theme');
   await test('Keine blauen/grünen Buttons und Embed-Farben (außer frei wählbaren Rollen-Buttons)', () => {
     const { COLORS } = require('../src/lib/embeds');

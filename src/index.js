@@ -148,6 +148,7 @@ client.once(Events.ClientReady, safe('ready', async c => {
   }
   await alert.onReady(c).catch(e => console.error('[alarm]', e));
   require('./modules/health').start(c);
+  require('./modules/tunnel').start(c);
   setInterval(() => clips.cleanup(), 12 * 3_600_000).unref();
   // Mitgliederlisten laden (für Statistik, Bestenlisten, Schutz)
   if (c.options.intents.has(I.GuildMembers)) for (const g of c.guilds.cache.values()) await g.members.fetch().catch(() => {});

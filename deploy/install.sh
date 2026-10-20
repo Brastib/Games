@@ -72,40 +72,8 @@ sudo systemctl enable --now etc-bot
 sleep 4
 sudo systemctl --no-pager --lines=8 status etc-bot || true
 
-say "6/6 Dashboard von außen erreichbar machen (Cloudflare-Tunnel)"
-if ! command -v cloudflared >/dev/null && [ "$(dpkg --print-architecture 2>/dev/null)" = "amd64" ]; then
-  read -rp "Cloudflare-Tunnel installieren, damit das Dashboard von überall geht? (j/n) " CF
-  if [ "${CF:-n}" = "j" ]; then
-    curl -fsSL -o /tmp/cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-    sudo dpkg -i /tmp/cloudflared.deb
-  fi
-fi
-if command -v cloudflared >/dev/null; then
-  sudo tee /etc/systemd/system/etc-bot-tunnel.service >/dev/null <<UNIT
-[Unit]
-Description=ETC. Bot Dashboard-Tunnel
-After=etc-bot.service
-
-[Service]
-User=$USER
-ExecStart=$(command -v cloudflared) tunnel --no-autoupdate --url http://localhost:$PORT
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-  sudo systemctl daemon-reload
-  sudo systemctl enable --now etc-bot-tunnel
-  echo "Warte auf die Dashboard-Adresse …"
-  for _ in $(seq 1 20); do
-    URL=$(journalctl -u etc-bot-tunnel --no-pager 2>/dev/null | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | tail -1 || true)
-    [ -n "$URL" ] && break; sleep 2
-  done
-  echo "Dashboard: ${URL:-noch nicht da – später mit: journalctl -u etc-bot-tunnel | grep trycloudflare}"
-else
-  echo "cloudflared ist nicht installiert – Dashboard nur im Heimnetz: http://$(hostname -I | awk '{print $1}'):$PORT"
-fi
+say "6/6 Dashboard von außen erreichbar machen (Cloudflare-Tunnel) + Laptop wach halten"
+bash "$DIR/deploy/tunnel-install.sh"
 
 say "Auto-Update einrichten (neue Versionen kommen automatisch)"
 bash "$DIR/deploy/autoupdate-install.sh"

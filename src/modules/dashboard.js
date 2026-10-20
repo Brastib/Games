@@ -84,7 +84,13 @@ function view(guild) {
 }
 
 async function show(interaction) {
-  return interaction.reply({ ...view(interaction.guild), flags: EPHEMERAL });
+  const v = view(interaction.guild);
+  const url = require('./tunnel').url();
+  // Link zum Web-Dashboard (Adresse kommt vom Cloudflare-Tunnel auf dem Laptop)
+  if (url && v.components.length < 5) {
+    v.components = [...v.components, new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(url).setLabel('Web-Dashboard öffnen').setEmoji('🌐'))];
+  }
+  return interaction.reply({ ...v, flags: EPHEMERAL });
 }
 
 async function handleButton(interaction, parts) {
