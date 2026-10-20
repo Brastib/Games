@@ -151,15 +151,15 @@ module.exports = [
         .addChannelOption(o => o.setName('kanal').setDescription('Wohin? (Standard: hier)').addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
         .addStringOption(o => o.setName('modus').setDescription('Buttons oder Auswahlmenü').addChoices({ name: 'Buttons', value: 'buttons' }, { name: 'Auswahlmenü', value: 'select' }))
         .addBooleanOption(o => o.setName('nur_eine').setDescription('Nur eine Rolle gleichzeitig erlaubt?')))
-      .addSubcommand(s => s.setName('add').setDescription('Rolle zum Panel hinzufügen')
-        .addStringOption(o => o.setName('nachricht_id').setDescription('ID der Panel-Nachricht').setRequired(true))
+      .addSubcommand(s => s.setName('add').setDescription('Rolle zum Panel hinzufügen (im Kanal des Panels)')
         .addRoleOption(o => o.setName('rolle').setDescription('Rolle').setRequired(true))
+        .addStringOption(o => o.setName('nachricht_id').setDescription('Nur nötig, wenn mehrere Panels im Kanal sind'))
         .addStringOption(o => o.setName('beschriftung').setDescription('Text auf dem Button').setMaxLength(80))
         .addStringOption(o => o.setName('emoji').setDescription('Emoji, z. B. 🎮'))
         .addStringOption(o => o.setName('farbe').setDescription('Button-Farbe').addChoices({ name: 'Grau', value: 'grau' }, { name: 'Rot', value: 'rot' }, { name: 'Blau', value: 'blau' }, { name: 'Grün', value: 'gruen' })))
-      .addSubcommand(s => s.setName('remove').setDescription('Rolle aus dem Panel entfernen')
-        .addStringOption(o => o.setName('nachricht_id').setDescription('ID der Panel-Nachricht').setRequired(true))
-        .addRoleOption(o => o.setName('rolle').setDescription('Rolle').setRequired(true))),
+      .addSubcommand(s => s.setName('remove').setDescription('Rolle aus dem Panel entfernen (im Kanal des Panels)')
+        .addRoleOption(o => o.setName('rolle').setDescription('Rolle').setRequired(true))
+        .addStringOption(o => o.setName('nachricht_id').setDescription('Nur nötig, wenn mehrere Panels im Kanal sind'))),
     async execute(i) {
       const sub = i.options.getSubcommand();
       try {
@@ -168,9 +168,11 @@ module.exports = [
           const msg = await rolepanels.create(ch, { title: i.options.getString('titel'), description: i.options.getString('beschreibung'), mode: i.options.getString('modus') || 'buttons', unique: i.options.getBoolean('nur_eine') ?? false });
           return respond(i, ok(`Panel erstellt in ${ch}.\n**Nachrichten-ID:** \`${msg.id}\`\nJetzt Rollen hinzufügen: \`/rolepanel add nachricht_id:${msg.id} rolle:…\``));
         }
-        const id = i.options.getString('nachricht_id').trim();
+        // Ohne ID: das neueste Rollen-Panel in diesem Kanal
+        const id = i.options.getString('nachricht_id')?.trim() || rolepanels.latestIn(i.guild.id, i.channelId);
+        if (!id) return respond(i, err('In diesem Kanal gibt es kein Rollen-Panel. Geh in den Kanal mit dem Panel oder gib `nachricht_id` an.'));
         if (sub === 'add') {
-          await rolepanels.addRole(i.guild, id, { role: i.options.getRole('rolle'), label: i.options.getString('beschriftung'), emoji: i.options.getString('emoji'), style: i.options.getString('farbe') });
+          await rolepanels.addRole(i.guild, id, { role: i.options.getRole('rolle'), label: i.options.getString('beschriftung'), emoji: i.options.getString('emoji'), style: i.options.getString('farbe') || 'rot' });
           return respond(i, ok('Rolle hinzugefügt.'));
         }
         await rolepanels.removeRole(i.guild, id, i.options.getRole('rolle').id);

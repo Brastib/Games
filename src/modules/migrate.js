@@ -376,7 +376,10 @@ function buildPlan(guild, d, x) {
     add('🎭 Rollen-Buttons', `${ch} · ${rp.roles.map(r => `${r.role}`).join(' ')}`, async () => {
       const rolepanels = require('./rolepanels');
       const msg = await rolepanels.create(ch, { title: truncate(rp.title || 'Rollen', 200), description: rp.description || 'Tippe auf einen Knopf, um die Rolle zu bekommen oder abzugeben.', mode: 'buttons', unique: false });
-      for (const r of rp.roles) await rolepanels.addRole(guild, msg.id, { role: r.role, label: r.label, style: 'grau' }).catch(() => {});
+      const problems = [];
+      for (const r of rp.roles) await rolepanels.addRole(guild, msg.id, { role: r.role, label: r.label, style: 'rot' }).catch(e => problems.push(e.message));
+      if (problems.length === rp.roles.length) { await msg.delete().catch(() => {}); throw new Error(problems[0]); }
+      if (problems.length) return `${rp.roles.length - problems.length}/${rp.roles.length} Rollen – ${problems[0]}`;
     });
   }
   for (const vp of d.verifyPanels) skipped.push(['✅ Regeln-Panel', `in <#${vp.channelId}> gefunden – im Dashboard (Willkommen → Regeln akzeptieren) Rolle wählen und „Regeln posten“`]);

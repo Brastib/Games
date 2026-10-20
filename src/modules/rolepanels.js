@@ -104,4 +104,10 @@ async function onSelect(interaction) {
   return respond(interaction, ok(`Gespeichert. ${add.length ? `Neu: ${add.map(id => `<@&${id}>`).join(', ')}. ` : ''}${remove.length ? `Entfernt: ${remove.map(id => `<@&${id}>`).join(', ')}.` : ''}`));
 }
 
-module.exports = { create, addRole, removeRole, onButton, onSelect, STYLE };
+/** Neuestes Rollen-Panel in einem Kanal (Nachrichten-IDs sind nach Zeit sortierbar) */
+function latestIn(guildId, channelId) {
+  const ids = store.entries('rolepanels').filter(([, p]) => p.guildId === guildId && p.channelId === channelId).map(([id]) => id);
+  return ids.sort((a, b) => (BigInt(a) < BigInt(b) ? 1 : -1))[0] || null;
+}
+
+module.exports = { create, addRole, removeRole, onButton, onSelect, latestIn, STYLE };
