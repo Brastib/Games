@@ -61,13 +61,16 @@ function cookieArgs() {
 
 function run(args, timeout = 45_000) {
   return ensure().then(bin => new Promise((resolve, reject) => {
-    execFile(bin, ['--no-warnings', '--ignore-config', ...cookieArgs(), ...args], { maxBuffer: 64 * 1024 * 1024, timeout }, (error, stdout, stderr) => {
+    // YouTube verlangt inzwischen eine JavaScript-Laufzeit für seine Prüfaufgaben – sonst fehlen die Audio-Formate.
+    // Wir nehmen das Node, mit dem der Bot selbst läuft.
+    execFile(bin, ['--no-warnings', '--ignore-config', '--js-runtimes', `node:${process.execPath}`, ...cookieArgs(), ...args], { maxBuffer: 64 * 1024 * 1024, timeout }, (error, stdout, stderr) => {
       if (error) {
         const msg = String(stderr || error.message);
         if (/confirm your age|age[- ]restricted|inappropriate for some users/i.test(msg)) return reject(new Error('Dieses Video ist altersbeschränkt.'));
         if (/not a bot|Sign in to confirm/i.test(msg)) return reject(new Error('YouTube blockiert gerade diesen Server („Bist du ein Bot?“). Lösung: YTDLP_COOKIES setzen (siehe README) oder einen anderen Link (SoundCloud, direkte MP3) nutzen.'));
         if (/Private video|Video unavailable|This video is unavailable/i.test(msg)) return reject(new Error('Dieses Video ist privat oder nicht verfügbar.'));
         if (/Unable to (connect|download)|timed out|Network is unreachable|Temporary failure/i.test(msg)) return reject(new Error('Die Quelle ist gerade nicht erreichbar. Bitte später nochmal versuchen.'));
+        if (/Requested format is not available/i.test(msg)) { const e = new Error('YouTube liefert für dieses Video gerade kein passendes Audio-Format.'); e.formatMissing = true; return reject(e); }
         return reject(new Error(msg.split('\n').find(l => l.includes('ERROR')) || msg.slice(0, 300)));
       }
       resolve(stdout);
@@ -83,7 +86,9 @@ async function info(query) {
 
 /** Direkte Audio-Adresse + nötige Header für ffmpeg */
 async function streamInfo(url) {
-  const out = await run(['-j', '--no-playlist', '-f', 'bestaudio[acodec=opus]/bestaudio/best', url]);
+  const out = await run(['-j', '--no-playlist', '-f', 'bestaudio[acodec=opus]/bestaudio/best', url])
+    // Zweiter Versuch: irgendein Format mit Ton (notfalls Video+Ton, ffmpeg nimmt nur den Ton)
+    .catch(e => (e.formatMissing ? run(['-j', '--no-playlist', '-f', 'ba*/b*', '-S', 'acodec,abr', url]) : Promise.reject(e)));
   const d = JSON.parse(out);
   return { url: d.url, headers: d.http_headers || {}, isLive: !!d.is_live, duration: d.duration || 0, title: d.title, thumbnail: d.thumbnail };
 }
