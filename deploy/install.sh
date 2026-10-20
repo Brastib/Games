@@ -24,6 +24,9 @@ cd "$DIR"
 
 say "3/6 Pakete installieren"
 npm ci --omit=dev
+# Neuere npm-Versionen blockieren Install-Skripte – ffmpeg (für Musik) daher direkt laden
+node node_modules/ffmpeg-static/install.js >/dev/null 2>&1 || true
+[ -x node_modules/ffmpeg-static/ffmpeg ] && echo "ffmpeg bereit (Musik)" || echo "⚠ ffmpeg fehlt – Musik geht erst nach: node node_modules/ffmpeg-static/install.js"
 
 say "4/6 Einstellungen (.env)"
 if [ ! -f .env ]; then
@@ -70,6 +73,13 @@ sleep 4
 sudo systemctl --no-pager --lines=8 status etc-bot || true
 
 say "6/6 Dashboard von außen erreichbar machen (Cloudflare-Tunnel)"
+if ! command -v cloudflared >/dev/null && [ "$(dpkg --print-architecture 2>/dev/null)" = "amd64" ]; then
+  read -rp "Cloudflare-Tunnel installieren, damit das Dashboard von überall geht? (j/n) " CF
+  if [ "${CF:-n}" = "j" ]; then
+    curl -fsSL -o /tmp/cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+    sudo dpkg -i /tmp/cloudflared.deb
+  fi
+fi
 if command -v cloudflared >/dev/null; then
   sudo tee /etc/systemd/system/etc-bot-tunnel.service >/dev/null <<UNIT
 [Unit]
