@@ -94,10 +94,28 @@ function run(args, timeout = 45_000) {
   }));
 }
 
+/**
+ * yt-dlp schreibt manchmal mehr als ein JSON (eins pro Zeile) oder Zusatztext nach stdout.
+ * Wir nehmen alles, was sich lesen lässt, und loggen den Rest (für die Fehlersuche).
+ */
+function parseJson(out) {
+  const text = String(out || '');
+  try { return [JSON.parse(text)]; } catch { /* zeilenweise weiter */ }
+  const objs = [];
+  for (const line of text.split('\n')) {
+    const l = line.trim();
+    if (!l) continue;
+    try { if (l.startsWith('{')) { objs.push(JSON.parse(l)); continue; } } catch { /* unten loggen */ }
+    console.warn(`[musik] yt-dlp Zusatzausgabe ignoriert: ${l.slice(0, 200)}`);
+  }
+  if (!objs.length) throw new Error('yt-dlp hat keine lesbaren Infos geliefert.');
+  return objs;
+}
+
 /** Infos zu Link oder Suche (Playlists flach, max. 200 Einträge) */
 async function info(query) {
   const out = await run(['-J', '--flat-playlist', '--playlist-end', '200', '--default-search', 'ytsearch', query]);
-  return JSON.parse(out);
+  return parseJson(out)[0];
 }
 
 /** Direkte Audio-Adresse + nötige Header für ffmpeg */
@@ -105,8 +123,9 @@ async function streamInfo(url) {
   const out = await run(['-j', '--no-playlist', '-f', 'bestaudio[acodec=opus]/bestaudio/best', url])
     // Zweiter Versuch: irgendein Format mit Ton (notfalls Video+Ton, ffmpeg nimmt nur den Ton)
     .catch(e => (e.formatMissing ? run(['-j', '--no-playlist', '-f', 'ba*/b*', '-S', 'acodec,abr', url]) : Promise.reject(e)));
-  const d = JSON.parse(out);
+  const all = parseJson(out);
+  const d = all.find(o => o.url) || all[0];
   return { url: d.url, headers: d.http_headers || {}, isLive: !!d.is_live, duration: d.duration || 0, title: d.title, thumbnail: d.thumbnail };
 }
 
-module.exports = { ensure, info, streamInfo, run, jsRuntimeArgs, get path() { return binPath; } };
+module.exports = { ensure, info, streamInfo, run, jsRuntimeArgs, parseJson, get path() { return binPath; } };

@@ -477,6 +477,18 @@ async function test(name, fn) {
     });
     assert(packets >= 90, `nur ${packets} Opus-Pakete (erwartet ~100 für 2 Sek.)`);
   });
+  await test('yt-dlp-Ausgabe: mehrere JSON-Zeilen und Zusatztext brechen nicht ab', () => {
+    const { parseJson } = require('../src/modules/music/ytdlp');
+    const warn = console.warn; console.warn = () => {};
+    try {
+      const big = JSON.stringify({ title: 'Song', url: 'https://a/b', formats: Array(500).fill({ x: 1 }) });
+      assert.strictEqual(parseJson(big)[0].title, 'Song');
+      const multi = parseJson(`${big}\n${JSON.stringify({ title: 'Zwei' })}\n`);
+      assert.strictEqual(multi.length, 2);
+      assert.strictEqual(parseJson(`[info] irgendwas\n${big}\nnoch was`)[0].url, 'https://a/b');
+      assert.throws(() => parseJson('nur Text'), /keine lesbaren/);
+    } finally { console.warn = warn; }
+  });
   await test('Alle Audio-Filter sind gültige ffmpeg-Filter', async () => {
     const { spawnSync } = require('child_process');
     const { FILTERS } = require('../src/modules/music/player');
