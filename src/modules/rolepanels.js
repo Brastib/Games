@@ -104,10 +104,22 @@ async function onSelect(interaction) {
   return respond(interaction, ok(`Gespeichert. ${add.length ? `Neu: ${add.map(id => `<@&${id}>`).join(', ')}. ` : ''}${remove.length ? `Entfernt: ${remove.map(id => `<@&${id}>`).join(', ')}.` : ''}`));
 }
 
+/** „Deep Rock Galactic, Rocket League, @Repo“ → Rollen. Vergleicht ohne Groß/klein, Emojis und doppelte Leerzeichen. */
+function parseRoleList(guild, text) {
+  const norm = s => String(s || '').toLowerCase().replace(/<a?:\w+:\d+>/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const roles = [], missing = [];
+  for (const part of String(text || '').split(/[,;\n]+/).map(x => x.trim()).filter(Boolean)) {
+    const id = /<@&(\d+)>/.exec(part)?.[1];
+    const role = id ? guild.roles.cache.get(id) : guild.roles.cache.find(r => r.id !== guild.id && norm(r.name) === norm(part));
+    if (role && !roles.includes(role)) roles.push(role); else if (!role) missing.push(part);
+  }
+  return { roles, missing };
+}
+
 /** Neuestes Rollen-Panel in einem Kanal (Nachrichten-IDs sind nach Zeit sortierbar) */
 function latestIn(guildId, channelId) {
   const ids = store.entries('rolepanels').filter(([, p]) => p.guildId === guildId && p.channelId === channelId).map(([id]) => id);
   return ids.sort((a, b) => (BigInt(a) < BigInt(b) ? 1 : -1))[0] || null;
 }
 
-module.exports = { create, addRole, removeRole, onButton, onSelect, latestIn, STYLE };
+module.exports = { create, addRole, removeRole, onButton, onSelect, latestIn, parseRoleList, STYLE };

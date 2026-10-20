@@ -150,7 +150,8 @@ module.exports = [
         .addStringOption(o => o.setName('beschreibung').setDescription('Text darunter').setMaxLength(2000))
         .addChannelOption(o => o.setName('kanal').setDescription('Wohin? (Standard: hier)').addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
         .addStringOption(o => o.setName('modus').setDescription('Buttons oder Auswahlmenü').addChoices({ name: 'Buttons', value: 'buttons' }, { name: 'Auswahlmenü', value: 'select' }))
-        .addBooleanOption(o => o.setName('nur_eine').setDescription('Nur eine Rolle gleichzeitig erlaubt?')))
+        .addBooleanOption(o => o.setName('nur_eine').setDescription('Nur eine Rolle gleichzeitig erlaubt?'))
+        .addStringOption(o => o.setName('rollen').setDescription('Gleich mehrere Rollen, mit Komma: Repo, Rounds, Helldivers II').setMaxLength(1500)))
       .addSubcommand(s => s.setName('add').setDescription('Rolle zum Panel hinzufügen (im Kanal des Panels)')
         .addRoleOption(o => o.setName('rolle').setDescription('Rolle').setRequired(true))
         .addStringOption(o => o.setName('nachricht_id').setDescription('Nur nötig, wenn mehrere Panels im Kanal sind'))
@@ -165,8 +166,14 @@ module.exports = [
       try {
         if (sub === 'create') {
           const ch = i.options.getChannel('kanal') || i.channel;
+          const list = rolepanels.parseRoleList(i.guild, i.options.getString('rollen'));
+          if (list.roles.length) await i.deferReply({ flags: 64 });
           const msg = await rolepanels.create(ch, { title: i.options.getString('titel'), description: i.options.getString('beschreibung'), mode: i.options.getString('modus') || 'buttons', unique: i.options.getBoolean('nur_eine') ?? false });
-          return respond(i, ok(`Panel erstellt in ${ch}.\n**Nachrichten-ID:** \`${msg.id}\`\nJetzt Rollen hinzufügen: \`/rolepanel add nachricht_id:${msg.id} rolle:…\``));
+          const added = [], failed = [...list.missing.map(m => `„${m}“ nicht gefunden`)];
+          for (const role of list.roles) {
+            await rolepanels.addRole(i.guild, msg.id, { role, style: 'rot' }).then(() => added.push(`${role}`)).catch(e => failed.push(e.message));
+          }
+          return respond(i, ok([`Panel erstellt in ${ch}.`, added.length ? `**Knöpfe:** ${added.join(' ')}` : 'Weitere Rollen: `/rolepanel add rolle:…` (im Kanal des Panels)', failed.length ? `⚠️ ${failed.join(' · ')}` : null].filter(Boolean).join('\n')));
         }
         // Ohne ID: das neueste Rollen-Panel in diesem Kanal
         const id = i.options.getString('nachricht_id')?.trim() || rolepanels.latestIn(i.guild.id, i.channelId);
