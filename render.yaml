@@ -1,5 +1,7 @@
 # Render-Blueprint: Render liest diese Datei und richtet den Bot automatisch ein.
-# Kostenloser Plan. DISCORD_TOKEN und MONGODB_URI fragt Render beim Einrichten ab.
+# Kostenloser Plan. Render fragt beim Einrichten nach den Werten mit "sync: false".
+# DASHBOARD_PASSWORD = Passwort fürs Web-Dashboard (steht nur bei Render, nie im Code).
+# DISCORD_CLIENT_SECRET ist optional (zusätzlicher Login mit Discord) – leer lassen geht.
 services:
   - type: web
     name: etc-bot
@@ -18,6 +20,8 @@ services:
       - key: DISCORD_TOKEN
         sync: false
       - key: MONGODB_URI
+        sync: false
+      - key: DASHBOARD_PASSWORD
         sync: false
       - key: DISCORD_CLIENT_SECRET
         sync: false

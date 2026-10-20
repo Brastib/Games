@@ -72,12 +72,12 @@ function view(guild) {
       const t = TOGGLES[k];
       const val = t.get(c);
       return new ButtonBuilder().setCustomId(`dash:t:${k}`).setLabel(k === 'links' ? `Links: ${a.links.enabled ? a.links.mode : 'off'}` : t.label)
-        .setEmoji(t.emoji).setStyle(val ? ButtonStyle.Success : ButtonStyle.Secondary);
+        .setEmoji(t.emoji).setStyle(val ? ButtonStyle.Danger : ButtonStyle.Secondary);
     })));
   }
   rows.push(new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('dash:lockdown').setLabel(c.lockdown.active ? 'Lockdown beenden' : 'Lockdown starten')
-      .setEmoji(c.lockdown.active ? '🔓' : '🔒').setStyle(c.lockdown.active ? ButtonStyle.Success : ButtonStyle.Danger),
+      .setEmoji(c.lockdown.active ? '🔓' : '🔒').setStyle(c.lockdown.active ? ButtonStyle.Secondary : ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('dash:refresh').setLabel('Aktualisieren').setEmoji('🔄').setStyle(ButtonStyle.Secondary),
   ));
   return { embeds: [embed], components: rows };

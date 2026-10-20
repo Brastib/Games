@@ -1,9 +1,12 @@
 'use strict';
 /**
  * Web-Dashboard + Statusseite.
- * Login mit Discord (OAuth2). Nur wer auf einem Server "Server verwalten" darf, kann ihn hier einstellen.
- * Nötig: DISCORD_CLIENT_SECRET und DASHBOARD_URL (z. B. https://dein-bot.onrender.com).
- * Im Developer Portal unter OAuth2 → Redirects muss  <DASHBOARD_URL>/callback  eingetragen sein.
+ * Zwei Login-Arten (eine reicht):
+ *  - Passwort: DASHBOARD_PASSWORD beim Hoster eintragen. Wer es kennt, darf alle Server des Bots einstellen.
+ *    Nach 5 Fehlversuchen ist die IP 15 Minuten gesperrt, nach 20 Fehlversuchen insgesamt der Passwort-Login für alle.
+ *  - Discord (OAuth2): DISCORD_CLIENT_SECRET und DASHBOARD_URL (z. B. https://dein-bot.onrender.com).
+ *    Im Developer Portal unter OAuth2 → Redirects muss  <DASHBOARD_URL>/callback  eingetragen sein.
+ *    Dann darf jeder die Server einstellen, auf denen er "Server verwalten" hat.
  */
 const path = require('path');
 const crypto = require('crypto');
@@ -22,6 +25,34 @@ function baseUrl() {
   return (process.env.DASHBOARD_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${port}`).replace(/\/$/, '');
 }
 const oauthReady = () => !!process.env.DISCORD_CLIENT_SECRET;
+const passwordReady = () => !!process.env.DASHBOARD_PASSWORD;
+const sha256 = v => crypto.createHash('sha256').update(String(v)).digest();
+// Fingerabdruck des Passworts: Ändert es sich beim Hoster, sind alte Passwort-Sitzungen ungültig
+const passwordTag = () => sha256('etc-dashboard:' + process.env.DASHBOARD_PASSWORD).toString('hex').slice(0, 16);
+
+// ---------- Sperre gegen Durchprobieren ----------
+const LIMIT = { perIp: 5, ipMinutes: 15, global: 20, globalMinutes: 15 };
+const failsByIp = new Map(); // ip -> { n, until }
+let globalFails = [];
+function lockedFor(ip, now = Date.now()) {
+  globalFails = globalFails.filter(t => now - t < LIMIT.globalMinutes * 60_000);
+  const a = failsByIp.get(ip);
+  if (a?.until > now) return a.until - now;
+  if (globalFails.length >= LIMIT.global) return globalFails[0] + LIMIT.globalMinutes * 60_000 - now;
+  return 0;
+}
+function registerFail(ip, now = Date.now()) {
+  if (failsByIp.size > 5000) for (const [k, v] of failsByIp) if (!(v.until > now)) failsByIp.delete(k);
+  const a = failsByIp.get(ip) || { n: 0, until: 0 };
+  a.n++;
+  if (a.n >= LIMIT.perIp) { a.until = now + LIMIT.ipMinutes * 60_000; a.n = 0; }
+  failsByIp.set(ip, a);
+  globalFails.push(now);
+  return a.until > now ? 0 : LIMIT.perIp - a.n;
+}
+function checkPassword(given) {
+  return typeof given === 'string' && given.length <= 200 && crypto.timingSafeEqual(sha256(given), sha256(process.env.DASHBOARD_PASSWORD));
+}
 
 function cookies(req) {
   const out = {};
@@ -39,13 +70,15 @@ function session(req) {
   const sid = cookies(req).sid;
   if (!sid || !/^[a-f0-9]{64}$/.test(sid)) return null;
   const s = store.get('sessions', sid);
-  if (!s || s.exp < Date.now()) { if (s) store.delete('sessions', sid); return null; }
+  if (!s || s.exp < Date.now() || (s.password && (!passwordReady() || s.pw !== passwordTag()))) { if (s) store.delete('sessions', sid); return null; }
   return { sid, ...s };
 }
 
 function start(client) {
   const app = express();
   app.disable('x-powered-by');
+  // Hinter dem Proxy des Hosters (Render & Co.) steht die echte IP in X-Forwarded-For – wichtig für die Login-Sperre
+  if (process.env.RENDER || process.env.TRUST_PROXY) app.set('trust proxy', 1);
   app.use(express.json({ limit: '300kb' }));
   app.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');
@@ -59,11 +92,33 @@ function start(client) {
   const status = () => ({
     status: client.isReady() ? 'online' : 'startet', bot: client.user?.tag || null, server: client.guilds.cache.size,
     ping: Math.round(client.ws.ping), online_seit_sekunden: Math.round((Date.now() - startedAt) / 1000),
-    speicher: store.kind, betrugs_domains: lf.phishingCount(), dashboard: oauthReady(),
+    speicher: store.kind, betrugs_domains: lf.phishingCount(), dashboard: oauthReady() || passwordReady(),
+    fehlende_intents: client.limitedIntents?.map(x => x.name) || [],
   });
   app.get('/health', (req, res) => res.json(status()));
 
   // ---------- Login ----------
+  app.get('/auth/methods', (req, res) => res.json({ discord: oauthReady(), password: passwordReady() }));
+
+  app.post('/login/password', async (req, res) => {
+    if (req.get('x-requested-with') !== 'dashboard') return res.status(403).json({ error: 'Ungültige Anfrage' });
+    if (!passwordReady()) return res.status(503).json({ error: 'Passwort-Login ist nicht eingerichtet (DASHBOARD_PASSWORD fehlt).' });
+    const ip = req.ip || 'unbekannt';
+    const wait = lockedFor(ip);
+    if (wait > 0) return res.status(429).json({ error: `Zu viele Fehlversuche. Bitte in ${Math.ceil(wait / 60_000)} Min. erneut versuchen.` });
+    if (!checkPassword(req.body?.password)) {
+      const left = registerFail(ip);
+      console.warn(`[dashboard] Falsches Passwort von ${ip}${left ? '' : ' – IP gesperrt'}`);
+      await new Promise(r => setTimeout(r, 600));
+      return res.status(401).json({ error: left ? `Falsches Passwort. Noch ${left} Versuch${left === 1 ? '' : 'e'}.` : `Falsches Passwort. Gesperrt für ${LIMIT.ipMinutes} Min.` });
+    }
+    failsByIp.delete(ip);
+    const sid = crypto.randomBytes(32).toString('hex');
+    store.set('sessions', sid, { password: true, pw: passwordTag(), userId: null, username: 'Admin', avatar: null, guilds: [], exp: Date.now() + SESSION_DAYS * 86_400_000 });
+    setCookie(res, 'sid', sid, SESSION_DAYS * 86400);
+    res.json({ ok: true });
+  });
+
   app.get('/login', (req, res) => {
     if (!oauthReady()) return res.status(503).send('Dashboard ist noch nicht eingerichtet: DISCORD_CLIENT_SECRET fehlt (siehe README).');
     const state = crypto.randomBytes(16).toString('hex');
@@ -129,6 +184,7 @@ function start(client) {
   async function access(req, res) {
     const guild = client.guilds.cache.get(req.params.id);
     if (!guild) { res.status(404).json({ error: 'Der Bot ist nicht auf diesem Server.' }); return null; }
+    if (req.session.password) return { guild, member: null, isOwner: true };
     const member = await guild.members.fetch(req.session.userId).catch(() => null);
     const isOwner = guild.ownerId === req.session.userId;
     if (!member || !(isOwner || member.permissions.has(P.ManageGuild))) { res.status(403).json({ error: 'Du darfst diesen Server nicht verwalten.' }); return null; }
@@ -151,11 +207,12 @@ function start(client) {
       .map(r => ({ id: r.id, name: r.name, color: r.colors?.primaryColor ?? r.color, position: r.position, managed: r.managed, editable: r.editable }))
       .sort((a, b) => b.position - a.position);
     const leveling = require('../modules/leveling');
-    const top = leveling.leaderboard(guild.id).slice(0, 5).map(e => ({ ...e, name: guild.members.cache.get(e.userId)?.displayName || e.userId, level: leveling.levelFromXp(e.xp).level }));
+    const top = leveling.leaderboard(guild.id).slice(0, 5).map(e => ({ ...e, name: guild.members.cache.get(e.userId)?.displayName || e.userId, level: leveling.levelFromXp(e.xp, guild.id).level }));
     const music = require('../modules/music/player').get(guild);
     return {
       guild: { id: guild.id, name: guild.name, icon: guild.iconURL({ size: 128 }), memberCount: guild.memberCount, ownerId: guild.ownerId },
       isOwner, config: publicConfig(cfg), channels, roles,
+      warnings: (client.limitedIntents || []).map(x => `${x.name} ist im Developer Portal aus – ohne funktioniert nicht: ${x.loses}.`),
       stats: {
         tempvoice: store.values('tempvoice').filter(r => r.guildId === guild.id).length,
         tickets: store.values('tickets').filter(t => t.guildId === guild.id).length,
@@ -169,9 +226,12 @@ function start(client) {
   api.get('/me', (req, res) => {
     const s = req.session;
     const appId = client.application?.id || client.user?.id;
+    // Passwort-Sitzung: alle Server, auf denen der Bot ist
+    const guilds = s.password ? client.guilds.cache.map(g => ({ id: g.id, name: g.name, icon: g.icon })) : s.guilds;
     res.json({
-      user: { id: s.userId, name: s.username, avatar: s.avatar ? `https://cdn.discordapp.com/avatars/${s.userId}/${s.avatar}.png?size=64` : null },
-      guilds: s.guilds.map(g => ({
+      user: { id: s.userId, name: s.username, avatar: s.avatar ? `https://cdn.discordapp.com/avatars/${s.userId}/${s.avatar}.png?size=64` : null, password: !!s.password },
+      invite: `https://discord.com/oauth2/authorize?client_id=${appId}&permissions=8&scope=bot%20applications.commands`,
+      guilds: guilds.map(g => ({
         ...g, iconUrl: g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=96` : null,
         botPresent: client.guilds.cache.has(g.id),
         invite: `https://discord.com/oauth2/authorize?client_id=${appId}&permissions=8&scope=bot%20applications.commands&guild_id=${g.id}&disable_guild_select=true`,
@@ -196,7 +256,7 @@ function start(client) {
     const a = await access(req, res); if (!a) return;
     const { type, channelId, reason, minutes } = req.body || {};
     const g = a.guild;
-    const user = await client.users.fetch(req.session.userId);
+    const user = req.session.password ? client.user : await client.users.fetch(req.session.userId);
     try {
       let message = 'Erledigt.';
       if (type === 'lockdownStart') {
@@ -231,6 +291,9 @@ function start(client) {
         else await ch.send(tickets.panelMessage());
         cfg.tickets.enabled = true; saveConfig(g.id);
         message = `Ticket-Button in #${ch.name} gepostet.`;
+      } else if (type === 'postAnimal' || type === 'postLeaderboard') {
+        const ch = await require('../modules/autoposts').runNow(g, type === 'postAnimal' ? 'animal' : 'leaderboard');
+        message = `Gepostet in #${ch.name}.`;
       } else if (type === 'setupStats') {
         await require('../modules/extras').setupStats(g);
         message = 'Statistik-Kanäle erstellt.';
@@ -247,10 +310,16 @@ function start(client) {
 
   // ---------- Oberfläche ----------
   app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+  // Alte Links wie /dashboard/?guildId=123 weiter nutzbar
+  app.get(['/dashboard', '/dashboard/'], (req, res) => {
+    const id = /^\d{15,22}$/.test(String(req.query.guildId || '')) ? `?guildId=${req.query.guildId}` : '';
+    res.redirect('/' + id);
+  });
   app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h' }));
 
   const port = process.env.PORT || 3000;
-  app.listen(port, () => console.log(`[web] Dashboard & Statusseite auf Port ${port} (${baseUrl()})${oauthReady() ? '' : ' – Login noch nicht eingerichtet (DISCORD_CLIENT_SECRET fehlt)'}`));
+  const logins = [passwordReady() && 'Passwort', oauthReady() && 'Discord'].filter(Boolean);
+  app.listen(port, () => console.log(`[web] Dashboard & Statusseite auf Port ${port} (${baseUrl()}) – ${logins.length ? `Login: ${logins.join(' + ')}` : 'Login noch nicht eingerichtet (DASHBOARD_PASSWORD oder DISCORD_CLIENT_SECRET fehlt)'}`));
   return app;
 }
 

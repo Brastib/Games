@@ -18,6 +18,7 @@ const v = {
   num: (min, max) => x => (typeof x === 'number' && isFinite(x) && x >= min && x <= max ? Math.round(x * 100) / 100 : fail(`muss eine Zahl von ${min} bis ${max} sein`)),
   str: (max, min = 0) => x => (typeof x === 'string' && x.length <= max && x.trim().length >= min ? x : fail(`Text zu lang (max. ${max}) oder leer`)),
   oneOf: (...opts) => x => (opts.includes(x) ? x : fail(`ungültige Auswahl`)),
+  time: () => x => (typeof x === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x) ? x : fail('Uhrzeit bitte so: 18:00')),
   channel: (types = ANY, nullable = true) => (x, g) => {
     if (x === null || x === '') return nullable ? null : fail('Kanal fehlt');
     const c = g.channels.cache.get(String(x));
@@ -120,6 +121,7 @@ const SCHEMA = {
   'tickets.enabled': v.bool(), 'tickets.supportRoles': v.roles(), 'tickets.logChannel': v.channel(TEXT), 'tickets.maxOpen': v.int(1, 5),
 
   'levels.enabled': v.bool(), 'levels.channel': v.channel(TEXT), 'levels.message': v.str(500, 1), 'levels.multiplier': v.num(0.1, 10),
+  'levels.formula': v.oneOf('etc', 'mee6'), 'levels.style': v.oneOf('embed', 'text'),
   'levels.noXpChannels': v.channels(), 'levels.noXpRoles': v.roles(), 'levels.stackRewards': v.bool(), 'levels.rewards': v.rewards(),
   'levels.voice.enabled': v.bool(), 'levels.voice.perMinute': v.int(0, 100), 'levels.voice.minMembers': v.int(1, 10),
   'levels.clips.enabled': v.bool(), 'levels.clips.channels': v.channels(TEXT.concat([ChannelType.GuildForum])), 'levels.clips.xp': v.int(0, 1000),
@@ -130,6 +132,11 @@ const SCHEMA = {
   'economy.enabled': v.bool(), 'economy.name': v.str(20, 1), 'economy.emoji': v.str(60, 1), 'economy.daily': v.int(1, 100000), 'economy.shop': v.shop(),
   'music.enabled': v.bool(), 'music.djRole': v.role(), 'music.defaultVolume': v.int(1, 200), 'music.maxQueue': v.int(10, 1000),
   'music.leaveMinutes': v.int(0, 60), 'music.channel': v.channel(TEXT),
+
+  'posts.animal.enabled': v.bool(), 'posts.animal.channel': v.channel(TEXT), 'posts.animal.weekday': v.int(0, 6), 'posts.animal.time': v.time(),
+  'posts.animal.source': v.oneOf('mixed', 'dogs', 'cats', 'pool'), 'posts.animal.poolChannel': v.channel([ChannelType.GuildText]), 'posts.animal.text': v.str(300, 1),
+  'posts.leaderboard.enabled': v.bool(), 'posts.leaderboard.channel': v.channel(TEXT), 'posts.leaderboard.weekday': v.int(0, 6),
+  'posts.leaderboard.time': v.time(), 'posts.leaderboard.text': v.str(300, 1),
 
   autoresponders: v.autoresponders(),
   'stats.enabled': v.bool(),

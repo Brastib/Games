@@ -52,18 +52,19 @@ function panelEmbed(ch, r) {
 
 function panelComponents(r = {}) {
   const b = (id, label, style) => new ButtonBuilder().setCustomId(`tv:${id}`).setLabel(label).setStyle(style);
-  const { Primary: BLUE, Success: GREEN, Danger: RED, Secondary: GREY } = ButtonStyle;
+  // Rot-Schwarz: Rot = Hauptaktion, aktiver Zustand oder Rauswurf; alles andere grau
+  const { Danger: RED, Secondary: GREY } = ButtonStyle;
   return [
     new ActionRowBuilder().addComponents(
-      b('quickload', 'Schnellladen', BLUE), b('rename', 'Umbenennen', BLUE), b('limit', 'User-Limit', BLUE),
-      r.locked ? b('unlock', 'Entsperren', GREEN) : b('lock', 'Sperren', GREY),
-      r.hidden ? b('unhide', 'Zeigen', GREEN) : b('hide', 'Verstecken', GREY)),
+      b('quickload', 'Schnellladen', RED), b('rename', 'Umbenennen', GREY), b('limit', 'User-Limit', GREY),
+      r.locked ? b('unlock', 'Entsperren', RED) : b('lock', 'Sperren', GREY),
+      r.hidden ? b('unhide', 'Zeigen', RED) : b('hide', 'Verstecken', GREY)),
     new ActionRowBuilder().addComponents(
-      b('permit', 'Zutritt erlauben', GREEN), b('kick', 'Kicken', RED), b('ban', 'Bannen', RED), b('unban', 'Entbannen', GREEN), b('claim', 'Übernehmen', BLUE)),
+      b('permit', 'Zutritt erlauben', GREY), b('kick', 'Kicken', RED), b('ban', 'Bannen', RED), b('unban', 'Entbannen', GREY), b('claim', 'Übernehmen', GREY)),
     new ActionRowBuilder().addComponents(
-      b('timer', r.timerAt ? 'Timer ⏱️' : 'Timer', GREY), b('activity', 'Aktivität', BLUE), b('music', 'Musik', GREEN), b('bitrate', 'Bitrate', GREY), b('region', 'Region', GREY)),
+      b('timer', r.timerAt ? 'Timer ⏱️' : 'Timer', r.timerAt ? RED : GREY), b('activity', 'Aktivität', GREY), b('music', 'Musik', GREY), b('bitrate', 'Bitrate', GREY), b('region', 'Region', GREY)),
     new ActionRowBuilder().addComponents(
-      b('transfer', 'Besitzer übertragen', BLUE), b('save', 'Speichern', GREEN), b('load', 'Laden', BLUE), b('info', 'Info', GREY), b('delete', 'Kanal löschen', RED)),
+      b('transfer', 'Besitzer übertragen', GREY), b('save', 'Speichern', GREY), b('load', 'Laden', GREY), b('info', 'Info', GREY), b('delete', 'Kanal löschen', RED)),
   ];
 }
 
@@ -587,5 +588,5 @@ async function handleSelect(interaction, action, channelId) {
 
 module.exports = {
   setup, sendPanel, addHub, removeHub, onVoiceUpdate, cleanup, handleButton, handleModal, handleSelect, handleConfirm,
-  rec, resolve, actions, refreshPanel, setFlagForAll, getPrefs, createFor, capture, applyProfile, saveProfile, processTimers,
+  rec, resolve, actions, refreshPanel, setFlagForAll, getPrefs, createFor, capture, applyProfile, saveProfile, processTimers, panelComponents,
 };

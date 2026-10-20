@@ -26,7 +26,7 @@ function embed(g) {
 function buttons(g) {
   return [new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('gw:join').setLabel(g.ended ? 'Beendet' : 'Teilnehmen').setEmoji('🎉')
-      .setStyle(ButtonStyle.Primary).setDisabled(!!g.ended))];
+      .setStyle(ButtonStyle.Danger).setDisabled(!!g.ended))];
 }
 
 async function start(channel, host, { prize, durationMs, winners, description, requiredRole }) {

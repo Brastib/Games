@@ -108,11 +108,33 @@ async function test(name, fn) {
 
   console.log('\n⭐ Level');
   const lv = require('../src/modules/leveling');
-  await test('Level-Formel wie MEE6', () => {
+  await test('Level-Formel ETC. (100 × Level²) passt zu den Screenshots des alten Bots', () => {
     assert.strictEqual(lv.levelFromXp(0).level, 0);
     assert.strictEqual(lv.levelFromXp(100).level, 1);
     assert.strictEqual(lv.levelFromXp(lv.xpForLevel(10)).level, 10);
     assert.strictEqual(lv.levelFromXp(lv.xpForLevel(10) - 1).level, 9);
+    assert.strictEqual(lv.levelFromXp(84_100).nextTotal, 90_000, 'Level 29 → nächstes Level bei 90.000 XP');
+    assert.strictEqual(lv.levelFromXp(114_451).level, 33, '114.451 XP = Level 33');
+  });
+  await test('Level-Formel MEE6 pro Server umschaltbar', () => {
+    getConfig('g-mee6').levels.formula = 'mee6';
+    assert.strictEqual(lv.levelFromXp(254, 'g-mee6').level, 1);
+    assert.strictEqual(lv.levelFromXp(255, 'g-mee6').level, 2, 'MEE6: Level 2 ab 100 + 155 XP');
+    assert.strictEqual(lv.levelFromXp(255).level, 1, 'ohne Server bleibt die ETC.-Formel');
+  });
+  await test('XP-Import: CSV mit Tausenderpunkten, Level-Spalte, JSON', () => {
+    assert.deepStrictEqual(lv.parseImport('Name;XP\nBastian;114.451\nMax;2.000'), [{ who: 'Bastian', xp: 114451, level: null }, { who: 'Max', xp: 2000, level: null }]);
+    assert.deepStrictEqual(lv.parseImport('Name;Level\nMax;12\nLea;Level 7').map(r => r.level), [12, 7]);
+    assert.deepStrictEqual(lv.parseImport('[{"id":"123456789012345678","xp":5000}]'), [{ who: '123456789012345678', xp: 5000, level: null }]);
+  });
+  await test('XP-Import ordnet Namen Mitgliedern zu und meldet Unbekannte', async () => {
+    const member = (id, username, displayName) => ({ id, displayName, nickname: null, user: { username, globalName: null } });
+    const guild = { id: 'g-imp', client: { options: { intents: { has: () => false } } }, members: { cache: new Map([['111111111111111111', member('111111111111111111', 'bastian', 'Bastian')], ['222222222222222222', member('222222222222222222', 'max', 'Maxi')]]) } };
+    const r = await lv.importXp(guild, 'Name;XP\nBastian;114.451\nMaxi;500\nUnbekannt;5');
+    assert.deepStrictEqual([r.imported, r.missing], [2, ['Unbekannt']]);
+    assert.strictEqual(lv.levelFromXp(lv.getData('g-imp', '111111111111111111').xp, 'g-imp').level, 33);
+    await lv.importXp(guild, 'Maxi;100', { mode: 'add' });
+    assert.strictEqual(lv.getData('g-imp', '222222222222222222').xp, 600, 'Modus „dazu“ addiert');
   });
 
   // ---------- Nachgebaute Discord-Objekte ----------
@@ -178,6 +200,21 @@ async function test(name, fn) {
 
   console.log('\n🔊 Temp-Sprachkanäle (nachgebauter Kanal)');
   const tempvoice = require('../src/modules/tempvoice');
+  await test('Bedienfeld nur in Rot und Grau (Rot-Schwarz-Theme)', () => {
+    const { ButtonStyle } = require('discord.js');
+    for (const r of [{}, { locked: true, hidden: true, timerAt: Date.now() }]) {
+      const styles = tempvoice.panelComponents(r).flatMap(row => row.components.map(b => b.data.style));
+      assert.strictEqual(styles.length, 20);
+      assert(styles.every(st => st === ButtonStyle.Danger || st === ButtonStyle.Secondary), 'nur rot/grau');
+    }
+  });
+  await test('Profile: max. 5, gleicher Name ersetzt, letztes = Schnellladen', () => {
+    for (const n of ['Zocken', 'Chill', 'Film', 'Lernen', 'Party', 'Nacht']) tempvoice.saveProfile('g-prof', 'u1', n, { name: n, limit: 4 });
+    tempvoice.saveProfile('g-prof', 'u1', 'chill', { name: 'Chill 2', limit: 2 });
+    const p = tempvoice.getPrefs('g-prof', 'u1');
+    assert.deepStrictEqual(p.profiles.map(x => x.name), ['chill', 'Nacht', 'Party', 'Lernen', 'Film']);
+    assert.strictEqual(p.quick, 'chill');
+  });
   await test('Sperren, Bannen, Entbannen, Übertragen + gemerkte Bannliste', async () => {
     const g = fakeGuild();
     g.id = 'g-tv';
@@ -197,6 +234,8 @@ async function test(name, fn) {
     assert(!ow().has('troll') && tempvoice.getPrefs('g-tv', 'owner1').banned.length === 0, 'entbannt');
     await tempvoice.actions.lock(ch, r, false);
     assert(!ow().get('guild').deny.has(F.Connect), 'wieder offen');
+    const snap = tempvoice.capture(ch, r);
+    assert(snap.permitted.includes('friend') && !snap.locked, 'Profil merkt erlaubte Personen und Sperre');
     await tempvoice.actions.transfer(ch, r, 'friend');
     assert.strictEqual(tempvoice.rec('vc1').ownerId, 'friend');
     assert(ow().get('friend').allow.has(F.ManageChannels), 'neuer Besitzer hat Rechte');
@@ -302,6 +341,15 @@ async function test(name, fn) {
     assert.strictEqual(c.tempvoice.hubs[0].limit, 4);
     assert.deepStrictEqual(c.automod.links.allow, ['meineseite.de']);
   });
+  await test('Wochen-Posts, Level-Formel und -Stil über das Dashboard', () => {
+    const c = getConfig('g-s');
+    const good = applyChanges(c, { 'posts.animal.enabled': true, 'posts.animal.channel': '111', 'posts.animal.weekday': 3, 'posts.animal.time': '18:30', 'posts.animal.source': 'cats', 'posts.leaderboard.time': '09:05', 'levels.formula': 'mee6', 'levels.style': 'text' }, fg, { isOwner: false });
+    assert.deepStrictEqual(good.errors, {});
+    assert.strictEqual(c.posts.animal.weekday, 3);
+    const bad = applyChanges(c, { 'posts.animal.time': '25:00', 'posts.animal.weekday': 7, 'posts.animal.channel': '222', 'levels.formula': 'xyz', 'posts.animal.lastRun': 'x' }, fg, { isOwner: false });
+    assert.deepStrictEqual(Object.keys(bad.errors).sort(), ['levels.formula', 'posts.animal.channel', 'posts.animal.lastRun', 'posts.animal.time', 'posts.animal.weekday']);
+    c.levels.formula = 'etc';
+  });
   await test('Ungültige Werte, falsche Kanaltypen und Fremd-Schlüssel werden abgelehnt', () => {
     const c = getConfig('g-s');
     const r = applyChanges(c, { 'welcome.channel': '222', 'automod.spam.maxMessages': 999, 'tempvoice.hubs': [{ id: '111' }], 'lockdown.active': true, 'antinuke.enabled': false, 'automod.links.allow': ['kein domain'] }, fg, { isOwner: false });
@@ -344,6 +392,35 @@ async function test(name, fn) {
     assert.strictEqual(getConfig('g-s').levels.enabled, false);
   });
 
+  await test('Passwort-Login: richtig, falsch, Sperre nach 5 Fehlversuchen, Passwortwechsel', async () => {
+    const base = 'http://127.0.0.1:3987';
+    process.env.DASHBOARD_PASSWORD = 'test-123456';
+    const methods = await (await fetch(base + '/auth/methods')).json();
+    assert.deepStrictEqual(methods, { discord: true, password: true });
+    const login = pw => fetch(base + '/login/password', { method: 'POST', headers: { 'content-type': 'application/json', 'x-requested-with': 'dashboard' }, body: JSON.stringify({ password: pw }) });
+    assert.strictEqual((await fetch(base + '/login/password', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"password":"test-123456"}' })).status, 403, 'ohne Header abgelehnt');
+    const good = await login('test-123456');
+    assert.strictEqual(good.status, 200);
+    const sid = good.headers.getSetCookie().map(c => /^sid=([a-f0-9]{64})/.exec(c)?.[1]).find(Boolean);
+    assert(sid, 'Sitzungs-Cookie fehlt');
+    const H = { cookie: `sid=${sid}` };
+    const me = await (await fetch(base + '/api/me', { headers: H })).json();
+    assert.strictEqual(me.user.password, true);
+    assert.deepStrictEqual(me.guilds.map(g => g.id), ['g-s'], 'Passwort-Sitzung sieht alle Bot-Server');
+    assert.strictEqual((await (await fetch(base + '/api/guild/g-s', { headers: H })).json()).isOwner, true);
+    process.env.DASHBOARD_PASSWORD = 'neues-passwort';
+    assert.strictEqual((await fetch(base + '/api/me', { headers: H })).status, 401, 'alte Sitzung nach Passwortwechsel ungültig');
+    for (let n = 1; n <= 5; n++) {
+      const r = await login('falsch');
+      assert.strictEqual(r.status, 401);
+      if (n === 5) assert.match((await r.json()).error, /Gesperrt/);
+    }
+    assert.strictEqual((await login('neues-passwort')).status, 429, 'nach 5 Fehlversuchen gesperrt – auch mit richtigem Passwort');
+    const legacy = await fetch(base + '/dashboard/?guildId=1213218593244712990', { redirect: 'manual' });
+    assert.strictEqual(legacy.headers.get('location'), '/?guildId=1213218593244712990');
+    delete process.env.DASHBOARD_PASSWORD;
+  });
+
   console.log('\n🎵 Musik');
   await test('ffmpeg → Opus → Discord-Audio-Ressource funktioniert', async () => {
     const { spawn } = require('child_process');
@@ -381,6 +458,41 @@ async function test(name, fn) {
     fs.writeFileSync(path.join(out, 'beispiel-willkommen.png'), w);
     fs.writeFileSync(path.join(out, 'beispiel-rang.png'), r);
     assert(w.length > 5000 && r.length > 5000);
+  });
+  await test('Bestenliste als Bild (Top 10)', async () => {
+    const entries = Array.from({ length: 10 }, (_, i) => ({ name: `Spieler ${i + 1}`, avatar: null, level: 33 - i * 2, xp: 114451 - i * 9000 }));
+    const png = await cards.leaderboardCard(entries, { subtitle: 'BESTENLISTE' });
+    fs.writeFileSync(path.join(process.env.CARD_OUT || os.tmpdir(), 'beispiel-bestenliste.png'), png);
+    assert(png.length > 10000 && png.subarray(1, 4).toString() === 'PNG');
+  });
+
+  console.log('\n📅 Wochen-Posts');
+  const autoposts = require('../src/modules/autoposts');
+  await test('Fällig genau einmal ab Wochentag + Uhrzeit (deutsche Zeit)', () => {
+    const p = { enabled: true, channel: 'c', weekday: 0, time: '18:00', lastRun: null };
+    const sun = (h, m = 0) => ({ weekday: 0, minutes: h * 60 + m, day: '2026-10-18' });
+    assert(!autoposts.isDue(p, sun(17, 59)));
+    assert(autoposts.isDue(p, sun(18, 0)));
+    assert(autoposts.isDue(p, sun(23, 0)), 'auch nach Neustart später am Tag');
+    assert(!autoposts.isDue({ ...p, lastRun: '2026-10-18' }, sun(19)), 'nicht doppelt');
+    assert(!autoposts.isDue(p, { ...sun(19), weekday: 1 }));
+    assert(!autoposts.isDue({ ...p, channel: null }, sun(19)));
+    const de = autoposts.nowParts(new Date('2026-10-18T16:00:00Z'));
+    assert.deepStrictEqual([de.weekday, de.minutes], [0, 18 * 60], 'Sommerzeit: 16 Uhr UTC = 18 Uhr in Berlin');
+    const winter = autoposts.nowParts(new Date('2026-12-06T17:00:00Z'));
+    assert.strictEqual(winter.minutes, 18 * 60, 'Winterzeit: 17 Uhr UTC = 18 Uhr in Berlin');
+  });
+
+  console.log('\n🎨 Rot-Schwarz-Theme');
+  await test('Keine blauen/grünen Buttons und Embed-Farben (außer frei wählbaren Rollen-Buttons)', () => {
+    const { COLORS } = require('../src/lib/embeds');
+    for (const [k, c] of Object.entries(COLORS)) {
+      const r = c >> 16, g = (c >> 8) & 255, b = c & 255;
+      assert(r > g && r > b, `Farbe ${k} ist nicht rot/orange`);
+    }
+    const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith('.js') ? [path.join(d, e.name)] : []);
+    const offenders = walk(path.join(__dirname, '..', 'src')).filter(f => !f.endsWith('rolepanels.js') && /ButtonStyle\.(Primary|Success)/.test(fs.readFileSync(f, 'utf8')));
+    assert.deepStrictEqual(offenders, []);
   });
 
   console.log(`\n${fail ? '❌' : '✅'} ${pass} bestanden, ${fail} fehlgeschlagen\n`);

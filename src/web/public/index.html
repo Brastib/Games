@@ -78,8 +78,14 @@ header.top .wrap { display: flex; align-items: center; gap: 12px; min-height: 60
 /* ---------- Login ---------- */
 .login-cta { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-bottom: 48px; text-align: center; }
 .login-cta p { margin: 0; color: var(--dim); max-width: 46ch; font-size: 17px; line-height: 1.45; }
+.login-wrap { display: flex; flex-direction: column; }
+.pw-form { display: flex; gap: 10px; width: min(420px, 100%); flex-wrap: wrap; justify-content: center; }
+.pw-form .inp { flex: 1 1 200px; font-size: 18px; padding: 16px 18px; border-radius: 999px; text-align: center; letter-spacing: .12em; }
+.pw-msg { color: var(--amber) !important; min-height: 1.45em; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .login-cta .logo { width: 112px; height: 112px; border-radius: 50%; border: 4px solid var(--red); object-fit: cover; }
 .login-cta h1 { margin: 0; font-size: clamp(34px, 7vw, 56px); font-weight: 900; text-transform: uppercase; letter-spacing: .02em; line-height: 1; }
+@media (max-width: 700px) { .login-wrap .login-cta { order: -1; padding: 28px 0 12px; } .login-cta .logo { width: 88px; height: 88px; } }
 
 /* ---------- Knöpfe ---------- */
 .btn {
@@ -151,6 +157,7 @@ nav.side button.on .n { color: var(--ink); }
 .inp:focus { border-color: var(--dim); outline: none; }
 textarea.inp { min-height: 96px; resize: vertical; line-height: 1.45; font-weight: 700; }
 input.num { width: 104px; text-align: right; font-variant-numeric: tabular-nums; }
+input.time { width: 150px; font-variant-numeric: tabular-nums; }
 select.inp { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--dim) 50%), linear-gradient(135deg, var(--dim) 50%, transparent 50%); background-position: calc(100% - 20px) 55%, calc(100% - 14px) 55%; background-size: 6px 6px; background-repeat: no-repeat; padding-right: 36px; }
 
 /* Schalter */
@@ -201,6 +208,7 @@ select.inp { appearance: none; background-image: linear-gradient(45deg, transpar
 
 /* Hinweise, Toast, Menü */
 .banner { margin: 16px 0 0; border: 1px dashed var(--dim); border-radius: 16px; padding: 12px 16px; color: var(--dim); font-size: 14px; line-height: 1.45; }
+.banner.alert { border-style: solid; border-color: var(--red); color: var(--red); }
 .toast {
   position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 140%); z-index: 50;
   background: var(--red); color: var(--ink); border-radius: 999px; padding: 12px 20px; font-weight: 900; max-width: calc(100vw - 32px);
@@ -336,7 +344,7 @@ function calendarEl(date = new Date(), marks = []) {
 // ====================================================================
 //  Daten / API (mit Vorschau-Modus, falls kein Bot-Server erreichbar ist)
 // ====================================================================
-const S = { me: null, g: null, section: 'overview', demo: false };
+const S = { me: null, g: null, section: 'overview', demo: false, methods: { discord: true, password: false } };
 async function api(path, opts = {}) {
   if (S.demo) return demoApi(path, opts);
   const r = await fetch('/api' + path, { credentials: 'same-origin', ...opts, headers: { 'content-type': 'application/json', 'x-requested-with': 'dashboard', ...(opts.headers || {}) } });
@@ -380,6 +388,7 @@ async function action(type, extra = {}, btn) {
 const A_ACTION = { delete: 'Nur löschen', warn: 'Löschen + verwarnen', timeout: 'Löschen + Timeout' };
 const A_HARD = { ...A_ACTION, kick: 'Löschen + kicken', ban: 'Löschen + bannen' };
 const TXT = [CT.text, CT.news];
+const WEEKDAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 const SECTIONS = [
   { id: 'overview', label: 'Übersicht' },
   { id: 'protect', label: 'Schutz', cards: [
@@ -488,6 +497,8 @@ const SECTIONS = [
       ['levels.enabled', 'toggle', 'Level-System an'],
       ['levels.channel', 'channel', 'Level-Up-Kanal (leer = gleicher Kanal)', TXT],
       ['levels.message', 'textarea', 'Level-Up-Nachricht', null, 'Platzhalter: {user} {level}'],
+      ['levels.style', 'select', 'Level-Up als', { embed: 'Embed mit Profilbild', text: 'Einfacher Text' }],
+      ['levels.formula', 'select', 'Level-Formel', { etc: 'ETC. – Level L ab 100·L² XP', mee6: 'MEE6 – wie beim MEE6-Bot' }],
       ['levels.multiplier', 'number', 'XP-Multiplikator', null, null, 0.1],
       ['levels.stackRewards', 'toggle', 'Belohnungs-Rollen behalten'],
       ['levels.rewards', 'rewards', 'Rollen-Belohnungen'],
@@ -544,6 +555,24 @@ const SECTIONS = [
       ['tickets.maxOpen', 'number', 'Offene Tickets pro Person'],
     ] },
   ] },
+  { id: 'posts', label: 'Wochen-Posts', cards: [
+    { title: '🐱🐶 Tierfoto', action: ['postAnimal', 'Jetzt posten (Test)'], note: 'Jede Woche ein zufälliges Tierfoto. „Eigener Sammel-Kanal“ nimmt Fotos aus einem Kanal, in den euer Server Tierbilder postet – mit Nennung, von wem es ist.', fields: [
+      ['posts.animal.enabled', 'toggle', 'Wöchentliches Tierfoto an'],
+      ['posts.animal.channel', 'channel', 'Kanal', TXT],
+      ['posts.animal.weekday', 'select', 'Wochentag', WEEKDAYS],
+      ['posts.animal.time', 'time', 'Uhrzeit (deutsche Zeit)'],
+      ['posts.animal.source', 'select', 'Quelle', { mixed: 'Hunde & Katzen', dogs: 'Hunde', cats: 'Katzen', pool: 'Eigener Sammel-Kanal' }],
+      ['posts.animal.poolChannel', 'channel', 'Sammel-Kanal', [CT.text]],
+      ['posts.animal.text', 'textarea', 'Text über dem Foto'],
+    ] },
+    { title: '🏆 Bestenliste', action: ['postLeaderboard', 'Jetzt posten (Test)'], note: 'Jede Woche die Top 10 als Bild – wie bisher.', fields: [
+      ['posts.leaderboard.enabled', 'toggle', 'Wöchentliche Bestenliste an'],
+      ['posts.leaderboard.channel', 'channel', 'Kanal', TXT],
+      ['posts.leaderboard.weekday', 'select', 'Wochentag', WEEKDAYS],
+      ['posts.leaderboard.time', 'time', 'Uhrzeit (deutsche Zeit)'],
+      ['posts.leaderboard.text', 'textarea', 'Text über der Bestenliste'],
+    ] },
+  ] },
   { id: 'extras', label: 'Extras', cards: [
     { title: 'Auto-Antworten', fields: [['autoresponders', 'autoresponders', 'Auto-Antworten']] },
     { title: 'Statistik-Kanäle', action: ['setupStats', 'Statistik-Kanäle anlegen'], fields: [['stats.enabled', 'toggle', 'Mitgliederzahl usw. als Kanalnamen']] },
@@ -586,7 +615,9 @@ function editor(f) {
     case 'textarea':
       return wrap(h('textarea', { class: 'inp', oninput: e => queueSave(path, e.target.value, 900) }, val || ''), true);
     case 'select':
-      return wrap(h('select', { class: 'inp', onchange: e => queueSave(path, e.target.value, 0) }, Object.entries(opt).map(([k, v]) => h('option', { value: k, selected: k === val ? true : null }, v))), true);
+      return wrap(h('select', { class: 'inp', onchange: e => queueSave(path, typeof val === 'number' ? Number(e.target.value) : e.target.value, 0) }, Object.entries(opt).map(([k, v]) => h('option', { value: k, selected: String(k) === String(val) ? true : null }, v))), true);
+    case 'time':
+      return wrap(h('input', { class: 'inp time', type: 'time', value: val || '', onchange: e => e.target.value && queueSave(path, e.target.value, 0) }));
     case 'channel':
       return wrap(selectEl(channelOptions(opt), val, v => queueSave(path, v, 0)), true);
     case 'role':
@@ -729,6 +760,7 @@ function render() {
   if (S.demo) app.append(h('p', { class: 'banner' }, 'Vorschau mit Beispieldaten – Änderungen werden hier nicht gespeichert. Das echte Dashboard läuft auf der Adresse deines Bots.'));
   if (!S.me) return app.append(loginView());
   if (!S.g) return app.append(pickerView());
+  for (const w of S.g.warnings || []) app.append(h('p', { class: 'banner alert' }, `⚠️ ${w}`));
   const nav = h('nav', { class: 'side', 'aria-label': 'Bereiche' }, SECTIONS.map((s, i) =>
     h('button', { class: s.id === S.section ? 'on' : null, onclick: () => { S.section = s.id; try { localStorage.setItem('dash.section', s.id); } catch { /* egal */ } render(); window.scrollTo({ top: 0 }); } },
       h('span', { class: 'n' }, String(i + 1).padStart(2, '0')), s.label)));
@@ -741,14 +773,32 @@ function render() {
 
 function loginView() {
   const err = new URLSearchParams(location.search).get('fehler');
-  return h('div', {},
+  const { discord, password } = S.methods;
+  const msg = h('p', { class: 'pw-msg', role: 'alert' }, err ? 'Die Anmeldung hat nicht geklappt. Bitte nochmal versuchen.' : '');
+  const pwForm = password ? h('form', { class: 'pw-form', onsubmit: async e => {
+    e.preventDefault();
+    const input = e.target.elements.pw, btn = e.target.querySelector('button');
+    if (!input.value) return input.focus();
+    btn.disabled = true; msg.textContent = '';
+    try {
+      const r = await fetch('/login/password', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-requested-with': 'dashboard' }, body: JSON.stringify({ password: input.value }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Anmeldung fehlgeschlagen');
+      location.replace('/' + location.search.replace(/[?&]fehler=[^&]*/, ''));
+    } catch (ex) { msg.textContent = ex.message; input.value = ''; input.focus(); btn.disabled = false; }
+  } },
+    h('label', { class: 'sr', for: 'pw' }, 'Passwort'),
+    h('input', { class: 'inp', id: 'pw', name: 'pw', type: 'password', autocomplete: 'current-password', placeholder: 'Passwort', required: true }),
+    h('button', { class: 'btn big', type: 'submit' }, 'Anmelden')) : null;
+  return h('div', { class: 'login-wrap' },
     h('div', { class: 'standby' }, clockEl(), calendarEl()),
     h('div', { class: 'login-cta' },
-      err ? h('p', { style: 'color:var(--amber)' }, 'Die Anmeldung hat nicht geklappt. Bitte nochmal versuchen.') : null,
       h('img', { class: 'logo', src: 'etc-bot-256.png', alt: 'ETC. Bot' }),
       h('h1', {}, 'ETC. Bot'),
-      h('p', {}, 'Melde dich mit Discord an, um die Server einzustellen, auf denen du „Server verwalten“ darfst.'),
-      h('a', { class: 'btn big', href: '/login' }, 'Mit Discord anmelden')));
+      h('p', {}, password ? 'Gib das Dashboard-Passwort ein.' : 'Melde dich mit Discord an, um die Server einzustellen, auf denen du „Server verwalten“ darfst.'),
+      pwForm, msg,
+      discord ? h('a', { class: password ? 'btn ghost' : 'btn big', href: '/login' }, password ? 'Stattdessen mit Discord anmelden' : 'Mit Discord anmelden') : null,
+      !discord && !password ? h('p', { style: 'color:var(--amber)' }, 'Noch kein Login eingerichtet: Beim Hoster DASHBOARD_PASSWORD eintragen (siehe README).') : null));
 }
 
 function pickerView() {
@@ -756,7 +806,9 @@ function pickerView() {
     S.me.guilds.length ? h('div', { class: 'servers' }, S.me.guilds.map(g => g.botPresent
       ? h('button', { class: 'server', onclick: () => openGuild(g.id) }, h('div', { class: 'ic' }, g.iconUrl ? h('img', { src: g.iconUrl, alt: '' }) : g.name.slice(0, 1)), h('div', { class: 'nm' }, g.name), h('div', { class: 'sub' }, 'Einstellen'))
       : h('a', { class: 'server missing', href: g.invite, target: '_blank', rel: 'noopener' }, h('div', { class: 'ic' }, g.iconUrl ? h('img', { src: g.iconUrl, alt: '' }) : g.name.slice(0, 1)), h('div', { class: 'nm' }, g.name), h('div', { class: 'sub' }, 'Bot einladen'))))
-      : h('p', { class: 'empty' }, 'Du verwaltest keinen Server.'));
+      : S.me.user.password
+        ? h('div', {}, h('p', { class: 'empty' }, 'Der Bot ist noch auf keinem Server.'), h('a', { class: 'btn', href: S.me.invite, target: '_blank', rel: 'noopener' }, 'Bot einladen'))
+        : h('p', { class: 'empty' }, 'Du verwaltest keinen Server.'));
 }
 
 async function openGuild(id) {
@@ -812,7 +864,7 @@ function demoData() {
       lockdown: { active: false, since: 0, until: 0, reason: '' },
       tempvoice: { enabled: true, panelInChat: true, hubs: [{ id: byName('➕ Kanal erstellen'), category: vc.id, nameTemplate: '🔊 {name}', limit: 0 }, { id: byName('➕ Gaming-Kanal'), category: vc.id, nameTemplate: '🎮 {name}s Runde', limit: 5 }] },
       tickets: { enabled: true, supportRoles: ['501'], logChannel: byName('mod-log'), maxOpen: 1 },
-      levels: { enabled: true, channel: null, message: 'GG {user}, du bist jetzt **Level {level}**! 🎉', multiplier: 1, stackRewards: true, rewards: { 10: '505', 25: '504' }, noXpChannels: [], noXpRoles: [],
+      levels: { enabled: true, channel: null, message: 'GG {user}, du bist jetzt **Level {level}**! 🎉', style: 'embed', formula: 'etc', multiplier: 1, stackRewards: true, rewards: { 10: '505', 25: '504' }, noXpChannels: [], noXpRoles: [],
         voice: { enabled: true, perMinute: 8, minMembers: 2 },
         clips: { enabled: true, channels: [byName('clips')], xp: 40, cooldownMinutes: 5, likeEmoji: '🔥', likeXp: 5, maxLikeXp: 100, hallOfFame: byName('hall-of-fame'), hallThreshold: 5 } },
       quests: { enabled: true, perDay: 3, rewardMultiplier: 1, announce: true },
@@ -820,6 +872,10 @@ function demoData() {
       music: { enabled: true, djRole: '502', defaultVolume: 80, maxQueue: 200, leaveMinutes: 3, channel: byName('musik') },
       autoresponders: [{ trigger: 'ip', response: 'Unsere Server-IP: play.meinserver.de', match: 'contains', reply: true }],
       stats: { enabled: false }, suggestions: { channel: null },
+      posts: {
+        animal: { enabled: true, channel: byName('allgemein'), weekday: 0, time: '18:00', source: 'mixed', poolChannel: null, text: '🐱🐶 **Hier ist dein wöchentliches Tierfoto!**' },
+        leaderboard: { enabled: true, channel: byName('allgemein'), weekday: 0, time: '12:00', text: '🏆 **Die aktuelle Bestenliste!** Wer schreibt sich diese Runde nach oben?' },
+      },
     },
   };
 }
@@ -844,13 +900,19 @@ async function demoApi(path, opts) {
 (async function boot() {
   try {
     S.me = await api('/me');
+    const wanted = new URLSearchParams(location.search).get('guildId');
+    if (wanted && S.me.guilds.some(g => g.id === wanted && g.botPresent)) return openGuild(wanted);
     let last = null;
     try { last = localStorage.getItem('dash.guild'); } catch { /* egal */ }
     if (last && S.me.guilds.some(g => g.id === last && g.botPresent)) return openGuild(last);
     if (S.me.guilds.filter(g => g.botPresent).length === 1) return openGuild(S.me.guilds.find(g => g.botPresent).id);
     render();
   } catch (e) {
-    if (e.status === 401) { S.me = null; return render(); }
+    if (e.status === 401) {
+      S.me = null;
+      try { S.methods = await (await fetch('/auth/methods')).json(); } catch { /* Standard behalten */ }
+      return render();
+    }
     S.demo = true;
     S.me = await api('/me');
     S.g = await api('/guild/1');

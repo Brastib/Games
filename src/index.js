@@ -6,7 +6,7 @@
 try { process.loadEnvFile(); } catch { /* keine .env-Datei – Variablen kommen vom Hoster */ }
 
 const crypto = require('crypto');
-const { Client, Events, GatewayIntentBits: I, Partials, ActivityType } = require('discord.js');
+const { Client, Events, GatewayIntentBits: I, IntentsBitField, Partials, ActivityType, Routes } = require('discord.js');
 const store = require('./lib/store');
 const lf = require('./lib/linkFilter');
 const { onInteraction, commands } = require('./handlers/interactions');
@@ -37,6 +37,31 @@ const client = new Client({
 const safe = (name, fn) => async (...args) => {
   try { await fn(...args); } catch (e) { console.error(`[${name}]`, e); }
 };
+
+// ---------- Privilegierte Intents prüfen ----------
+// Sind sie im Developer Portal aus, lehnt Discord den Login ab (Code 4014) und der Bot startet beim Hoster endlos neu.
+// Stattdessen läuft er ohne sie weiter und meldet laut, was dann nicht geht.
+const PRIVILEGED = [
+  { intent: I.GuildMembers, flags: (1 << 14) | (1 << 15), name: 'SERVER MEMBERS INTENT', loses: 'Willkommen, Verifizierung beim Beitritt, Anti-Raid, Beitritts-Logs, Mitglieder-Statistik' },
+  { intent: I.MessageContent, flags: (1 << 18) | (1 << 19), name: 'MESSAGE CONTENT INTENT', loses: 'Linkschutz, AutoMod, Auto-Antworten, Clip-XP (Anhänge)' },
+];
+client.limitedIntents = [];
+async function checkIntents() {
+  client.rest.setToken(process.env.DISCORD_TOKEN);
+  const app = await client.rest.get(Routes.currentApplication()).catch(() => null);
+  if (!app) return; // Prüfung nicht möglich – normaler Login entscheidet
+  const missing = PRIVILEGED.filter(p => !(app.flags & p.flags));
+  if (!missing.length) return;
+  client.limitedIntents = missing.map(p => ({ name: p.name, loses: p.loses }));
+  client.options.intents = new IntentsBitField(client.options.intents.bitfield & ~missing.reduce((a, p) => a | p.intent, 0)).freeze();
+  console.warn([
+    '',
+    '⚠️  Eingeschränkter Modus: Im Developer Portal → „Bot“ → „Privileged Gateway Intents“ ist ausgeschaltet:',
+    ...missing.map(p => `   • ${p.name} – ohne funktioniert nicht: ${p.loses}`),
+    '   Einschalten, speichern, Bot neu starten.',
+    '',
+  ].join('\n'));
+}
 
 // ---------- Befehle bei Discord anmelden (nur wenn sie sich geändert haben) ----------
 async function registerCommands() {
@@ -104,7 +129,7 @@ client.once(Events.ClientReady, safe('ready', async c => {
   setInterval(() => extras.updateStats(c).catch(() => {}), 10 * 60_000).unref();
   setInterval(() => clips.cleanup(), 12 * 3_600_000).unref();
   // Mitgliederlisten laden (für Statistik, Bestenlisten, Schutz)
-  for (const g of c.guilds.cache.values()) await g.members.fetch().catch(() => {});
+  if (c.options.intents.has(I.GuildMembers)) for (const g of c.guilds.cache.values()) await g.members.fetch().catch(() => {});
   extras.updateStats(c).catch(() => {});
   const invite = `https://discord.com/oauth2/authorize?client_id=${c.user.id}&permissions=8&scope=bot%20applications.commands`;
   console.log(`[bot] Einladungslink: ${invite}`);
@@ -209,6 +234,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
     console.error('\n❌ Datenbank-Verbindung fehlgeschlagen:', e.message, '\nPrüfe MONGODB_URI und ob in MongoDB Atlas unter „Network Access“ 0.0.0.0/0 erlaubt ist.\n');
     process.exit(1);
   }
+  await checkIntents();
   try {
     await client.login(process.env.DISCORD_TOKEN);
   } catch (e) {

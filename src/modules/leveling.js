@@ -6,7 +6,7 @@
  *  - Formel 'mee6': pro Level 5·L² + 50·L + 100 XP.
  * XP: 15–25 pro Nachricht (höchstens einmal pro Minute), Sprachzeit, Clips, Quests.
  */
-const { AttachmentBuilder, EmbedBuilder } = require('discord.js');
+const { AttachmentBuilder, EmbedBuilder, GatewayIntentBits } = require('discord.js');
 const store = require('../lib/store');
 const { getConfig } = require('../lib/config');
 const { COLORS } = require('../lib/embeds');
@@ -209,13 +209,14 @@ function parseImport(text) {
     else for (const [k, v] of Object.entries(d)) push(k, typeof v === 'object' ? (v.xp ?? v.totalXp) : v, typeof v === 'object' ? v.level : null);
     return rows;
   }
+  let levelColumn = false; // Kopfzeile „Name;Level“ → alle Zahlen darunter sind Level, keine XP
   for (const line of trimmed.split(/\r?\n/)) {
     if (!line.trim()) continue;
     const parts = line.split(/[;,\t|]/).map(x => x.trim()).filter(Boolean);
     if (parts.length < 2) continue;
-    if (/^(id|user|name|nutzer|mitglied)/i.test(parts[0]) && /xp|level|punkte/i.test(parts[1])) continue; // Kopfzeile
+    if (/^(id|user|name|nutzer|mitglied)/i.test(parts[0]) && /xp|level|punkte/i.test(parts[1])) { levelColumn = /level/i.test(parts[1]) && !/xp/i.test(parts[1]); continue; }
     const val = parts[1];
-    if (/level/i.test(line) && !/xp/i.test(line)) push(parts[0], null, parseInt(val, 10));
+    if (levelColumn || (/level/i.test(line) && !/xp/i.test(line))) push(parts[0], null, parseInt(val.replace(/\D/g, ''), 10));
     else push(parts[0], val, parts[2] && /^\d+$/.test(parts[2]) ? parts[2] : null);
   }
   return rows;
@@ -223,7 +224,7 @@ function parseImport(text) {
 
 async function importXp(guild, text, { mode = 'set' } = {}) {
   const rows = parseImport(text);
-  await guild.members.fetch().catch(() => {});
+  if (guild.client.options.intents.has(GatewayIntentBits.GuildMembers)) await guild.members.fetch().catch(() => {});
   const byName = new Map();
   for (const m of guild.members.cache.values()) {
     for (const n of [m.user.username, m.user.globalName, m.displayName, m.nickname]) if (n) byName.set(n.toLowerCase(), m.id);

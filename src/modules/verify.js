@@ -30,7 +30,7 @@ function rulesMessage(cfg) {
     embeds: [new EmbedBuilder().setColor(COLORS.brand).setTitle(`📜 ${cfg.verify.title || 'Regeln'}`).setDescription(cfg.verify.text || DEFAULT_RULES)
       .setFooter({ text: 'Mit dem Klick auf den Button akzeptierst du die Regeln.' })],
     components: [new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('vr:accept').setLabel('Regeln akzeptieren').setEmoji('✅').setStyle(ButtonStyle.Success))],
+      new ButtonBuilder().setCustomId('vr:accept').setLabel('Regeln akzeptieren').setEmoji('✅').setStyle(ButtonStyle.Danger))],
   };
 }
 

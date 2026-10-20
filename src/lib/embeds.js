@@ -1,14 +1,16 @@
 'use strict';
 const { EmbedBuilder, MessageFlags } = require('discord.js');
 
+// Rot-Schwarz wie die StandBy-Uhr: Rot ist der Akzent, Abstufungen statt Grün/Blau/Gelb
+const BRAND = parseInt((process.env.BRAND_COLOR || 'fd0000').replace('#', ''), 16) || 0xfd0000;
 const COLORS = {
-  brand: parseInt((process.env.BRAND_COLOR || 'fd0000').replace('#', ''), 16) || 0xfd0000,
-  ok: 0x2ecc71,
-  warn: 0xf1c40f,
-  err: 0xe74c3c,
-  info: 0x5865f2,
-  mod: 0xe67e22,
-  protect: 0xc0392b,
+  brand: BRAND,
+  ok: BRAND,
+  info: BRAND,
+  warn: 0xff9230, // oranger Punkt
+  err: 0x8c0000, // gedimmtes Rot
+  mod: 0xa80000, // Sekundenzeiger
+  protect: 0xf40000, // Zeiger
 };
 
 const make = (color, text, title) => {

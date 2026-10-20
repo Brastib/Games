@@ -4,7 +4,8 @@
 
 Ein deutscher All-in-One-Bot für Discord-Server: Moderation, Server-Schutz (Lockdown, Linkschutz, Anti-Raid, Anti-Nuke),
 temporäre Sprachkanäle mit Bedienfeld im Kanal-Chat, Musik und Soundboard, tägliche Quests, Level mit XP für Clips und Sprachzeit,
-Münzen und Rollen-Shop, Tickets, Willkommen mit Bildkarte, Regeln akzeptieren, Gewinnspiele und ein **Web-Dashboard im Rot-Schwarz-StandBy-Look**.
+Münzen und Rollen-Shop, Tickets, Willkommen mit Bildkarte, Regeln akzeptieren, Gewinnspiele, wöchentliches Tierfoto und Bestenliste
+und ein **Web-Dashboard im Rot-Schwarz-StandBy-Look**. Auch in Discord ist alles Rot-Schwarz: rote Embeds, rote und graue Buttons.
 Vorbilder waren Carl-bot und MEE6, aber alles ist kostenlos und gehört dir.
 
 ---
@@ -13,7 +14,7 @@ Vorbilder waren Carl-bot und MEE6, aber alles ist kostenlos und gehört dir.
 
 | Bereich | Funktionen |
 |---|---|
-| 🌐 **Web-Dashboard** | Login mit Discord, Server auswählen, **alles** einstellen: Schutz, Hubs für Temp-Kanäle, Level-Belohnungen, Shop, Auto-Antworten, Logs … Startseite mit Uhr und Kalender wie die iPhone-StandBy-Anzeige, großer Lockdown-Knopf. Jede Änderung speichert sofort. |
+| 🌐 **Web-Dashboard** | Login mit **Passwort** (`DASHBOARD_PASSWORD`, Sperre nach 5 Fehlversuchen) und/oder mit Discord, Server auswählen, **alles** einstellen: Schutz, Hubs für Temp-Kanäle, Level-Belohnungen, Shop, Auto-Antworten, Logs … Startseite mit Uhr und Kalender wie die iPhone-StandBy-Anzeige, großer Lockdown-Knopf. Jede Änderung speichert sofort. |
 | 🔒 **Lockdown** | `/lockdown start` (oder Knopf im Dashboard) sperrt alle öffentlichen Kanäle (Text + Sprache), pausiert Einladungen, auf Wunsch auf Zeit. `/lockdown end` stellt **jede** Berechtigung exakt wieder her – auch nach einem Neustart. |
 | 🔗 **Linkschutz** | GIFs (Tenor, Giphy, Klipy), hochgeladene Dateien, YouTube, Twitch, Discord-Links usw. funktionieren. Blockiert werden rund **39.000 bekannte Betrugs-Domains** (öffentliche Listen, alle 6 Std. aktualisiert), gefälschte Discord-/Steam-Seiten, IP-Logger, Kurz-Links, IP-Adressen, Punycode-Fälschungen. Modus **Smart** oder **Streng**. Optional Google Safe Browsing. |
 | 🤖 **AutoMod** | Spam, fremde Einladungen, Massen-Erwähnungen, GROSSBUCHSTABEN, Wortfilter. Automatische Strafen ab 3/5/7 Verwarnungen. |
@@ -24,10 +25,11 @@ Vorbilder waren Carl-bot und MEE6, aber alles ist kostenlos und gehört dir.
 | 🔈 **Sounds** | `/sound play` spielt Discord-Soundboard-Sounds (Standard + eigene) im Sprachkanal, `/sound add` lädt eigene Sounds hoch. |
 | 📺 **YouTube schauen** | `/watch` startet die Discord-Aktivität **Watch Together** im Sprachkanal: Alle schauen das YouTube-Video synchron. |
 | 🗓️ **Tages-Quests** | Jeden Tag eigene Aufgaben pro Person (Nachrichten, Sprachzeit, Clips posten, 🔥 sammeln, Songs abspielen, Antworten, Reaktionen …). Belohnung XP + Münzen, Bonus für alle geschafft, **Serie** (Streak). `/quests` |
-| ⭐ **Level & Clips** | XP für Nachrichten, **Zeit im Sprachkanal** und **Clips** im Clip-Kanal (Videos, Medal, Twitch-Clips, Shorts …). 🔥-Likes geben dem Ersteller XP, die besten Clips landen in der **Hall of Fame**. Rang-Bildkarte, Bestenliste (XP, Münzen, Sprachzeit, Clips), Rollen-Belohnungen. |
+| ⭐ **Level & Clips** | XP für Nachrichten, **Zeit im Sprachkanal** und **Clips** im Clip-Kanal (Videos, Medal, Twitch-Clips, Shorts …). 🔥-Likes geben dem Ersteller XP, die besten Clips landen in der **Hall of Fame**. Level-Formel **ETC.** wie beim alten Bot (Level L ab 100 × L² XP) oder **MEE6**. Level-Up als Embed mit Profilbild und „XP für nächstes Level“. Rang-Bildkarte, Bestenliste **als Bild** (oder Liste nach XP, Münzen, Sprachzeit, Clips), Rollen-Belohnungen. **XP-Übernahme** vom alten Bot: `/level import` mit CSV- oder JSON-Datei. |
 | 🪙 **Münzen** | `/daily` mit Serie, `/balance`, `/pay`, **Rollen-Shop** (`/shop`). |
 | 👋 **Willkommen & Regeln** | Willkommen mit Bildkarte, Abschied, Auto-Rollen, Regeln mit „Akzeptieren“-Button + Captcha. |
 | 🎫 **Tickets** | Button → privater Kanal, Übernehmen, Schließen mit Protokoll-Datei. |
+| 📅 **Wochen-Posts** | Jede Woche automatisch ein **Tierfoto** (Hunde, Katzen oder aus eurem eigenen Sammel-Kanal mit Nennung) und die **Bestenliste als Bild** – Kanal, Wochentag, Uhrzeit und Text im Dashboard oder mit `/autopost`. |
 | 🎉 **Extras** | Gewinnspiele, Umfragen, Vorschläge mit Abstimmung (`/suggest`), Erinnerungen (`/remind`), Auto-Antworten, Statistik-Kanäle (Mitgliederzahl), Embed-Baukasten, Rollen per Button. |
 
 ---
@@ -52,10 +54,10 @@ Du brauchst 4 kostenlose Konten: **Discord Developer Portal**, **GitHub** (hast 
 2. Links **Bot**:
    - **Reset Token** → Token kopieren und sicher notieren (*wie ein Passwort – niemals teilen!*).
    - **SERVER MEMBERS INTENT** und **MESSAGE CONTENT INTENT** einschalten → **Save Changes**.
+     (Ohne die beiden startet der Bot trotzdem, aber Linkschutz, AutoMod, Willkommen und Anti-Raid funktionieren dann nicht. Das steht dann rot im Log und im Dashboard.)
 3. Links **OAuth2**:
    - **Client ID** kopieren.
-   - **Client Secret** → **Reset Secret** → kopieren (für das Web-Dashboard).
-   - Bei **Redirects** eintragen: `https://DEINE-ADRESSE.onrender.com/callback` (die Adresse bekommst du in Schritt 3 – danach hier nachtragen).
+   - *Nur falls du zusätzlich „Mit Discord anmelden“ willst:* **Client Secret** → **Reset Secret** → kopieren und bei **Redirects** `https://DEINE-ADRESSE.onrender.com/callback` eintragen (die Adresse bekommst du in Schritt 3).
 4. Bot einladen (ersetze `DEINE_CLIENT_ID`):
    `https://discord.com/oauth2/authorize?client_id=DEINE_CLIENT_ID&permissions=8&scope=bot%20applications.commands`
 
@@ -70,10 +72,11 @@ Du brauchst 4 kostenlose Konten: **Discord Developer Portal**, **GitHub** (hast 
 2. Render fragt nach:
    - `DISCORD_TOKEN` → Token aus Schritt 1
    - `MONGODB_URI` → Link aus Schritt 2
-   - `DISCORD_CLIENT_SECRET` → Client Secret aus Schritt 1
+   - `DASHBOARD_PASSWORD` → dein Dashboard-Passwort
+   - `DISCORD_CLIENT_SECRET` → optional, Client Secret aus Schritt 1 (sonst leer lassen)
 3. **Apply**. Nach 2–4 Minuten steht im Log `Eingeloggt als …`.
-4. Deine Adresse (z. B. `https://etc-bot-xxxx.onrender.com`) in Schritt 1 bei **Redirects** als `…/callback` eintragen.
-5. Adresse öffnen → **Mit Discord anmelden** → Dashboard. 🎉
+4. Adresse (z. B. `https://etc-bot-xxxx.onrender.com`) öffnen → Passwort eingeben → Dashboard. 🎉
+   Alte Links wie `…/dashboard/?guildId=123` öffnen direkt den richtigen Server.
 
 ### Name und Profilbild
 Beim **ersten Start** setzt der Bot das Icon aus `assets/icon/etc-bot-512.png` als Profilbild – aber nur, wenn noch keins da ist. Den Namen lässt er so, wie er im Developer Portal steht (nur mit `BOT_NAME` wird er geändert, mit `SKIP_BRANDING=1` passiert gar nichts).
@@ -108,11 +111,14 @@ sudo npm i -g pm2 && pm2 start src/index.js --name discord-bot && pm2 save && pm
 |---|---|---|
 | `DISCORD_TOKEN` | ja | Bot-Token |
 | `MONGODB_URI` | bei Render ja | Datenbank; ohne wird in `./data` gespeichert |
-| `DISCORD_CLIENT_SECRET` | für Dashboard | OAuth2-Secret für den Discord-Login |
+| `DASHBOARD_PASSWORD` | für Dashboard | Passwort fürs Web-Dashboard. Gibt Zugriff auf alle Server des Bots. 5 Fehlversuche → IP 15 Min. gesperrt, 20 insgesamt → Passwort-Login 15 Min. gesperrt. Ein längeres Passwort ist sicherer als 6 Ziffern. |
+| `DISCORD_CLIENT_SECRET` | nein | Zusätzlicher Login mit Discord (jeder sieht dann nur Server, auf denen er „Server verwalten“ darf) |
 | `DASHBOARD_URL` | nein | Öffentliche Adresse (bei Render automatisch) |
 | `YTDLP_COOKIES` | nein | Falls YouTube blockiert: `cookies.txt` aus dem Browser (Erweiterung „Get cookies.txt“), **Base64-kodiert**. Am besten einen Zweit-Account nehmen. |
 | `SAFE_BROWSING_KEY` | nein | Google Safe Browsing für unbekannte Links |
 | `BRAND_COLOR` | nein | Embed-Farbe, Standard `fd0000` (StandBy-Rot) |
+| `SKIP_BRANDING` | nein | `1` = Profilbild und Namen nie automatisch setzen |
+| `TRUST_PROXY` | nein | `1`, wenn der Bot hinter einem Proxy läuft (bei Render automatisch) – nötig für die Login-Sperre pro IP |
 | `DEV_GUILD_ID` | nein | Befehle nur auf diesem Server registrieren |
 | `KEEPALIVE_URL` | nein | Adresse für den Selbst-Ping (bei Render automatisch) |
 
@@ -120,12 +126,13 @@ sudo npm i -g pm2 && pm2 start src/index.js --name discord-bot && pm2 save && pm
 
 ```bash
 npm install
-npm run check   # 35 Selbsttests ohne Discord: Befehle, Linkschutz, Lockdown, Temp-Voice, AutoMod,
-                # Quests, Münzen, Clips, Dashboard-API und Eingabeprüfung, Audio-Kette (ffmpeg → Opus), Bildkarten
+npm run check   # 45 Selbsttests ohne Discord: Befehle, Linkschutz, Lockdown, Temp-Voice, AutoMod, Level-Formeln, XP-Import,
+                # Quests, Münzen, Clips, Dashboard-API, Passwort-Login + Sperre, Eingabeprüfung, Audio-Kette (ffmpeg → Opus),
+                # Bildkarten, Wochen-Posts (Zeitplan inkl. Sommer-/Winterzeit), Rot-Schwarz-Farben
 npm start
 ```
 
-**Aufbau:** `src/index.js` (Start, Ereignisse, Zeitplaner) · `src/commands/` (62 Slash-Befehle) · `src/modules/` (Funktionen, `music/` für den Player) · `src/web/` (Dashboard: `server.js`, `schema.js` = erlaubte Einstellungen, `public/index.html` = Oberfläche) · `src/lib/` (Speicher, Linkfilter, Bildkarten) · `scripts/selftest.js`
+**Aufbau:** `src/index.js` (Start, Ereignisse, Zeitplaner) · `src/commands/` (63 Slash-Befehle) · `src/modules/` (Funktionen, `music/` für den Player) · `src/web/` (Dashboard: `server.js`, `schema.js` = erlaubte Einstellungen, `public/index.html` = Oberfläche) · `src/lib/` (Speicher, Linkfilter, Bildkarten) · `scripts/selftest.js`
 
 Musik: yt-dlp wird beim ersten `/play` automatisch nach `./bin` geladen und wöchentlich erneuert; ffmpeg kommt aus `ffmpeg-static`.
 
