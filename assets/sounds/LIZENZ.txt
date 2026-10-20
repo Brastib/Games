@@ -1,3 +1,4 @@
-lockdown.ogg – Sirene (mit ffmpeg erzeugt) + Durchsage „Achtung! Achtung! Lockdown aktiv. Bitte verlassen Sie sofort den Voice-Kanal …“
+lockdown.ogg – Luftschutzsirene (synthetisch, scripts/sound/siren.py) + Durchsage
+„Achtung! Achtung! Lockdown aktiv. Bitte verlassen Sie sofort den Voice-Kanal …“
 Stimme erzeugt mit Piper (https://github.com/rhasspy/piper), Stimme de_DE „thorsten“ (Thorsten-Voice, CC0).
-Neu erzeugen: siehe scripts/make-lockdown-sound.md
+Lautstärke: Sirene −28 LUFS, Durchsage −24 LUFS (bewusst leise für Discord).

@@ -820,7 +820,7 @@ async function test(name, fn) {
     assert(fs.statSync(ld.ALARM_SOUND).size > 50_000, 'Tondatei fehlt');
     const { spawnSync } = require('child_process');
     const probe = spawnSync(require('ffmpeg-static'), ['-hide_banner', '-i', ld.ALARM_SOUND, '-f', 'null', '-'], { encoding: 'utf8' }).stderr;
-    assert(/opus/.test(probe) && /Duration: 00:00:1[0-9]/.test(probe), 'Opus, 10–19 Sekunden');
+    assert(/opus/.test(probe) && /Duration: 00:00:[12][0-9]/.test(probe), 'Opus, 10–29 Sekunden');
     const g = fakeGuild();
     g.id = 'g-alarm';
     const posts = [];
