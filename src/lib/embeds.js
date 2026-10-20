@@ -2,7 +2,7 @@
 const { EmbedBuilder, MessageFlags } = require('discord.js');
 
 const COLORS = {
-  brand: parseInt((process.env.BRAND_COLOR || 'ff2d55').replace('#', ''), 16) || 0xff2d55,
+  brand: parseInt((process.env.BRAND_COLOR || 'fd0000').replace('#', ''), 16) || 0xfd0000,
   ok: 0x2ecc71,
   warn: 0xf1c40f,
   err: 0xe74c3c,

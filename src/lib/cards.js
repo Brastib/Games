@@ -19,7 +19,10 @@ try {
 }
 
 const hex = n => '#' + n.toString(16).padStart(6, '0');
-const ACCENT = hex(COLORS.brand);
+// StandBy-Farben (aus dem Nachtmodus der iPhone-Uhr)
+const ACCENT = hex(COLORS.brand);   // #fd0000
+const DIM = '#8c0000';
+const TRACK = '#1f1f1f';
 
 async function loadAvatar(user) {
   try {
@@ -36,29 +39,30 @@ function fitText(ctx, text, maxWidth, size, font) {
   return ctx.font;
 }
 
-function background(ctx, w, h) {
-  const g = ctx.createLinearGradient(0, 0, w, h);
-  g.addColorStop(0, '#16161d');
-  g.addColorStop(1, '#0b0b0f');
-  ctx.fillStyle = g;
+function background(ctx, w, h, { ticks = true } = {}) {
+  ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, w, h);
-  // dezente Kreise als Deko
-  ctx.globalAlpha = 0.12;
-  ctx.fillStyle = ACCENT;
-  ctx.beginPath(); ctx.arc(w - 60, -40, 220, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(w - 220, h + 80, 160, 0, Math.PI * 2); ctx.fill();
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = ACCENT;
-  ctx.fillRect(0, 0, 10, h);
+  if (!ticks) return;
+  // Zifferblatt-Striche als Deko rechts (wie die StandBy-Uhr)
+  const cx = w - 30, cy = h / 2, r = h * 0.62;
+  for (let i = 0; i < 60; i++) {
+    const a = (i / 60) * Math.PI * 2;
+    const big = i % 5 === 0;
+    ctx.strokeStyle = big ? DIM : '#2a0000';
+    ctx.lineWidth = big ? 5 : 3;
+    ctx.lineCap = 'round';
+    const r2 = r - (big ? 26 : 16);
+    ctx.beginPath(); ctx.moveTo(cx + Math.sin(a) * r, cy - Math.cos(a) * r); ctx.lineTo(cx + Math.sin(a) * r2, cy - Math.cos(a) * r2); ctx.stroke();
+  }
 }
 
 function avatarCircle(ctx, img, x, y, r) {
   ctx.save();
-  ctx.beginPath(); ctx.arc(x, y, r + 7, 0, Math.PI * 2); ctx.fillStyle = ACCENT; ctx.fill();
-  ctx.beginPath(); ctx.arc(x, y, r + 2, 0, Math.PI * 2); ctx.fillStyle = '#0b0b0f'; ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, r + 8, 0, Math.PI * 2); ctx.fillStyle = ACCENT; ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, r + 3, 0, Math.PI * 2); ctx.fillStyle = '#000000'; ctx.fill();
   ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip();
   if (img) ctx.drawImage(img, x - r, y - r, r * 2, r * 2);
-  else { ctx.fillStyle = '#2a2a33'; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+  else { ctx.fillStyle = TRACK; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
   ctx.restore();
 }
 
@@ -69,14 +73,14 @@ async function welcomeCard(member, { title = 'WILLKOMMEN', subtitle } = {}) {
   const ctx = canvas.getContext('2d');
   background(ctx, w, h);
   avatarCircle(ctx, await loadAvatar(member.user), 180, h / 2, 110);
-  ctx.fillStyle = ACCENT;
-  ctx.font = '30px "Poppins Bold"';
+  ctx.fillStyle = DIM;
+  ctx.font = '30px "Poppins ExtraBold"';
   ctx.fillText(title, 340, 120);
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = ACCENT;
   const name = member.displayName || member.user.username;
-  ctx.font = fitText(ctx, name, w - 380, 66, 'Poppins ExtraBold');
+  ctx.font = fitText(ctx, name, w - 420, 66, 'Poppins ExtraBold');
   ctx.fillText(name, 336, 195);
-  ctx.fillStyle = '#a3a3b2';
+  ctx.fillStyle = DIM;
   ctx.font = fitText(ctx, subtitle || `Mitglied #${member.guild.memberCount} auf ${member.guild.name}`, w - 380, 28, 'Poppins');
   ctx.fillText(subtitle || `Mitglied #${member.guild.memberCount} auf ${member.guild.name}`, 340, 245);
   return canvas.encode('png');
@@ -87,7 +91,7 @@ async function rankCard(member, { level, xpIn, xpNeed, rank, totalXp }) {
   const w = 934, h = 282;
   const canvas = C.createCanvas(w, h);
   const ctx = canvas.getContext('2d');
-  background(ctx, w, h);
+  background(ctx, w, h, { ticks: false });
   avatarCircle(ctx, await loadAvatar(member.user), 140, h / 2, 90);
   // Rang & Level rechts, von rechts nach links: [RANG #3]  [LEVEL 12]
   const baseY = 120;
@@ -100,23 +104,23 @@ async function rankCard(member, { level, xpIn, xpNeed, rank, totalXp }) {
     x -= tw + gap;
   };
   part(String(level), '56px "Poppins ExtraBold"', ACCENT, 10);
-  part('LEVEL', '22px "Poppins Bold"', '#a3a3b2', 34);
-  part(`#${rank}`, '56px "Poppins ExtraBold"', '#ffffff', 10);
-  part('RANG', '22px "Poppins Bold"', '#a3a3b2', 0);
+  part('LEVEL', '22px "Poppins ExtraBold"', DIM, 34);
+  part(`#${rank}`, '56px "Poppins ExtraBold"', ACCENT, 10);
+  part('RANG', '22px "Poppins ExtraBold"', DIM, 0);
   // Name links, so breit wie Platz ist
   const name = member.displayName || member.user.username;
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = ACCENT;
   ctx.font = fitText(ctx, name, Math.max(120, x - 270 - 24), 44, 'Poppins ExtraBold');
   ctx.fillText(name, 270, baseY);
   // Fortschrittsbalken
   const bx = 270, by = 170, bw = w - bx - 40, bh = 36;
-  ctx.fillStyle = '#2a2a33';
+  ctx.fillStyle = TRACK;
   roundRect(ctx, bx, by, bw, bh, bh / 2); ctx.fill();
   const p = Math.max(0.02, Math.min(1, xpIn / xpNeed));
   ctx.fillStyle = ACCENT;
   roundRect(ctx, bx, by, bw * p, bh, bh / 2); ctx.fill();
-  ctx.fillStyle = '#a3a3b2';
-  ctx.font = '22px "Poppins"';
+  ctx.fillStyle = DIM;
+  ctx.font = '22px "Poppins Bold"';
   ctx.fillText(`${fmt(xpIn)} / ${fmt(xpNeed)} XP`, bx, by + bh + 34);
   ctx.textAlign = 'right';
   ctx.fillText(`Gesamt: ${fmt(totalXp)} XP`, w - 40, by + bh + 34);

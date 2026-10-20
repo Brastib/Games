@@ -105,7 +105,7 @@ sudo npm i -g pm2 && pm2 start src/index.js --name discord-bot && pm2 save && pm
 | `DASHBOARD_URL` | nein | Öffentliche Adresse (bei Render automatisch) |
 | `YTDLP_COOKIES` | nein | Falls YouTube blockiert: `cookies.txt` aus dem Browser (Erweiterung „Get cookies.txt“), **Base64-kodiert**. Am besten einen Zweit-Account nehmen. |
 | `SAFE_BROWSING_KEY` | nein | Google Safe Browsing für unbekannte Links |
-| `BRAND_COLOR` | nein | Embed-Farbe, z. B. `ff2d55` |
+| `BRAND_COLOR` | nein | Embed-Farbe, Standard `fd0000` (StandBy-Rot) |
 | `DEV_GUILD_ID` | nein | Befehle nur auf diesem Server registrieren |
 | `KEEPALIVE_URL` | nein | Adresse für den Selbst-Ping (bei Render automatisch) |
 
