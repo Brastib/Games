@@ -60,11 +60,12 @@ async function registerCommands() {
 // ---------- Name und Profilbild einmalig setzen (danach im Developer Portal frei änderbar) ----------
 async function applyBranding(c) {
   if (store.get('meta', 'branding') === 1 || process.env.SKIP_BRANDING) return;
-  const name = process.env.BOT_NAME || 'ETC. Bot';
-  if (c.user.username !== name) await c.user.setUsername(name);
+  // Namen nur ändern, wenn BOT_NAME ausdrücklich gesetzt ist – sonst bleibt der Name aus dem Developer Portal
+  const name = process.env.BOT_NAME;
+  if (name && c.user.username !== name) await c.user.setUsername(name);
   if (!c.user.avatar) await c.user.setAvatar(require('path').join(__dirname, '..', 'assets', 'icon', 'etc-bot-512.png'));
   store.set('meta', 'branding', 1);
-  console.log(`[bot] Name „${name}“ und Profilbild gesetzt.`);
+  console.log('[bot] Profilbild/Name geprüft.');
 }
 
 // ---------- Zeitplaner: Zeit-Banns, Temp-Kanäle, Gewinnspiele, Lockdown-Ende ----------

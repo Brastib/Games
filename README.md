@@ -76,7 +76,7 @@ Du brauchst 4 kostenlose Konten: **Discord Developer Portal**, **GitHub** (hast 
 5. Adresse öffnen → **Mit Discord anmelden** → Dashboard. 🎉
 
 ### Name und Profilbild
-Beim **ersten Start** nennt sich der Bot automatisch **„ETC. Bot“** und setzt das Icon aus `assets/icon/etc-bot-512.png` als Profilbild (nur einmal – danach kannst du beides im Developer Portal frei ändern; mit `SKIP_BRANDING=1` ganz abschalten, mit `BOT_NAME` einen anderen Namen wählen).
+Beim **ersten Start** setzt der Bot das Icon aus `assets/icon/etc-bot-512.png` als Profilbild – aber nur, wenn noch keins da ist. Den Namen lässt er so, wie er im Developer Portal steht (nur mit `BOT_NAME` wird er geändert, mit `SKIP_BRANDING=1` passiert gar nichts).
 Für die App-Seite im Developer Portal: **General Information → App Icon** → `assets/icon/etc-bot.png` hochladen.
 Das Icon wird mit `python3 scripts/make-icon.py assets/icon/collage-original.webp assets/icon` aus der Spiele-Collage erzeugt.
 
