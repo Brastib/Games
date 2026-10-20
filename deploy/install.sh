@@ -107,4 +107,7 @@ else
   echo "cloudflared ist nicht installiert – Dashboard nur im Heimnetz: http://$(hostname -I | awk '{print $1}'):$PORT"
 fi
 
+say "Auto-Update einrichten (neue Versionen kommen automatisch)"
+bash "$DIR/deploy/autoupdate-install.sh"
+
 say "Fertig! Log ansehen: journalctl -u etc-bot -f   ·   Update: bash $DIR/deploy/update.sh"
