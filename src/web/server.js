@@ -306,6 +306,8 @@ function start(client) {
     }
   });
 
+  require('./members').mount(api, { client, access });
+
   app.use('/api', api);
 
   // ---------- Oberfläche ----------

@@ -359,6 +359,7 @@ async function test(name, fn) {
   });
 
   console.log('\n🌐 Web-Server (Dashboard-API)');
+  let webGuild;
   await test('Statusseite, Login-Schutz, Einstellungen speichern', async () => {
     process.env.PORT = '3987';
     process.env.DISCORD_CLIENT_SECRET = 'test';
@@ -368,7 +369,9 @@ async function test(name, fn) {
     };
     for (const c of guild.channels.cache.values()) Object.assign(c, { name: 'k' + c.id, parentId: null, rawPosition: 0, isThread: () => false });
     for (const r of guild.roles.cache.values()) Object.assign(r, { name: 'r', position: 1, managed: false, editable: true, color: 0 });
-    const client = { isReady: () => true, user: { id: 'bot', tag: 'Bot#1' }, application: { id: 'bot' }, ws: { ping: 42 }, guilds: { cache: new Collection([['g-s', guild]]) }, users: { fetch: async () => ({ id: 'u', tag: 'u' }) } };
+    const client = { isReady: () => true, user: { id: 'bot', tag: 'Bot#1' }, application: { id: 'bot' }, ws: { ping: 42 }, guilds: { cache: new Collection([['g-s', guild]]) }, users: { fetch: async () => ({ id: 'u', tag: 'u' }) }, options: { intents: { has: () => false } } };
+    guild.client = client;
+    webGuild = guild;
     require('../src/web/server').start(client);
     await new Promise(r => setTimeout(r, 300));
     const base = 'http://127.0.0.1:3987';
@@ -390,6 +393,40 @@ async function test(name, fn) {
     const okRes = await (await fetch(base + '/api/guild/g-s/config', { method: 'PATCH', headers: { ...H, 'x-requested-with': 'dashboard' }, body: JSON.stringify({ changes: { 'levels.enabled': false } }) })).json();
     assert.deepStrictEqual(okRes.applied, ['levels.enabled']);
     assert.strictEqual(getConfig('g-s').levels.enabled, false);
+  });
+
+  await test('Mitglieder-API: Liste, Details, Rolle geben, Level setzen, Rollen-Grenze', async () => {
+    const base = 'http://127.0.0.1:3987';
+    const g = webGuild;
+    let actorCmp = 1; // höchste Rolle der angemeldeten Person im Vergleich zur Zielrolle
+    const actor = { id: 'u', permissions: { has: () => true }, roles: { highest: { comparePositionTo: () => actorCmp } }, user: { id: 'u', tag: 'u#1' } };
+    const target = {
+      id: '555', displayName: 'Lea', guild: g, joinedTimestamp: Date.now() - 5000, communicationDisabledUntilTimestamp: null, premiumSinceTimestamp: null, displayColor: 0,
+      user: { id: '555', username: 'lea', bot: false, createdTimestamp: 1 }, displayAvatarURL: () => 'https://cdn.discordapp.com/embed/avatars/0.png',
+      roles: { cache: new Collection(), add: async r => target.roles.cache.set(r.id, r), remove: async r => target.roles.cache.delete(r.id), highest: { comparePositionTo: () => -1 } },
+      permissions: { has: () => false }, voice: {}, manageable: true,
+    };
+    g.members.cache.set('555', target);
+    g.members.fetch = async arg => (arg === 'u' ? actor : g.members.cache.get(typeof arg === 'string' ? arg : arg?.user));
+    const sid = 'b'.repeat(64);
+    store.set('sessions', sid, { userId: 'u', username: 'Mod', guilds: [{ id: 'g-s', name: 'Testserver' }], exp: Date.now() + 60_000 });
+    const H = { cookie: `sid=${sid}`, 'content-type': 'application/json' }, HX = { ...H, 'x-requested-with': 'dashboard' };
+    const list = await (await fetch(base + '/api/guild/g-s/members', { headers: H })).json();
+    assert(list.members.some(m => m.id === '555' && m.name === 'Lea'));
+    const d = await (await fetch(base + '/api/guild/g-s/members/555', { headers: H })).json();
+    assert.strictEqual(d.level, 0); assert.strictEqual(d.xpNeed, 100);
+    const act = body => fetch(base + '/api/guild/g-s/members/555/action', { method: 'POST', headers: HX, body: JSON.stringify(body) });
+    assert.strictEqual((await fetch(base + '/api/guild/g-s/members/555/action', { method: 'POST', headers: H, body: '{"type":"roleAdd","roleId":"900"}' })).status, 403, 'ohne Header abgelehnt');
+    const add = await (await act({ type: 'roleAdd', roleId: '900' })).json();
+    assert.deepStrictEqual(add.member.roles, ['900']);
+    const lvl = await (await act({ type: 'level', value: 10 })).json();
+    assert.strictEqual(lvl.member.level, 10); assert.strictEqual(lvl.member.xp, 10_000);
+    actorCmp = -1;
+    const deny = await act({ type: 'roleRemove', roleId: '900' });
+    assert.strictEqual(deny.status, 400);
+    assert.match((await deny.json()).error, /über deiner höchsten Rolle/);
+    assert(target.roles.cache.has('900'), 'Rolle bleibt');
+    g.members.cache.delete('555');
   });
 
   await test('Passwort-Login: richtig, falsch, Sperre nach 5 Fehlversuchen, Passwortwechsel', async () => {

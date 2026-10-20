@@ -117,6 +117,7 @@ header.top .wrap { display: flex; align-items: center; gap: 12px; min-height: 60
 
 /* ---------- Bereichs-Navigation ---------- */
 .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 28px; padding-bottom: 80px; }
+.layout > * { min-width: 0; } /* breite Inhalte (Filter-Leiste) dürfen die Spalte nicht aufblähen */
 nav.side { position: sticky; top: 80px; align-self: start; display: flex; flex-direction: column; gap: 4px; padding-top: 24px; }
 nav.side button {
   border: 0; background: transparent; text-align: left; padding: 11px 14px; border-radius: 14px; cursor: pointer;
@@ -221,6 +222,84 @@ select.inp { appearance: none; background-image: linear-gradient(45deg, transpar
 .menu a:hover, .menu button:hover { background: var(--chip); }
 .empty { color: var(--dim); font-size: 15px; }
 .loading { padding: 80px 0; text-align: center; color: var(--dim); }
+
+/* ---------- Mitglieder ---------- */
+.mtools { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.mtools .inp { flex: 1 1 180px; width: auto; border-radius: 999px; }
+.mtools input.inp { flex-basis: 260px; }
+.mfilters { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 0 8px; padding-bottom: 4px; }
+.mfilters::-webkit-scrollbar { display: none; }
+.fchip { border: 0; background: var(--chip); color: var(--red); border-radius: 999px; padding: 8px 14px; font: inherit; font-weight: 800; font-size: 14px; cursor: pointer; white-space: nowrap; }
+.fchip.on { background: var(--red); color: var(--ink); }
+.mcount { color: var(--dim); font-size: 14px; margin: 6px 0 14px; }
+.mgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 12px; }
+@media (max-width: 480px) { .mgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+.mtile { position: relative; border: 1px solid var(--line); border-radius: var(--r-card); padding: 18px 12px 14px; background: transparent; color: var(--red); font: inherit;
+  text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; transition: border-color .15s, background .15s, transform .12s; }
+.mtile:hover, .mtile:focus-visible { border-color: var(--dim); background: var(--deep); outline: none; }
+.mtile:active { transform: scale(.97); }
+.av { --ring: var(--faint); position: relative; width: 64px; height: 64px; border-radius: 50%; background: var(--chip); display: grid; place-items: center;
+  font-size: 26px; font-weight: 900; color: var(--red); flex: none; box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--ring); }
+.av img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.av .lv { position: absolute; right: -8px; bottom: -6px; min-width: 28px; height: 28px; padding: 0 7px; border-radius: 999px; background: var(--red); color: var(--ink);
+  font-size: 13px; font-weight: 900; display: grid; place-items: center; border: 3px solid var(--bg); font-variant-numeric: tabular-nums; }
+.mtile .nm { font-weight: 900; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 6px; }
+.mtile .un { color: var(--dim); font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: -4px; }
+.bar { width: 100%; height: 6px; border-radius: 999px; background: var(--chip); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--red); border-radius: 999px; }
+.mtile .meta { display: flex; justify-content: space-between; width: 100%; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.badges { position: absolute; top: 8px; right: 10px; display: flex; gap: 3px; font-size: 14px; }
+.rdots { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; min-height: 8px; }
+.rdots i { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.mtile.gold .av { --ring: #f5b301; } .mtile.silver .av { --ring: #c9d1dc; } .mtile.bronze .av { --ring: #d9822b; }
+/* Detail-Fenster */
+.sheet-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, .78); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 24px; animation: fade .15s ease; }
+.sheet { width: min(780px, 100%); max-height: 100%; overflow: auto; background: var(--bg); border: 1px solid var(--dim); border-radius: 28px; padding: 24px; position: relative; overscroll-behavior: contain; }
+@media (max-width: 700px) {
+  .sheet-bg { padding: 0; align-items: flex-end; }
+  .sheet { border-radius: 28px 28px 0 0; max-height: 94vh; padding: 22px 16px calc(28px + env(safe-area-inset-bottom, 0px)); animation: up .22s ease; border-bottom: 0; }
+}
+@keyframes up { from { transform: translateY(48px); opacity: .5; } to { transform: none; opacity: 1; } }
+@keyframes fade { from { opacity: 0; } }
+.sheet .x { position: absolute; top: 14px; right: 14px; width: 42px; height: 42px; border-radius: 50%; border: 0; background: var(--chip); color: var(--red); font: inherit; font-size: 20px; font-weight: 900; cursor: pointer; }
+.mhead { display: flex; gap: 20px; align-items: center; padding-right: 48px; }
+.mhead .av { width: 92px; height: 92px; font-size: 38px; }
+.mhead h2 { margin: 0; font-size: clamp(26px, 5vw, 38px); font-weight: 900; text-transform: uppercase; line-height: 1.05; overflow-wrap: anywhere; }
+.mhead .sub { color: var(--dim); font-size: 14px; margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.mhead .sub button { border: 0; background: var(--chip); color: var(--dim); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tag { background: var(--chip); border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 800; }
+.tag.hot { background: var(--red); color: var(--ink); }
+.mtop { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 20px; align-items: center; margin: 24px 0 4px; }
+@media (max-width: 560px) { .mtop { grid-template-columns: 1fr; justify-items: center; } .mtop .mstats { width: 100%; } }
+.ring { width: 180px; height: 180px; position: relative; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring .c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.ring .c span { font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: .1em; }
+.ring .c b { font-size: 60px; font-weight: 900; line-height: .95; font-variant-numeric: tabular-nums; }
+.ring .c em { font-style: normal; font-size: 12px; color: var(--dim); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.mstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.mstats div { background: var(--deep); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; min-width: 0; }
+.mstats b { display: block; font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mstats span { font-size: 12px; color: var(--dim); }
+.msec { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 16px; }
+.msec h4 { margin: 0 0 10px; font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); }
+.since { font-size: clamp(22px, 5vw, 30px); font-weight: 900; font-variant-numeric: tabular-nums; }
+.since + p { margin: 4px 0 0; color: var(--dim); font-size: 14px; }
+.chip .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--faint); flex: none; }
+.acts { display: grid; gap: 10px; }
+.act { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.act .inp { flex: 1 1 140px; width: auto; }
+.act select.inp { flex: 0 1 160px; }
+.act select.inp.grow { flex: 1 1 200px; }
+.btn.outline { background: transparent; box-shadow: inset 0 0 0 2px var(--red); color: var(--red); }
+.btn.outline:hover { background: var(--deep); }
+.btn.armed { background: var(--red-hi); color: var(--ink); box-shadow: none; }
+.hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.hist li { background: var(--deep); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; display: flex; gap: 10px; align-items: center; font-size: 14px; }
+.hist li div { flex: 1; min-width: 0; }
+.hist li small { display: block; color: var(--dim); font-size: 12px; margin-top: 2px; }
+.hist li.old { opacity: .55; }
 </style>
 </head>
 <body>
@@ -391,6 +470,7 @@ const TXT = [CT.text, CT.news];
 const WEEKDAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 const SECTIONS = [
   { id: 'overview', label: 'Übersicht' },
+  { id: 'members', label: 'Mitglieder' },
   { id: 'protect', label: 'Schutz', cards: [
     { title: 'Linkschutz', note: 'GIFs (Tenor, Giphy, Klipy), hochgeladene Dateien, YouTube, Twitch und Discord sind immer erlaubt. Blockiert werden Betrug, IP-Logger, Kurz-Links und Fälschungen.', fields: [
       ['automod.links.enabled', 'toggle', 'Linkschutz an'],
@@ -751,6 +831,208 @@ function overview() {
 }
 
 // ====================================================================
+//  Mitglieder: Kacheln + Detail-Fenster
+// ====================================================================
+const MS = { list: null, total: 0, complete: true, gid: null, q: '', sort: 'xp', filter: 'all', role: '', timer: null };
+const LCURVE = { etc: l => 100 * l * l, mee6: l => { let x = 0; for (let i = 0; i < l; i++) x += 5 * i * i + 50 * i + 100; return x; } };
+function lvlInfo(xp) {
+  const t = LCURVE[S.g?.config.levels.formula] || LCURVE.etc;
+  let l = 0;
+  while (t(l + 1) <= xp && l < 5000) l++;
+  const a = t(l), b = t(l + 1);
+  return { level: l, xpIn: xp - a, xpNeed: b - a, pct: Math.max(0, Math.min(1, (xp - a) / (b - a))) };
+}
+const nf = n => Number(n || 0).toLocaleString('de-DE');
+const voiceTxt = min => (min >= 60 ? `${(min / 60).toLocaleString('de-DE', { maximumFractionDigits: min >= 600 ? 0 : 1 })} Std.` : `${min} Min.`);
+const dateTxt = t => (t ? new Date(t).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '–');
+const roleHex = r => (r?.color ? '#' + Number(r.color).toString(16).padStart(6, '0') : null);
+const roleOf = id => S.g.roles.find(r => r.id === id);
+function avatarEl(m, lv) {
+  const el = h('div', { class: 'av' }, (m.name || '?').trim().slice(0, 1).toUpperCase());
+  if (m.avatar) { const img = h('img', { src: m.avatar, alt: '', loading: 'lazy' }); img.addEventListener('error', () => img.remove()); el.append(img); }
+  if (lv != null) el.append(h('span', { class: 'lv', 'aria-label': `Level ${lv}` }, lv));
+  return el;
+}
+function badgesOf(m) {
+  return [m.owner && '👑', m.bot && '🤖', m.booster && '💎', m.timeoutUntil && '⏳', m.warns && '⚠️'].filter(Boolean);
+}
+const FILTERS = [
+  ['all', 'Alle'], ['active', 'Mit XP'], ['new', 'Neu (7 Tage)'], ['warned', 'Verwarnt'], ['timeout', 'Im Timeout'], ['booster', 'Booster'], ['bots', 'Bots'],
+];
+const SORTS = { xp: 'Level / XP', joinedNew: 'Neueste zuerst', joinedOld: 'Am längsten dabei', name: 'Name A–Z', voice: 'Sprachzeit', msgs: 'Nachrichten', coins: 'Münzen', warns: 'Verwarnungen' };
+function visibleMembers() {
+  const q = MS.q.trim().toLowerCase();
+  const now = Date.now();
+  const list = MS.list.filter(m => {
+    if (q && !(m.name.toLowerCase().includes(q) || m.username.toLowerCase().includes(q) || m.id.includes(q))) return false;
+    if (MS.role && !m.roles.includes(MS.role)) return false;
+    switch (MS.filter) {
+      case 'active': return m.xp > 0;
+      case 'new': return m.joinedAt && now - m.joinedAt < 7 * 86_400_000;
+      case 'warned': return m.warns > 0;
+      case 'timeout': return !!m.timeoutUntil;
+      case 'booster': return m.booster;
+      case 'bots': return m.bot;
+      default: return true;
+    }
+  });
+  const by = {
+    xp: (a, b) => b.xp - a.xp || a.name.localeCompare(b.name), joinedNew: (a, b) => (b.joinedAt || 0) - (a.joinedAt || 0), joinedOld: (a, b) => (a.joinedAt || 0) - (b.joinedAt || 0),
+    name: (a, b) => a.name.localeCompare(b.name, 'de'), voice: (a, b) => b.voiceMin - a.voiceMin, msgs: (a, b) => b.msgs - a.msgs, coins: (a, b) => b.coins - a.coins, warns: (a, b) => b.warns - a.warns,
+  }[MS.sort];
+  return list.sort(by);
+}
+function memberTile(m) {
+  const li = lvlInfo(m.xp);
+  const medal = { 1: ' gold', 2: ' silver', 3: ' bronze' }[m.rank] || '';
+  return h('button', { class: 'mtile' + medal, onclick: () => openMember(m.id), 'aria-label': `${m.name}, Level ${li.level}` },
+    h('div', { class: 'badges', 'aria-hidden': 'true' }, badgesOf(m).join('')),
+    avatarEl(m, li.level),
+    h('div', { class: 'nm' }, m.name), h('div', { class: 'un' }, '@' + m.username),
+    h('div', { class: 'bar', title: `${nf(li.xpIn)} / ${nf(li.xpNeed)} XP` }, h('i', { style: `width:${Math.round(li.pct * 100)}%` })),
+    h('div', { class: 'meta' }, h('span', {}, m.rank ? `#${m.rank}` : '–'), h('span', {}, `${nf(m.xp)} XP`)),
+    h('div', { class: 'rdots', 'aria-hidden': 'true' }, m.roles.slice(0, 6).map(id => h('i', { style: roleHex(roleOf(id)) ? `background:${roleHex(roleOf(id))}` : null }))));
+}
+function membersView() {
+  if (MS.gid !== S.g.guild.id) Object.assign(MS, { list: null, gid: S.g.guild.id, q: '', role: '', filter: 'all' });
+  const grid = h('div', { class: 'mgrid' });
+  const count = h('p', { class: 'mcount' });
+  const draw = () => {
+    if (!MS.list) { count.textContent = 'Lade Mitglieder …'; return; }
+    const vis = visibleMembers();
+    count.textContent = `${nf(vis.length)} von ${nf(MS.total)} Mitgliedern` + (MS.complete ? '' : ' · Liste unvollständig: SERVER MEMBERS INTENT im Developer Portal einschalten');
+    grid.replaceChildren(...(vis.length ? vis.slice(0, 400).map(memberTile) : [h('p', { class: 'empty' }, 'Niemand gefunden.')]));
+  };
+  const filters = h('div', { class: 'mfilters', role: 'group', 'aria-label': 'Filter' }, FILTERS.map(([id, label]) =>
+    h('button', { class: 'fchip' + (MS.filter === id ? ' on' : ''), onclick: e => { MS.filter = id; filters.querySelectorAll('.fchip').forEach(b => b.classList.toggle('on', b === e.currentTarget)); draw(); } }, label)));
+  const tools = h('div', { class: 'mtools' },
+    h('input', { class: 'inp', type: 'search', placeholder: '🔎 Name, @name oder ID', value: MS.q, 'aria-label': 'Mitglieder suchen', oninput: e => { MS.q = e.target.value; draw(); } }),
+    h('select', { class: 'inp', 'aria-label': 'Sortieren', onchange: e => { MS.sort = e.target.value; draw(); } },
+      Object.entries(SORTS).map(([k, v]) => h('option', { value: k, selected: MS.sort === k ? true : null }, v))),
+    h('select', { class: 'inp', 'aria-label': 'Nach Rolle filtern', onchange: e => { MS.role = e.target.value; draw(); } },
+      h('option', { value: '' }, 'Alle Rollen'), S.g.roles.map(r => h('option', { value: r.id, selected: MS.role === r.id ? true : null }, '@' + r.name))));
+  if (!MS.list) {
+    api(`/guild/${S.g.guild.id}/members`).then(r => { Object.assign(MS, { list: r.members, total: r.total, complete: r.complete }); draw(); })
+      .catch(e => { count.textContent = e.message; });
+  }
+  draw();
+  return h('div', {}, tools, filters, count, grid);
+}
+
+function closeSheet() {
+  clearInterval(MS.timer);
+  $('.sheet-bg')?.remove();
+  document.removeEventListener('keydown', escClose);
+}
+function escClose(e) { if (e.key === 'Escape') closeSheet(); }
+async function openMember(id) {
+  closeSheet();
+  const sheet = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Mitglied' }, h('p', { class: 'loading' }, 'Lade …'));
+  const bg = h('div', { class: 'sheet-bg', onclick: e => { if (e.target === bg) closeSheet(); } }, sheet);
+  document.body.append(bg);
+  document.addEventListener('keydown', escClose);
+  try { fillSheet(sheet, await api(`/guild/${S.g.guild.id}/members/${id}`)); } catch (e) { toast(e.message, true); closeSheet(); }
+}
+function ringEl(d) {
+  const li = lvlInfo(d.xp), R = 80, C = 2 * Math.PI * R;
+  const svg = `<svg viewBox="0 0 180 180" aria-hidden="true"><circle cx="90" cy="90" r="${R}" fill="none" stroke="#1f1f1f" stroke-width="12"/>` +
+    `<circle cx="90" cy="90" r="${R}" fill="none" stroke="#fd0000" stroke-width="12" stroke-linecap="round" stroke-dasharray="${(li.pct * C).toFixed(1)} ${C.toFixed(1)}"/></svg>`;
+  const el = h('div', { class: 'ring', role: 'img', 'aria-label': `Level ${li.level}, ${Math.round(li.pct * 100)} Prozent bis Level ${li.level + 1}` });
+  el.innerHTML = svg;
+  el.append(h('div', { class: 'c' }, h('span', {}, 'Level'), h('b', {}, li.level), h('em', {}, `${nf(li.xpIn)} / ${nf(li.xpNeed)} XP`)));
+  return el;
+}
+function sinceTxt(t) {
+  let s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  const d = Math.floor(s / 86400); s %= 86400;
+  const hh = Math.floor(s / 3600); s %= 3600;
+  return `${nf(d)} T  ${String(hh).padStart(2, '0')}:${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+// Gefährliche Knöpfe: erst „scharf machen“, zweiter Tipp führt aus
+function twoStep(label, armedLabel, fn) {
+  let armed = false, t;
+  const b = h('button', { class: 'btn small outline', onclick: async () => {
+    if (!armed) { armed = true; b.classList.add('armed'); b.textContent = armedLabel; t = setTimeout(() => { armed = false; b.classList.remove('armed'); b.textContent = label; }, 4000); return; }
+    clearTimeout(t); b.disabled = true; await fn(); b.disabled = false;
+  } }, label);
+  return b;
+}
+async function memberAction(id, body, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const r = await api(`/guild/${S.g.guild.id}/members/${id}/action`, { method: 'POST', body: JSON.stringify(body) });
+    toast(r.message || 'Erledigt.');
+    if (r.gone) { MS.list = MS.list?.filter(m => m.id !== id) || null; closeSheet(); render(); return; }
+    if (r.member) {
+      const i = MS.list?.findIndex(m => m.id === id) ?? -1;
+      if (i >= 0) MS.list[i] = { ...MS.list[i], ...r.member };
+      fillSheet($('.sheet'), r.member);
+      if (S.section === 'members') { const y = window.scrollY; render(); window.scrollTo({ top: y }); }
+    }
+  } catch (e) { toast(e.message, true); } finally { if (btn) btn.disabled = false; }
+}
+function fillSheet(sheet, d) {
+  if (!sheet) return;
+  clearInterval(MS.timer);
+  const act = (body, btn) => memberAction(d.id, body, btn);
+  const tags = [d.owner && ['👑 Inhaber', true], d.bot && ['🤖 Bot'], d.booster && ['💎 Booster'], d.timeoutUntil && [`⏳ Timeout bis ${new Date(d.timeoutUntil).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}`, true],
+    d.voiceChannel && [`🔊 ${d.voiceChannel}`], ...d.perms.slice(0, 4).map(p => [p])].filter(Boolean);
+  const since = h('div', { class: 'since' }, d.joinedAt ? sinceTxt(d.joinedAt) : 'unbekannt');
+  if (d.joinedAt) MS.timer = setInterval(() => { since.textContent = sinceTxt(d.joinedAt); }, 1000);
+  const assignable = S.g.roles.filter(r => !r.managed && r.editable !== false && !d.roles.includes(r.id));
+  let addRole = '';
+  const nick = h('input', { class: 'inp', type: 'text', maxlength: 32, placeholder: 'Spitzname (leer = entfernen)', value: d.name !== d.username ? d.name : '' });
+  const xpVal = h('input', { class: 'inp', type: 'number', inputmode: 'numeric', min: 0, placeholder: 'Wert' });
+  const xpKind = h('select', { class: 'inp' }, h('option', { value: 'level' }, 'Level setzen'), h('option', { value: 'xp' }, 'XP setzen'), h('option', { value: 'coins' }, 'Münzen ±'));
+  const reason = h('input', { class: 'inp', type: 'text', maxlength: 300, placeholder: 'Grund (optional)' });
+  const tmo = h('select', { class: 'inp', 'aria-label': 'Timeout-Dauer' }, [[10, '10 Min.'], [60, '1 Std.'], [360, '6 Std.'], [1440, '1 Tag'], [10080, '1 Woche']].map(([v, l]) => h('option', { value: v }, l)));
+  const R = () => reason.value.trim();
+  sheet.replaceChildren(...[
+    h('button', { class: 'x', onclick: closeSheet, 'aria-label': 'Schließen' }, '✕'),
+    h('div', { class: 'mhead' }, avatarEl(d),
+      h('div', { style: 'min-width:0' }, h('h2', {}, d.name),
+        h('div', { class: 'sub' }, h('span', {}, '@' + d.username),
+          h('button', { onclick: () => { navigator.clipboard?.writeText(d.id).then(() => toast('ID kopiert')).catch(() => toast(d.id)); } }, 'ID ' + d.id)),
+        h('div', { class: 'tags' }, tags.map(([t, hot]) => h('span', { class: 'tag' + (hot ? ' hot' : '') }, t))))),
+    h('div', { class: 'mtop' }, ringEl(d),
+      h('div', { class: 'mstats' },
+        [[d.rank ? '#' + d.rank : '–', 'Rang'], [nf(d.xp), 'XP gesamt'], [nf(d.msgs), 'Nachrichten'], [voiceTxt(d.voiceMin), 'Sprachzeit'], [nf(d.clips), 'Clips'],
+          [nf(d.coins), S.g.config.economy.name || 'Münzen'], [d.warns, 'Verwarnungen'], [`${d.dailyStreak} 🔥`, 'Daily-Serie'], [`${d.questStreak} 🔥`, 'Quest-Serie']]
+          .map(([v, l]) => h('div', {}, h('b', {}, v), h('span', {}, l))))),
+    h('div', { class: 'msec' }, h('h4', {}, 'Auf dem Server seit'), since,
+      h('p', {}, `Beigetreten ${dateTxt(d.joinedAt)} · Discord-Konto seit ${dateTxt(d.createdAt)}`)),
+    h('div', { class: 'msec' }, h('h4', {}, `Rollen (${d.roles.length})`),
+      h('div', { class: 'chips' }, d.roles.length ? d.roles.map(id => {
+        const r = roleOf(id);
+        return h('span', { class: 'chip' }, h('i', { class: 'dot', style: roleHex(r) ? `background:${roleHex(r)}` : null }), h('span', {}, '@' + (r?.name || id)),
+          r && !r.managed ? h('button', { 'aria-label': `@${r.name} entfernen`, onclick: e => act({ type: 'roleRemove', roleId: id }, e.currentTarget) }, '×') : null);
+      }) : h('span', { class: 'empty' }, 'Keine Rollen')),
+      assignable.length ? h('div', { class: 'act', style: 'margin-top:10px' },
+        Object.assign(selectEl(assignable.map(r => ({ id: r.id, label: '@' + r.name })), '', v => { addRole = v; }, '+ Rolle wählen …'), { className: 'inp grow' }),
+        h('button', { class: 'btn small', onclick: e => (addRole ? act({ type: 'roleAdd', roleId: addRole }, e.currentTarget) : toast('Erst eine Rolle wählen.', true)) }, 'Geben')) : null),
+    d.bot ? null : h('div', { class: 'msec' }, h('h4', {}, 'Bearbeiten'),
+      h('div', { class: 'acts' },
+        h('div', { class: 'act' }, nick, h('button', { class: 'btn small ghost', onclick: e => act({ type: 'nick', nick: nick.value }, e.currentTarget) }, 'Speichern')),
+        h('div', { class: 'act' }, xpKind, xpVal, h('button', { class: 'btn small ghost', onclick: e => (xpVal.value === '' ? toast('Erst eine Zahl eingeben.', true) : act({ type: xpKind.value, value: Number(xpVal.value) }, e.currentTarget)) }, 'Setzen')))),
+    d.owner || d.bot ? null : h('div', { class: 'msec' }, h('h4', {}, 'Moderation'),
+      h('div', { class: 'acts' }, reason,
+        h('div', { class: 'act' },
+          d.timeoutUntil ? h('button', { class: 'btn small ghost', onclick: e => act({ type: 'untimeout', reason: R() }, e.currentTarget) }, '🔊 Timeout aufheben')
+            : [tmo, h('button', { class: 'btn small ghost', onclick: e => act({ type: 'timeout', minutes: Number(tmo.value), reason: R() }, e.currentTarget) }, '⏳ Timeout')],
+          h('button', { class: 'btn small ghost', onclick: e => act({ type: 'warn', reason: R() }, e.currentTarget) }, '⚠️ Verwarnen')),
+        h('div', { class: 'act' },
+          twoStep('👢 Kicken', 'Wirklich kicken?', () => act({ type: 'kick', reason: R() })),
+          twoStep('🔨 Bannen', 'Wirklich bannen?', () => act({ type: 'ban', reason: R(), deleteDays: 0 }))))),
+    d.warnList.length || d.cases.length ? h('div', { class: 'msec' }, h('h4', {}, 'Verlauf'),
+      h('ul', { class: 'hist' },
+        d.warnList.map(w => h('li', { class: w.active ? null : 'old' }, '⚠️', h('div', {}, w.reason, h('small', {}, `Verwarnung #${w.id} · ${dateTxt(w.at)}${w.active ? '' : ' · abgelaufen'}`)),
+          h('button', { class: 'btn small ghost', 'aria-label': 'Verwarnung löschen', onclick: e => act({ type: 'unwarn', caseId: w.id }, e.currentTarget) }, '×'))),
+        d.cases.filter(c => c.type !== 'warn').map(c => h('li', {}, { timeout: '⏳', untimeout: '🔊', kick: '👢', ban: '🔨', unban: '🕊️', automod: '🤖' }[c.type] || '📝',
+          h('div', {}, c.reason, h('small', {}, `Fall #${c.id} · ${c.type} · ${c.modTag} · ${dateTxt(c.at)}`)))))) : null,
+  ].filter(Boolean)); // replaceChildren würde null als Text „null“ einfügen
+}
+
+// ====================================================================
 //  Seiten
 // ====================================================================
 function render() {
@@ -766,7 +1048,7 @@ function render() {
       h('span', { class: 'n' }, String(i + 1).padStart(2, '0')), s.label)));
   const sec = SECTIONS.find(s => s.id === S.section) || SECTIONS[0];
   const body = h('div', {}, h('h1', { class: 'section-title' }, sec.label),
-    sec.id === 'overview' ? overview() : h('div', { class: 'cards' }, sec.cards.map(cardEl)));
+    sec.id === 'overview' ? overview() : sec.id === 'members' ? membersView() : h('div', { class: 'cards' }, sec.cards.map(cardEl)));
   app.append(h('div', { class: 'layout' }, nav, body));
   nav.querySelector('.on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
 }
@@ -879,10 +1161,51 @@ function demoData() {
     },
   };
 }
+function demoMembers() {
+  const names = ['Bastian', 'Lea', 'Tom', 'Mia', 'Ali', 'Jonas', 'Sophie', 'Ben', 'Emma', 'Noah', 'Lina', 'Paul', 'Hannah', 'Elias', 'Marie', 'Finn', 'Lara', 'Leon', 'Nele', 'Max', 'Clara', 'Luis', 'Ida', 'Theo'];
+  const day = 86_400_000, now = Date.now();
+  const list = names.map((n, i) => {
+    const xp = Math.round(118000 / (i + 1) ** 1.25) - (i > 17 ? 1500 : 0);
+    return { id: String(9 + i), name: n, username: n.toLowerCase() + (i * 7 % 100), bot: false, avatar: null, color: null,
+      joinedAt: now - (i * 37 + 3) * day - i * 3_600_000, createdAt: now - (900 + i * 41) * day,
+      roles: ['500', '501', '502', '503', '506', '507'].filter((_, k) => (i + k) % 3 === 0 || k === 5).concat(i === 0 ? ['500'] : []).filter((v, k, a) => a.indexOf(v) === k),
+      level: 0, xp: Math.max(0, xp), rank: xp > 0 ? i + 1 : null, msgs: Math.round(xp / 21), voiceMin: Math.round(xp / 9), clips: i % 4,
+      coins: Math.round(xp / 7), warns: i === 6 ? 1 : 0, timeoutUntil: i === 11 ? now + 2 * 3_600_000 : null, owner: i === 0, booster: i % 5 === 1 };
+  });
+  list.push({ id: '99', name: 'ETC. Bot', username: 'etc-bot', bot: true, avatar: 'etc-bot-256.png', color: null, joinedAt: now - 5 * day, createdAt: now - 40 * day, roles: ['500'], level: 0, xp: 0, rank: null, msgs: 0, voiceMin: 0, clips: 0, coins: 0, warns: 0, timeoutUntil: null, owner: false, booster: false });
+  return list;
+}
+function demoDetail(m) {
+  const li = lvlInfo(m.xp);
+  return { ...m, xpIn: li.xpIn, xpNeed: li.xpNeed, nextTotal: m.xp - li.xpIn + li.xpNeed, dailyStreak: m.rank ? 12 - Math.min(11, m.rank) : 0, questStreak: m.rank ? 6 - Math.min(5, m.rank) : 0,
+    questsDone: 30, voiceChannel: m.rank === 2 ? 'Lounge' : null, perms: m.owner ? ['Administrator'] : m.roles.includes('501') ? ['Kicken', 'Timeout', 'Nachrichten verwalten'] : [],
+    warnList: m.warns ? [{ id: 17, reason: 'Spam im Clip-Kanal', at: Date.now() - 3 * 86_400_000, active: true }] : [],
+    cases: m.timeoutUntil ? [{ id: 18, type: 'timeout', reason: 'Beleidigung', modTag: 'Bastian', at: Date.now() - 3_600_000 }] : [] };
+}
+let DEMO_MEMBERS = null;
 let DEMO = null;
 async function demoApi(path, opts) {
   DEMO ||= demoData();
   if (path === '/me') return { user: { id: '9', name: 'Vorschau' }, guilds: [{ id: '1', name: 'Mein Server', iconUrl: null, botPresent: true }, { id: '2', name: 'Zweiter Server', iconUrl: null, botPresent: false, invite: '#' }] };
+  const mm = /^\/guild\/[^/]+\/members(?:\/(\d+))?(\/action)?$/.exec(path);
+  if (mm) {
+    DEMO_MEMBERS ||= demoMembers();
+    if (!mm[1]) return { members: DEMO_MEMBERS, total: DEMO_MEMBERS.length, complete: true };
+    const m = DEMO_MEMBERS.find(x => x.id === mm[1]);
+    if (!mm[2]) return demoDetail(m);
+    const b = JSON.parse(opts.body);
+    if (b.type === 'roleAdd') m.roles.push(b.roleId);
+    if (b.type === 'roleRemove') m.roles = m.roles.filter(r => r !== b.roleId);
+    if (b.type === 'level') m.xp = LCURVE.etc(b.value);
+    if (b.type === 'xp') m.xp = b.value;
+    if (b.type === 'coins') m.coins += b.value;
+    if (b.type === 'nick') m.name = b.nick || m.username;
+    if (b.type === 'timeout') m.timeoutUntil = Date.now() + b.minutes * 60_000;
+    if (b.type === 'untimeout') m.timeoutUntil = null;
+    if (b.type === 'warn') m.warns++;
+    if (b.type === 'kick' || b.type === 'ban') { DEMO_MEMBERS = DEMO_MEMBERS.filter(x => x !== m); return { message: 'Vorschau: wäre jetzt ausgeführt.', gone: true }; }
+    return { message: 'Vorschau: gespeichert (nicht echt).', member: demoDetail(m) };
+  }
   if (path.startsWith('/guild/') && !opts.method) return DEMO;
   if (path.endsWith('/config')) { const { changes } = JSON.parse(opts.body); for (const [k, v] of Object.entries(changes)) setPath(DEMO.config, k, v); return { applied: Object.keys(changes), errors: {}, config: DEMO.config }; }
   if (path.endsWith('/action')) {
