@@ -2,7 +2,7 @@
 # Kostenloser Plan. DISCORD_TOKEN und MONGODB_URI fragt Render beim Einrichten ab.
 services:
   - type: web
-    name: discord-bot
+    name: etc-bot
     runtime: node
     plan: free
     region: frankfurt

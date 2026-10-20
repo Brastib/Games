@@ -1,4 +1,6 @@
-# Discord-Bot
+# ETC. Bot
+
+<img src="assets/icon/etc-bot-256.png" alt="ETC. Bot Icon" width="128" align="right">
 
 Ein deutscher All-in-One-Bot für Discord-Server: Moderation, Server-Schutz (Lockdown, Linkschutz, Anti-Raid, Anti-Nuke),
 temporäre Sprachkanäle mit Bedienfeld im Kanal-Chat, Musik und Soundboard, tägliche Quests, Level mit XP für Clips und Sprachzeit,
@@ -70,8 +72,13 @@ Du brauchst 4 kostenlose Konten: **Discord Developer Portal**, **GitHub** (hast 
    - `MONGODB_URI` → Link aus Schritt 2
    - `DISCORD_CLIENT_SECRET` → Client Secret aus Schritt 1
 3. **Apply**. Nach 2–4 Minuten steht im Log `Eingeloggt als …`.
-4. Deine Adresse (z. B. `https://discord-bot-xxxx.onrender.com`) in Schritt 1 bei **Redirects** als `…/callback` eintragen.
+4. Deine Adresse (z. B. `https://etc-bot-xxxx.onrender.com`) in Schritt 1 bei **Redirects** als `…/callback` eintragen.
 5. Adresse öffnen → **Mit Discord anmelden** → Dashboard. 🎉
+
+### Name und Profilbild
+Beim **ersten Start** nennt sich der Bot automatisch **„ETC. Bot“** und setzt das Icon aus `assets/icon/etc-bot-512.png` als Profilbild (nur einmal – danach kannst du beides im Developer Portal frei ändern; mit `SKIP_BRANDING=1` ganz abschalten, mit `BOT_NAME` einen anderen Namen wählen).
+Für die App-Seite im Developer Portal: **General Information → App Icon** → `assets/icon/etc-bot.png` hochladen.
+Das Icon wird mit `python3 scripts/make-icon.py assets/icon/collage-original.webp assets/icon` aus der Spiele-Collage erzeugt.
 
 ### Schritt 4 – Wach halten
 Render legt Gratis-Dienste schlafen, wenn 15 Minuten lang keine Anfrage von außen kommt. Der Bot ruft sich selbst alle 10 Minuten auf. **Zusätzlich empfohlen:** bei <https://cron-job.org> (kostenlos) alle 10 Minuten `https://DEINE-ADRESSE.onrender.com/health` aufrufen lassen.

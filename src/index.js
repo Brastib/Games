@@ -56,6 +56,16 @@ async function registerCommands() {
   console.log(`[befehle] ${body.length} Befehle global registriert.`);
 }
 
+// ---------- Name und Profilbild einmalig setzen (danach im Developer Portal frei änderbar) ----------
+async function applyBranding(c) {
+  if (store.get('meta', 'branding') === 1 || process.env.SKIP_BRANDING) return;
+  const name = process.env.BOT_NAME || 'ETC. Bot';
+  if (c.user.username !== name) await c.user.setUsername(name);
+  if (!c.user.avatar) await c.user.setAvatar(require('path').join(__dirname, '..', 'assets', 'icon', 'etc-bot-512.png'));
+  store.set('meta', 'branding', 1);
+  console.log(`[bot] Name „${name}“ und Profilbild gesetzt.`);
+}
+
 // ---------- Zeitplaner: Zeit-Banns, Temp-Kanäle, Gewinnspiele, Lockdown-Ende ----------
 let ticking = false;
 async function tick() {
@@ -78,7 +88,8 @@ async function tick() {
 // ---------- Ereignisse ----------
 client.once(Events.ClientReady, safe('ready', async c => {
   console.log(`[bot] Eingeloggt als ${c.user.tag} auf ${c.guilds.cache.size} Server(n).`);
-  c.user.setPresence({ activities: [{ name: '/help · Server-Schutz aktiv', type: ActivityType.Watching }], status: 'online' });
+  c.user.setPresence({ activities: [{ name: 'ETC. Bot · /help', type: ActivityType.Watching }], status: 'online' });
+  await applyBranding(c).catch(e => console.warn('[bot] Name/Profilbild:', e.message));
   await registerCommands().catch(e => console.error('[befehle] Registrierung fehlgeschlagen:', e.message));
   await tempvoice.cleanup(c).catch(() => {});
   lf.loadPhishingLists().catch(() => {});
