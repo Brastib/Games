@@ -630,6 +630,86 @@ async function test(name, fn) {
     assert.deepStrictEqual(Object.keys(bad.errors).sort(), ['alert.webhook', 'backups.keep', 'counting.current', 'music.filter.terms']);
   });
 
+  console.log('\n🔄 /nb – Übernahme vom alten Bot');
+  const migrate = require('../src/modules/migrate');
+  const mkMsg = ({ content = '', labels = [], embeds = [], mention = null }) => ({
+    content, embeds, attachments: new Collection(),
+    components: labels.length ? [{ components: labels.map(l => ({ type: 2, label: l, customId: 'x:' + l })) }] : [],
+    mentions: { users: new Collection(mention ? [[mention, { id: mention, bot: false }]] : []) },
+  });
+  const mgGuild = () => {
+    const sent = [];
+    const ch = (id, name, type = ChannelType.GuildText) => [id, { id, name, type, parentId: null, toString: () => `#${name}`, send: async m => { sent.push([name, m]); return { id: 'n' + sent.length }; } }];
+    return {
+      sent, id: 'g-mg', client: { user: { id: 'bot' } },
+      channels: { cache: new Collection([ch('100000000000000001', 'willkommen'), ch('100000000000000002', 'tschüss'), ch('100000000000000003', 'level'), ch('100000000000000004', 'zählen'), ch('100000000000000005', 'Join to create', ChannelType.GuildVoice)]) },
+      roles: { cache: new Collection([['g-mg', { id: 'g-mg', name: '@everyone' }], ['200000000000000001', { id: '200000000000000001', name: 'Gamer', managed: false, toString: () => '@Gamer' }], ['200000000000000002', { id: '200000000000000002', name: 'Neu', managed: false, toString: () => '@Neu' }]]) },
+    };
+  };
+  await test('Nachrichten des alten Bots erkennen (Temp-Voice-Panel, Rollen-Buttons, Level-Up)', () => {
+    const g = mgGuild();
+    assert.strictEqual(migrate.classify(mkMsg({ labels: ['Umbenennen', 'User-Limit', 'Sperren', 'Kicken'] }), g).kind, 'tempvoicePanel');
+    const rp = migrate.classify(mkMsg({ labels: ['🎮 Gamer', 'Neu'], embeds: [{ title: 'Wähle deine Rollen' }] }), g);
+    assert.deepStrictEqual([rp.kind, rp.roles.map(r => r.role.name).join(',')], ['rolePanel', 'Gamer,Neu']);
+    const lu = migrate.classify(mkMsg({ content: '<@123456789012345678> hat **Level 12** erreicht! 🎉', mention: '123456789012345678' }), g);
+    assert.deepStrictEqual([lu.kind, lu.userId, lu.level], ['levelUp', '123456789012345678', 12]);
+    assert.strictEqual(migrate.classify(mkMsg({ content: 'Guten Morgen' }), g).kind, null);
+  });
+  await test('Uhrzeit und Rhythmus aus alten Posts ableiten', () => {
+    const daily = [17, 18, 19, 20].map(d => Date.UTC(2026, 9, d, 10, 0, 40)); // 12:00 Berliner Sommerzeit
+    const ds = migrate.scheduleFrom(daily);
+    assert.deepStrictEqual([ds.time, ds.everyDays], ['12:00', 1], 'täglich – Wochentag spielt dann keine Rolle');
+    const weekly = [3, 10, 17].map(d => Date.UTC(2026, 9, d, 19, 43));
+    assert.deepStrictEqual(migrate.scheduleFrom(weekly), { weekday: 6, time: '21:40', everyDays: 7 });
+  });
+  await test('Plan aus altem Dashboard: übernehmen, XP nur nach oben, Texte aufgeräumt', async () => {
+    const g = mgGuild();
+    store.set('levels', 'g-mg:300000000000000001', { xp: 99_999, msgs: 5 }); // schon mit neuem Bot verdient – darf nicht sinken
+    const x = {
+      root: 'https://alt.invalid', animals: [], levelroles: [],
+      config: {
+        welcome_channel_id: '100000000000000001', welcome_message: 'Wilkommen {user} auf ETC. ', welcome_autorole_id: '200000000000000002',
+        leave_channel_id: '100000000000000002', leave_message: 'BYE BYE {user}', level_up_channel_id: '100000000000000003',
+        weekly_leaderboard_enable: '1', weekly_leaderboard_channel_id: '100000000000000003', leaderboard_interval_days: '1', weekly_leaderboard_time: '12:00',
+        xp_min_msg: '15', xp_max_msg: '25', xp_voice_pc: '5', xp_voice_playstation: '10', xp_server_tag_boost_enable: '1', xp_server_tag_boost_percent: '25',
+        counting_channel_id: '100000000000000004', counting_current_num: '41', temp_voice_creator_channel_id: '100000000000000005', temp_voice_prefix: '╟🔊 Voice von',
+        emergency_webhook_url: 'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz', emergency_owner_id: '400000000000000001',
+      },
+      members: [{ id: '300000000000000001', xp: 5000, messageCount: 50, voiceSeconds: 600 }, { id: '300000000000000002', xp: 114451, messageCount: 10, voiceSeconds: 869_940 }],
+      badwords: [{ word: 'Doof', is_regex: 0 }], musicfilter: [{ begriff: 'landser', is_regex: 0 }, { begriff: 'sieg\\s*heil', is_regex: 1 }],
+    };
+    const d = { botId: 'old', botTag: 'Alt#1', channels: {}, panels: [], rolePanels: [], verifyPanels: [], levels: new Map(), schedule: {}, counting: null, scanned: 4 };
+    const plan = migrate.buildPlan(g, d, x);
+    const report = await migrate.apply(g, plan, { by: 'u' });
+    assert.deepStrictEqual(report.failed, []);
+    const c = getConfig('g-mg');
+    assert.strictEqual(c.welcome.message, 'Willkommen {user} auf ETC.', 'Tippfehler korrigiert');
+    assert.deepStrictEqual(c.welcome.autoRoles, ['200000000000000002']);
+    assert.strictEqual(c.goodbye.message, 'BYE BYE **{username}**');
+    assert.deepStrictEqual([c.posts.leaderboard.everyDays, c.posts.leaderboard.time], [1, '12:00']);
+    assert.deepStrictEqual([c.levels.msgXp, c.levels.voice.perMinute, c.levels.voice.psPerMinute, c.levels.tagBoost.percent], [{ min: 15, max: 25 }, 5, 10, 25]);
+    assert.deepStrictEqual([c.counting.channel, c.counting.current], ['100000000000000004', 41]);
+    assert.strictEqual(c.tempvoice.hubs[0].nameTemplate, '╟🔊 Voice von {name}');
+    assert.deepStrictEqual([c.alert.enabled, c.alert.mentions], [true, ['400000000000000001']]);
+    assert(c.automod.badwords.words.includes('doof'));
+    assert.deepStrictEqual(c.music.filter.terms, ['landser', '/sieg\\s*heil/']);
+    assert.strictEqual(lv.getData('g-mg', '300000000000000001').xp, 99_999, 'höhere neue XP bleiben');
+    assert.deepStrictEqual([lv.getData('g-mg', '300000000000000002').xp, lv.getData('g-mg', '300000000000000002').voiceMin], [114451, 14499]);
+    assert(g.sent.some(([n, m]) => n === 'zählen' && /Nächste Zahl: \*\*42\*\*/.test(m)));
+    assert(require('../src/modules/backups').list('g-mg').some(b => b.reason === 'vor /nb'), 'vorher gesichert');
+    assert(store.get('migrations', 'g-mg').done.length >= 8);
+  });
+  await test('/nb nur für den Bot-Besitzer', async () => {
+    const client = { application: { fetch: async () => ({ owner: { id: 'owner1' } }) } };
+    assert(await migrate.isBotOwner({ id: 'owner1' }, client));
+    assert(!(await migrate.isBotOwner({ id: 'jemand' }, client)));
+    process.env.OWNER_IDS = 'jemand';
+    assert(await migrate.isBotOwner({ id: 'jemand' }, client), 'OWNER_IDS erlaubt zusätzliche Personen');
+    delete process.env.OWNER_IDS;
+    const team = { application: { fetch: async () => ({ owner: { members: new Collection([['t1', {}]]) } }) } };
+    assert(await migrate.isBotOwner({ id: 't1' }, team), 'Team-Mitglied');
+  });
+
   console.log('\n🎨 Rot-Schwarz-Theme');
   await test('Keine blauen/grünen Buttons und Embed-Farben (außer frei wählbaren Rollen-Buttons)', () => {
     const { COLORS } = require('../src/lib/embeds');

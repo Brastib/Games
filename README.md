@@ -97,6 +97,15 @@ Render legt Gratis-Dienste schlafen, wenn 15 Minuten lang keine Anfrage von auß
 3. Im **Web-Dashboard** alles Weitere einstellen (Clip-Kanal, Quests, Musik, Shop, Regeln …) – oder per `/setup …`.
 4. `/help` zeigt alle Befehle.
 
+### Vom alten Bot umziehen: `/nb`
+`/nb` („neuer Bot“) kann nur der **Besitzer des Bots** benutzen (Developer Portal; weitere Personen per `OWNER_IDS`). Der Bot
+1. liest die letzten Nachrichten des alten Bots in allen Kanälen (Panels, Level-Ups, Tierfotos, Bestenlisten, Willkommen …),
+2. liest – wenn du `dashboard:` (Adresse) und `passwort:` angibst – das alte Dashboard: genaue Einstellungen, **XP, Nachrichten und Sprachzeit aller Mitglieder**, Wortfilter, Musik-Filter, hochgeladene Tierfotos,
+3. zeigt einen Plan und übernimmt erst nach deinem Klick – auf Wunsch werden die alten Panels gelöscht und sauber neu gepostet.
+
+Vorher wird automatisch ein Backup erstellt („vor /nb“, im Dashboard unter *System → Backups* zurückspielbar). XP werden nur nach oben übernommen.
+Danach den alten Bot vom Server entfernen, sonst läuft alles doppelt. Der Bericht steht auch im Dashboard unter *System*.
+
 ### Stabiler und besser für Musik: Oracle Cloud „Always Free“
 Dauerhaft kostenlose Linux-VM, die nie schläft (Kreditkarte nur zur Identitätsprüfung):
 ```bash
@@ -125,19 +134,21 @@ sudo npm i -g pm2 && pm2 start src/index.js --name discord-bot && pm2 save && pm
 | `SKIP_BRANDING` | nein | `1` = Profilbild und Namen nie automatisch setzen |
 | `TRUST_PROXY` | nein | `1`, wenn der Bot hinter einem Proxy läuft (bei Render automatisch) – nötig für die Login-Sperre pro IP |
 | `DEV_GUILD_ID` | nein | Befehle nur auf diesem Server registrieren |
+| `OWNER_IDS` | nein | Weitere Nutzer-IDs, die `/nb` benutzen dürfen (Komma-getrennt) |
+| `OLD_DASHBOARD_URL` / `OLD_DASHBOARD_PASSWORD` | nein | Altes Dashboard für `/nb`, falls du es nicht im Befehl eintippen willst |
 | `KEEPALIVE_URL` | nein | Adresse für den Selbst-Ping (bei Render automatisch) |
 
 ## Für Entwickler
 
 ```bash
 npm install
-npm run check   # 54 Selbsttests ohne Discord: Befehle, Linkschutz, Lockdown, Temp-Voice, AutoMod, Level-Formeln, XP-Import,
+npm run check   # 58 Selbsttests ohne Discord: Befehle, Linkschutz, Lockdown, Temp-Voice, AutoMod, Level-Formeln, XP-Import,
                 # Quests, Münzen, Clips, Dashboard-API, Passwort-Login + Sperre, Eingabeprüfung, Audio-Kette (ffmpeg → Opus),
                 # Bildkarten, Wochen-Posts (Zeitplan inkl. Sommer-/Winterzeit), Rot-Schwarz-Farben
 npm start
 ```
 
-**Aufbau:** `src/index.js` (Start, Ereignisse, Zeitplaner) · `src/commands/` (63 Slash-Befehle) · `src/modules/` (Funktionen, `music/` für den Player) · `src/web/` (Dashboard: `server.js`, `schema.js` = erlaubte Einstellungen, `public/index.html` = Oberfläche) · `src/lib/` (Speicher, Linkfilter, Bildkarten) · `scripts/selftest.js`
+**Aufbau:** `src/index.js` (Start, Ereignisse, Zeitplaner) · `src/commands/` (64 Slash-Befehle) · `src/modules/` (Funktionen, `music/` für den Player) · `src/web/` (Dashboard: `server.js`, `schema.js` = erlaubte Einstellungen, `public/index.html` = Oberfläche) · `src/lib/` (Speicher, Linkfilter, Bildkarten) · `scripts/selftest.js`
 
 Musik: yt-dlp wird beim ersten `/play` automatisch nach `./bin` geladen und wöchentlich erneuert; ffmpeg kommt aus `ffmpeg-static`.
 

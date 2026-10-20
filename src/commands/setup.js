@@ -302,4 +302,24 @@ module.exports = [
       .setDefaultMemberPermissions(P.ManageGuild),
     execute: i => dashboard.show(i),
   },
+  {
+    // „Neuer Bot“: nur für den Besitzer des Bots (Developer Portal) – für alle anderen ausgeblendet
+    data: new SlashCommandBuilder().setName('nb').setDescription('Neuer Bot: Einstellungen und XP vom alten Bot übernehmen (nur Bot-Besitzer)')
+      .setDefaultMemberPermissions(P.Administrator)
+      .addUserOption(o => o.setName('alter_bot').setDescription('Welcher Bot war es? (leer = automatisch erkennen)'))
+      .addStringOption(o => o.setName('dashboard').setDescription('Adresse des alten Dashboards – für genaue Einstellungen und alle XP').setMaxLength(300))
+      .addStringOption(o => o.setName('passwort').setDescription('Passwort des alten Dashboards (nur du siehst die Antwort)').setMaxLength(200)),
+    async execute(i) {
+      const migrate = require('../modules/migrate');
+      if (!(await migrate.isBotOwner(i.user, i.client))) return respond(i, err('Nur der Besitzer des Bots darf /nb benutzen.'));
+      const oldBot = i.options.getUser('alter_bot');
+      if (oldBot && !oldBot.bot) return respond(i, err(`${oldBot} ist kein Bot.`));
+      await i.deferReply({ flags: 64 });
+      try {
+        return respond(i, await migrate.start(i, { oldBot, dashboard: i.options.getString('dashboard'), password: i.options.getString('passwort') }));
+      } catch (e) {
+        return respond(i, err(`Übernahme fehlgeschlagen: ${e.message}`));
+      }
+    },
+  },
 ];

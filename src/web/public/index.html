@@ -692,6 +692,7 @@ const SECTIONS = [
       ['alert.mentions', 'list', 'Diese Personen anpingen (Nutzer-IDs)', '123456789012345678'],
       ['alert.message', 'textarea', 'Alarm-Nachricht'],
     ] },
+    { title: '🔄 Übernahme vom alten Bot', custom: 'migration', note: 'In Discord /nb eingeben (nur der Besitzer des Bots sieht den Befehl). Der Bot liest, was der alte Bot gepostet und eingestellt hat, zeigt einen Plan und übernimmt erst nach deinem Klick. Mit dashboard: und passwort: kommen auch alle XP mit.', fields: [] },
     { title: '💾 Backups', custom: 'backups', note: 'Täglich automatisch. Vor jeder Wiederherstellung wird der aktuelle Stand zusätzlich gesichert.', fields: [
       ['backups.enabled', 'toggle', 'Tägliche Backups'],
       ['backups.keep', 'number', 'Wie viele behalten?'],
@@ -832,6 +833,15 @@ function cardEl(card) {
 
 // ---------- Eigene Karten-Inhalte ----------
 const CUSTOM = {
+  migration() {
+    const m = S.g.migration;
+    if (!m) return h('p', { class: 'empty' }, 'Noch keine Übernahme gemacht.');
+    const li = (icon, t, cls) => h('li', { class: cls || null }, icon, h('div', {}, t));
+    return h('div', { class: 'msec' },
+      h('h4', {}, `Zuletzt: ${new Date(m.at).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })} · ${m.oldBot || 'alter Bot'} · ${m.source}`),
+      h('ul', { class: 'hist' }, m.done.map(t => li('✅', t)), m.failed.map(t => li('⚠️', t)), m.skipped.map(t => li('➖', t, 'old')),
+        m.removed ? li('🧹', `${m.removed} alte Panels gelöscht`) : null));
+  },
   backups() {
     const box = h('div', { class: 'msec' }, h('p', { class: 'note' }, 'Lade Sicherungen …'));
     const draw = list => box.replaceChildren(
@@ -1223,6 +1233,9 @@ function demoData() {
         leaderboard: { enabled: true, channel: byName('allgemein'), weekday: 0, everyDays: 1, time: '12:00', text: '🏆 **Die aktuelle Bestenliste!** Wer schreibt sich diese Runde nach oben?' },
       },
     },
+    migration: { at: Date.now() - 2 * 3_600_000, oldBot: 'Red-Sun-Bot#9965', source: 'Discord + altes Dashboard', removed: 2,
+      done: ['👋 Willkommen – #willkommen · Auto-Rolle @Neu', '📈 XP & Statistik – 24 Mitglieder übernommen', '🏆 Bestenliste – #level · täglich 12:00', '🧮 Zählspiel – #counting · weiter ab 3'],
+      failed: [], skipped: ['🎉 Fun- & Prefix-Befehle: kommen noch'] },
   };
 }
 function demoMembers() {

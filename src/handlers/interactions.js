@@ -73,6 +73,7 @@ async function onInteraction(i) {
         case 'dash': return await dashboard.handleButton(i, [action, value]);
         case 'mu': return await require('../commands/music').handleButton(i, action);
         case 'sg': return await extras.onSuggestionButton(i, action);
+        case 'nb': return await require('../modules/migrate').handleButton(i, action, value);
         case 'lb': return await i.update({ content: '', files: [], attachments: [], ...leaderboardPayload(i.guild, parseInt(value, 10) || 0, action) });
       }
       return;

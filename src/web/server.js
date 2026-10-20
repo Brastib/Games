@@ -212,6 +212,7 @@ function start(client) {
     return {
       guild: { id: guild.id, name: guild.name, icon: guild.iconURL({ size: 128 }), memberCount: guild.memberCount, ownerId: guild.ownerId },
       isOwner, config: publicConfig(cfg), channels, roles,
+      migration: store.get('migrations', guild.id) || null,
       warnings: (client.limitedIntents || []).map(x => `${x.name} ist im Developer Portal aus – ohne funktioniert nicht: ${x.loses}.`),
       stats: {
         tempvoice: store.values('tempvoice').filter(r => r.guildId === guild.id).length,

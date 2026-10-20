@@ -67,8 +67,9 @@ async function poolAnimal(guild, p) {
     const batch = await ch.messages.fetch({ limit: 100, before }).catch(() => null);
     if (!batch?.size) break;
     for (const m of batch.values()) {
-      if (m.author.bot) continue;
-      for (const a of m.attachments.values()) if ((a.contentType || '').startsWith('image/')) found.push({ url: a.url, author: m.author.id, id: a.id, link: m.url });
+      const own = m.author.id === guild.client.user.id; // vom Bot übernommene Fotos (z. B. per /nb) – ohne Nennung
+      if (m.author.bot && !own) continue;
+      for (const a of m.attachments.values()) if ((a.contentType || '').startsWith('image/')) found.push({ url: a.url, author: own ? null : m.author.id, id: a.id, link: m.url });
     }
     before = batch.last().id;
   }
@@ -84,7 +85,7 @@ async function postAnimal(guild, channel) {
   if (p.source === 'pool' && p.poolChannel) {
     const pick = await poolAnimal(guild, p);
     url = pick.url;
-    credit = `\n📷 Foto von <@${pick.author}>`;
+    credit = pick.author ? `\n📷 Foto von <@${pick.author}>` : '';
     p.used = [...(p.used || []), pick.id].slice(-200);
   } else {
     const kind = p.source === 'mixed' || !p.source || p.source === 'pool' ? (Math.random() < 0.5 ? 'dogs' : 'cats') : p.source;
