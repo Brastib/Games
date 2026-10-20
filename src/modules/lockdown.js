@@ -3,6 +3,8 @@
  * Lockdown: Der ganze Server wird schreibgeschützt (und optional Sprachkanäle gesperrt + Einladungen pausiert).
  * Alle vorherigen Berechtigungen werden gesichert und beim Beenden exakt wiederhergestellt – auch nach einem Neustart.
  */
+const fs = require('fs');
+const path = require('path');
 const { ChannelType, EmbedBuilder, PermissionFlagsBits: P } = require('discord.js');
 const { getConfig, saveConfig } = require('../lib/config');
 const { sendLog } = require('../lib/logger');
@@ -46,7 +48,7 @@ async function start(guild, opts = {}) {
   if (cfg.lockdown.active) return { already: true };
   if (busy.has(guild.id)) return { busy: true };
   busy.add(guild.id);
-  const reason = opts.reason || 'Kein Grund angegeben';
+  const reason = opts.reason || cfg.lockdownAlarm?.reason || 'Kein Grund angegeben';
   const auditReason = `Lockdown: ${reason}`.slice(0, 500);
   const everyone = guild.roles.everyone;
   const backup = [];
@@ -124,6 +126,16 @@ async function start(guild, opts = {}) {
         }
       }
     }
+    // Warnung im Chat (auch wenn der Lockdown aus dem Dashboard oder automatisch kommt)
+    const alarmCh = guild.channels.cache.get(cfg.lockdownAlarm?.chatChannel) || guild.systemChannel;
+    if (alarmCh?.isTextBased?.() && alarmCh.id !== opts.announceChannel?.id && !(opts.announceAll && locked.includes(alarmCh))) {
+      await alarmCh.send({ embeds: [new EmbedBuilder().setColor(COLORS.protect).setTitle('🚨 LOCKDOWN AKTIV')
+        .setDescription(`Der Server ist gesperrt. **Bitte verlasst die Sprachkanäle** und wartet auf Entwarnung.
+
+**Grund:** ${reason}`)
+        .setTimestamp()] }).catch(() => {});
+    }
+    if (cfg.lockdownAlarm?.voice !== false) voiceAlarm(guild).catch(e => console.warn('[lockdown] Sprach-Alarm:', e.message));
     const log = EmbedBuilder.from(embed).setTitle('🔒 Lockdown gestartet')
       .setDescription(`**Grund:** ${reason}\n**Von:** ${opts.by ? `<@${opts.by.id}>` : 'Automatischer Schutz'}`);
     sendLog(guild, 'protection', log);
@@ -168,6 +180,8 @@ async function end(guild, { by = null, auto = false } = {}) {
       .setTitle('🔓 Lockdown beendet')
       .setDescription(`${auto ? 'Automatisch nach Ablauf der Zeit' : `Von ${by ? `<@${by.id}>` : 'unbekannt'}`} · Dauer: ${formatDuration(duration)}`)
       .setTimestamp());
+    const alarmCh = guild.channels.cache.get(cfg.lockdownAlarm?.chatChannel) || guild.systemChannel;
+    await alarmCh?.send?.({ embeds: [new EmbedBuilder().setColor(COLORS.ok).setTitle('✅ Entwarnung').setDescription('Der Lockdown ist vorbei, alles ist wieder offen.').setTimestamp()] }).catch(() => {});
     return { restored };
   } finally {
     busy.delete(guild.id);
@@ -213,4 +227,39 @@ async function processTimers(client) {
   }
 }
 
-module.exports = { start, end, lockChannel, unlockChannel, processTimers };
+// ---------------- Sprach-Alarm ----------------
+const ALARM_SOUND = path.join(__dirname, '..', '..', 'assets', 'sounds', 'lockdown.ogg');
+
+/**
+ * Geht nacheinander in jeden besetzten Sprachkanal (ein Bot kann pro Server nur in einem gleichzeitig sein),
+ * spielt Sirene + Durchsage „Lockdown aktiv – bitte verlassen Sie den Voice-Kanal“ und verlässt den Kanal danach.
+ * @returns {Promise<number>} in wie vielen Kanälen abgespielt wurde
+ */
+async function voiceAlarm(guild) {
+  const voice = require('@discordjs/voice');
+  require('./music/player').get(guild)?.destroy('Lockdown'); // Musik weg – die Sprachverbindung wird gebraucht
+  const me = guild.members.me;
+  const targets = [...guild.channels.cache.values()]
+    .filter(c => c.type === ChannelType.GuildVoice && c.members.some(m => !m.user.bot) && c.permissionsFor(me)?.has([P.Connect, P.Speak]))
+    .sort((a, b) => b.members.size - a.members.size);
+  let played = 0;
+  for (const ch of targets) {
+    if (!getConfig(guild.id).lockdown.active) break; // inzwischen beendet
+    try {
+      const conn = voice.joinVoiceChannel({ channelId: ch.id, guildId: guild.id, adapterCreator: guild.voiceAdapterCreator, selfDeaf: true });
+      await voice.entersState(conn, voice.VoiceConnectionStatus.Ready, 15_000);
+      const player = voice.createAudioPlayer();
+      conn.subscribe(player);
+      player.play(voice.createAudioResource(fs.createReadStream(ALARM_SOUND), { inputType: voice.StreamType.OggOpus }));
+      await voice.entersState(player, voice.AudioPlayerStatus.Playing, 5_000);
+      await voice.entersState(player, voice.AudioPlayerStatus.Idle, 40_000);
+      played++;
+    } catch (e) {
+      console.warn(`[lockdown] Sprach-Alarm in ${ch.name}: ${e.message}`);
+    }
+  }
+  voice.getVoiceConnection(guild.id)?.destroy();
+  return played;
+}
+
+module.exports = { voiceAlarm, ALARM_SOUND, start, end, lockChannel, unlockChannel, processTimers };

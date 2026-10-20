@@ -265,7 +265,7 @@ function start(client) {
     try {
       let message = 'Erledigt.';
       if (type === 'lockdownStart') {
-        const r = await require('../modules/lockdown').start(g, { reason: String(reason || 'Über das Web-Dashboard').slice(0, 300), by: user, minutes: Math.min(1440, Math.max(0, Number(minutes) || 0)) });
+        const r = await require('../modules/lockdown').start(g, { reason: reason ? String(reason).slice(0, 300) : null, by: user, minutes: Math.min(1440, Math.max(0, Number(minutes) || 0)) });
         message = r.already ? 'Lockdown läuft bereits.' : `Lockdown aktiv: ${r.locked} Kanäle gesperrt.`;
       } else if (type === 'lockdownEnd') {
         const r = await require('../modules/lockdown').end(g, { by: user });

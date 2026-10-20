@@ -42,7 +42,7 @@ module.exports = [
         if (durStr && !ms) return respond(i, err('Dauer nicht erkannt. Beispiele: `30m`, `2h`.'));
         await i.deferReply();
         const r = await lockdown.start(i.guild, {
-          reason: i.options.getString('grund') || 'Kein Grund angegeben', by: i.user, minutes: ms ? ms / 60_000 : 0,
+          reason: i.options.getString('grund') || null, by: i.user, minutes: ms ? ms / 60_000 : 0, // ohne Grund: Standard aus den Einstellungen
           voice: i.options.getBoolean('sprachkanaele') ?? true, pauseInvites: i.options.getBoolean('einladungen_pausieren') ?? true,
           announceAll: i.options.getBoolean('ueberall_ankuendigen') ?? false,
           onProgress: (d, t) => i.editReply(`⏳ Sperre Kanäle … ${d}/${t}`).catch(() => {}),

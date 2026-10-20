@@ -160,6 +160,7 @@ const SCHEMA = {
   'posts.leaderboard.time': v.time(), 'posts.leaderboard.text': v.str(300, 1), 'posts.leaderboard.everyDays': v.int(1, 30),
 
   quiet: v.bool(),
+  'lockdownAlarm.voice': v.bool(), 'lockdownAlarm.chatChannel': v.channel(TEXT), 'lockdownAlarm.reason': v.str(200, 1),
   'fun.enabled': v.bool(), 'prefix.enabled': v.bool(), 'prefix.char': x => (typeof x === 'string' && /^[^\s\w/@#<>]{1,3}$/.test(x) ? x : fail('1–3 Zeichen wie ! ? . $ – keine Buchstaben, kein /')),
   'tickets.archiveCategory': v.category(),
   autoresponders: v.autoresponders(),

@@ -57,6 +57,8 @@ function defaults() {
       trusted: [],
     },
     lockdown: { active: false, since: 0, until: 0, reason: '', by: null, backup: [], invitesPaused: false },
+    // Beim Lockdown: Sirene + Durchsage in allen besetzten Sprachkanälen, Warnung im Chat; Grund, wenn keiner angegeben ist
+    lockdownAlarm: { voice: true, chatChannel: null, reason: 'Auf Befehl von Basti' },
     lockedChannels: {},
     // hubs: [{ id, category, nameTemplate, limit }] – "Kanal erstellen"-Sprachkanäle (im Dashboard einstellbar)
     tempvoice: { enabled: false, hubs: [], hub: null, category: null, panelChannel: null, nameTemplate: '🔊 {name}', limit: 0, panelInChat: true },

@@ -472,6 +472,11 @@ const SECTIONS = [
   { id: 'overview', label: 'Übersicht' },
   { id: 'members', label: 'Mitglieder' },
   { id: 'protect', label: 'Schutz', cards: [
+    { title: '🚨 Lockdown-Alarm', note: 'Beim Lockdown geht der Bot nacheinander in jeden besetzten Sprachkanal und spielt Sirene + Durchsage „Lockdown aktiv – bitte verlassen Sie den Voice-Kanal“. Dazu eine Warnung im Chat und am Ende eine Entwarnung.', fields: [
+      ['lockdownAlarm.voice', 'toggle', 'Sirene + Durchsage in den Sprachkanälen'],
+      ['lockdownAlarm.chatChannel', 'channel', 'Warnung in diesem Kanal (leer = System-Kanal)', TXT],
+      ['lockdownAlarm.reason', 'text', 'Grund, wenn keiner angegeben wird'],
+    ] },
     { title: 'Linkschutz', note: 'GIFs (Tenor, Giphy, Klipy), hochgeladene Dateien, YouTube, Twitch und Discord sind immer erlaubt. Blockiert werden Betrug, IP-Logger, Kurz-Links und Fälschungen.', fields: [
       ['automod.links.enabled', 'toggle', 'Linkschutz an'],
       ['automod.links.mode', 'select', 'Modus', { smart: 'Smart – nur gefährliche Links', strict: 'Streng – nur Erlaubt-Liste', off: 'Aus' }],
@@ -921,7 +926,7 @@ function overview() {
           L.active
             ? h('button', { class: 'btn', onclick: e => action('lockdownEnd', {}, e.currentTarget) }, '🔓 Lockdown beenden')
             : h('div', { class: 'chips' },
-              h('input', { class: 'inp', placeholder: 'Grund (optional)', oninput: e => { reason = e.target.value; } }),
+              h('input', { class: 'inp', placeholder: `Grund (leer = „${c.lockdownAlarm?.reason || 'Auf Befehl von Basti'}“)`, oninput: e => { reason = e.target.value; } }),
               h('input', { class: 'inp num', type: 'number', min: 0, max: 1440, placeholder: 'Min.', title: 'Automatisch beenden nach Minuten (0 = manuell)', oninput: e => { minutes = Number(e.target.value) || 0; } }),
               h('button', { class: 'btn big', onclick: e => action('lockdownStart', { reason, minutes }, e.currentTarget) }, '🔒 Lockdown starten')))),
       h('section', { class: 'card' }, h('h3', {}, 'Module'), h('div', { class: 'toggles' }, quick.map(([p, l]) =>
@@ -1263,6 +1268,7 @@ function demoData() {
       freegames: { enabled: true, channel: byName('allgemein'), role: null, deleteExpired: true },
       alert: { enabled: false, webhook: null, mentions: [], message: '🚨 **ETC. Bot ist offline!** Bitte nachsehen.' },
       backups: { enabled: true, keep: 7 },
+      lockdownAlarm: { voice: true, chatChannel: null, reason: 'Auf Befehl von Basti' },
       fun: { enabled: true }, prefix: { enabled: true, char: '!' },
       posts: {
         animal: { enabled: true, channel: byName('allgemein'), weekday: 0, time: '18:00', source: 'mixed', poolChannel: null, text: '🐱🐶 **Hier ist dein wöchentliches Tierfoto!**' },

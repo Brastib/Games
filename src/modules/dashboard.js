@@ -102,7 +102,7 @@ async function handleButton(interaction, parts) {
   if (action === 'lockdown') {
     await interaction.deferUpdate();
     if (c.lockdown.active) await lockdown.end(guild, { by: interaction.user });
-    else await lockdown.start(guild, { reason: 'Über das Dashboard gestartet', by: interaction.user, announceChannel: interaction.channel });
+    else await lockdown.start(guild, { reason: null, by: interaction.user, announceChannel: interaction.channel });
     return interaction.editReply(view(guild));
   }
   if (action === 't') {

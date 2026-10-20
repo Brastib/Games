@@ -1,0 +1,3 @@
+lockdown.ogg – Sirene (mit ffmpeg erzeugt) + Durchsage „Achtung! Achtung! Lockdown aktiv. Bitte verlassen Sie sofort den Voice-Kanal …“
+Stimme erzeugt mit Piper (https://github.com/rhasspy/piper), Stimme de_DE „thorsten“ (Thorsten-Voice, CC0).
+Neu erzeugen: siehe scripts/make-lockdown-sound.md

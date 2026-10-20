@@ -811,6 +811,25 @@ async function test(name, fn) {
     delete process.env.DASHBOARD_URL;
   });
 
+  await test('Lockdown-Alarm: Tondatei ok (Opus, ~16 s), Standard-Grund, Warnung + Entwarnung im Chat', async () => {
+    const ld = require('../src/modules/lockdown');
+    assert(fs.statSync(ld.ALARM_SOUND).size > 50_000, 'Tondatei fehlt');
+    const { spawnSync } = require('child_process');
+    const probe = spawnSync(require('ffmpeg-static'), ['-hide_banner', '-i', ld.ALARM_SOUND, '-f', 'null', '-'], { encoding: 'utf8' }).stderr;
+    assert(/opus/.test(probe) && /Duration: 00:00:1[0-9]/.test(probe), 'Opus, 10–19 Sekunden');
+    const g = fakeGuild();
+    g.id = 'g-alarm';
+    const posts = [];
+    g.systemChannel = { id: 'sys', isTextBased: () => true, send: async m => { posts.push(m.embeds[0].data); } };
+    g.members = { me: { id: 'bot' } };
+    getConfig('g-alarm').lockdownAlarm.voice = false; // Sprachkanäle gibt es im Test nicht
+    await ld.start(g, { by: { id: 'u', tag: 'u' } });
+    assert.strictEqual(getConfig('g-alarm').lockdown.reason, 'Auf Befehl von Basti');
+    assert(posts.some(p => p.title === '🚨 LOCKDOWN AKTIV' && /Auf Befehl von Basti/.test(p.description)));
+    await ld.end(g, { by: { id: 'u', tag: 'u' } });
+    assert(posts.some(p => p.title === '✅ Entwarnung'));
+  });
+
   console.log('\n🎨 Rot-Schwarz-Theme');
   await test('Keine blauen/grünen Buttons und Embed-Farben (außer frei wählbaren Rollen-Buttons)', () => {
     const { COLORS } = require('../src/lib/embeds');
