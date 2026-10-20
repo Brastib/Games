@@ -25,11 +25,19 @@ module.exports = [
         .addBooleanOption(o => o.setName('einladungen_pausieren').setDescription('Einladungen pausieren, damit niemand Neues beitritt? (Standard: ja)'))
         .addBooleanOption(o => o.setName('ueberall_ankuendigen').setDescription('Hinweis in jedem gesperrten Kanal posten? (Standard: nein)')))
       .addSubcommand(s => s.setName('end').setDescription('Lockdown beenden und alles wiederherstellen'))
-      .addSubcommand(s => s.setName('status').setDescription('Zeigt, ob gerade ein Lockdown läuft')),
+      .addSubcommand(s => s.setName('status').setDescription('Zeigt, ob gerade ein Lockdown läuft'))
+      .addSubcommand(s => s.setName('sirenentest').setDescription('Sirene + Durchsage nur in deinem Sprachkanal testen – ohne Lockdown')),
     async execute(i) {
       if (!isStaff(i.member)) return respond(i, err('Nur das Team darf das.'));
       const sub = i.options.getSubcommand();
       const cfg = getConfig(i.guild.id);
+      if (sub === 'sirenentest') {
+        const vc = i.member.voice.channel;
+        if (!vc) return respond(i, err('Geh zuerst in einen Sprachkanal.'));
+        await i.deferReply({ flags: 64 });
+        const n = await lockdown.voiceAlarm(i.guild, { only: vc.id, test: true });
+        return respond(i, n ? ok(`Sirene in ${vc} abgespielt.`) : err('Konnte nicht abspielen – darf ich dem Kanal beitreten und sprechen? (Log: journalctl -u etc-bot)'));
+      }
       if (sub === 'status') {
         const l = cfg.lockdown;
         return respond(i, l.active

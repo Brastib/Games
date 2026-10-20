@@ -235,16 +235,16 @@ const ALARM_SOUND = path.join(__dirname, '..', '..', 'assets', 'sounds', 'lockdo
  * spielt Sirene + Durchsage „Lockdown aktiv – bitte verlassen Sie den Voice-Kanal“ und verlässt den Kanal danach.
  * @returns {Promise<number>} in wie vielen Kanälen abgespielt wurde
  */
-async function voiceAlarm(guild) {
+async function voiceAlarm(guild, { only = null, test = false } = {}) {
   const voice = require('@discordjs/voice');
   require('./music/player').get(guild)?.destroy('Lockdown'); // Musik weg – die Sprachverbindung wird gebraucht
   const me = guild.members.me;
   const targets = [...guild.channels.cache.values()]
-    .filter(c => c.type === ChannelType.GuildVoice && c.members.some(m => !m.user.bot) && c.permissionsFor(me)?.has([P.Connect, P.Speak]))
+    .filter(c => c.type === ChannelType.GuildVoice && (!only || c.id === only) && c.members.some(m => !m.user.bot) && c.permissionsFor(me)?.has([P.Connect, P.Speak]))
     .sort((a, b) => b.members.size - a.members.size);
   let played = 0;
   for (const ch of targets) {
-    if (!getConfig(guild.id).lockdown.active) break; // inzwischen beendet
+    if (!test && !getConfig(guild.id).lockdown.active) break; // inzwischen beendet
     try {
       const conn = voice.joinVoiceChannel({ channelId: ch.id, guildId: guild.id, adapterCreator: guild.voiceAdapterCreator, selfDeaf: true });
       await voice.entersState(conn, voice.VoiceConnectionStatus.Ready, 15_000);
