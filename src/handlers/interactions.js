@@ -65,6 +65,7 @@ async function onInteraction(i) {
     if (i.isButton()) {
       switch (ns) {
         case 'tv': return await tempvoice.handleButton(i, action);
+        case 'tvc': return await tempvoice.handleConfirm(i, action, value);
         case 'tk': return await tickets.handleButton(i, action);
         case 'vr': return await verify.handleButton(i);
         case 'rp': return await rolepanels.onButton(i, action);
@@ -72,7 +73,7 @@ async function onInteraction(i) {
         case 'dash': return await dashboard.handleButton(i, [action, value]);
         case 'mu': return await require('../commands/music').handleButton(i, action);
         case 'sg': return await extras.onSuggestionButton(i, action);
-        case 'lb': return await i.update(leaderboardPayload(i.guild, parseInt(value, 10) || 0, action));
+        case 'lb': return await i.update({ content: '', files: [], attachments: [], ...leaderboardPayload(i.guild, parseInt(value, 10) || 0, action) });
       }
       return;
     }

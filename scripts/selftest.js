@@ -236,7 +236,8 @@ async function test(name, fn) {
     const sent = [];
     const guild = { id: guildId, roles: { cache: new Collection() }, channels: { cache: new Collection() } };
     const channel = { isTextBased: () => true, send: async m => { sent.push(m); return { delete: async () => {} }; } };
-    return { id, guild, user: { id, bot: false, displayAvatarURL: () => '' }, roles: { cache: new Collection(), add: async () => {} }, displayName: id, sent, channel };
+    const avatar = () => 'https://cdn.discordapp.com/embed/avatars/0.png';
+    return { id, guild, user: { id, bot: false, displayAvatarURL: avatar }, displayAvatarURL: avatar, roles: { cache: new Collection(), add: async () => {} }, displayName: id, sent, channel };
   }
 
   console.log('\n🗓️  Quests, Level & Münzen');

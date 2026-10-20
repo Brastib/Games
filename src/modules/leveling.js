@@ -1,7 +1,10 @@
 'use strict';
 /**
- * Level-System (wie MEE6): 15–25 XP pro Nachricht, höchstens einmal pro Minute.
- * XP für nächstes Level: 5·L² + 50·L + 100. Rollen-Belohnungen pro Level.
+ * Level-System.
+ *  - Formel 'etc' (Standard, wie der bisherige ETC. Bot): Level L braucht insgesamt 100·L² XP
+ *    → Level 11 ab 12.100 XP, Level 29 ab 84.100 XP, nächstes Level (30) bei 90.000 XP.
+ *  - Formel 'mee6': pro Level 5·L² + 50·L + 100 XP.
+ * XP: 15–25 pro Nachricht (höchstens einmal pro Minute), Sprachzeit, Clips, Quests.
  */
 const { AttachmentBuilder, EmbedBuilder } = require('discord.js');
 const store = require('../lib/store');
@@ -10,20 +13,36 @@ const { COLORS } = require('../lib/embeds');
 const { fillTemplate, randomInt, progressBar } = require('../lib/util');
 const cards = require('../lib/cards');
 
-const needFor = level => 5 * level * level + 50 * level + 100;
 const key = (g, u) => `${g}:${u}`;
+const mee6Step = l => 5 * l * l + 50 * l + 100;
 
-function levelFromXp(xp) {
-  let level = 0;
-  let rest = xp;
-  while (rest >= needFor(level)) { rest -= needFor(level); level++; }
-  return { level, xpIn: rest, xpNeed: needFor(level) };
+const CURVES = {
+  etc: {
+    label: 'ETC. (100 × Level²)',
+    total: l => 100 * l * l,
+    level: xp => Math.floor(Math.sqrt(Math.max(0, xp) / 100)),
+  },
+  mee6: {
+    label: 'MEE6',
+    total: l => { let x = 0; for (let i = 0; i < l; i++) x += mee6Step(i); return x; },
+    level: xp => { let l = 0, rest = Math.max(0, xp); while (rest >= mee6Step(l)) { rest -= mee6Step(l); l++; } return l; },
+  },
+};
+
+function curve(guildId) {
+  return CURVES[guildId && getConfig(guildId).levels.formula] || CURVES.etc;
 }
-function xpForLevel(level) {
-  let xp = 0;
-  for (let l = 0; l < level; l++) xp += needFor(l);
-  return xp;
+
+/** Level aus Gesamt-XP. xpIn/xpNeed = Fortschritt im aktuellen Level, nextTotal = Gesamt-XP fürs nächste Level */
+function levelFromXp(xp, guildId) {
+  const c = curve(guildId);
+  let level = c.level(xp);
+  while (c.total(level + 1) <= xp) level++;
+  while (level > 0 && c.total(level) > xp) level--;
+  const start = c.total(level), nextTotal = c.total(level + 1);
+  return { level, xpIn: xp - start, xpNeed: nextTotal - start, nextTotal };
 }
+function xpForLevel(level, guildId) { return curve(guildId).total(level); }
 
 function getData(guildId, userId) {
   return store.get('levels', key(guildId, userId)) || { xp: 0, msgs: 0, last: 0 };
@@ -57,11 +76,28 @@ async function applyRewards(member, level) {
   return added;
 }
 
+/** Level-Up-Nachricht wie beim bisherigen ETC. Bot */
+function levelUpPayload(member, level, roles = []) {
+  const cfg = getConfig(member.guild.id).levels;
+  const text = fillTemplate(cfg.message, { member, extra: { level: String(level) } }) +
+    (roles.length ? `\nNeue Rolle: ${roles.map(r => `<@&${r.id}>`).join(', ')}` : '');
+  if (cfg.style === 'text') return { content: text, allowedMentions: { users: [member.id] } };
+  const { nextTotal } = levelFromXp(xpForLevel(level, member.guild.id), member.guild.id);
+  return {
+    embeds: [new EmbedBuilder()
+      .setColor(COLORS.brand)
+      .setTitle('⬆️ Level Up!')
+      .setDescription(text)
+      .addFields({ name: 'XP für nächstes Level', value: String(nextTotal) })
+      .setThumbnail(member.displayAvatarURL({ size: 256 }))
+      .setTimestamp()],
+    allowedMentions: { parse: [] },
+  };
+}
+
 /**
  * XP gutschreiben (Nachrichten, Sprachzeit, Clips, Quests …) und Level-Aufstieg verkünden.
- * @param {import('discord.js').GuildMember} member
- * @param {number} amount
- * @param {{ channel?: any, stat?: string, statAmount?: number, ignoreMultiplier?: boolean }} opts
+ * @param {{ channel?: any, stat?: string, statAmount?: number, ignoreMultiplier?: boolean, silent?: boolean }} opts
  */
 async function addXp(member, amount, opts = {}) {
   if (!member?.guild || member.user.bot) return null;
@@ -70,16 +106,14 @@ async function addXp(member, amount, opts = {}) {
   const k = key(member.guild.id, member.id);
   const d = getData(member.guild.id, member.id);
   if (opts.stat) d[opts.stat] = (d[opts.stat] || 0) + (opts.statAmount ?? 1);
-  const before = levelFromXp(d.xp).level;
+  const before = levelFromXp(d.xp, member.guild.id).level;
   d.xp = Math.max(0, d.xp + Math.round(amount * (opts.ignoreMultiplier ? 1 : (cfg.multiplier || 1))));
   store.set('levels', k, d);
-  const after = levelFromXp(d.xp).level;
-  if (after > before) {
+  const after = levelFromXp(d.xp, member.guild.id).level;
+  if (after > before && !opts.silent) {
     const roles = await applyRewards(member, after);
-    const text = fillTemplate(cfg.message, { member, extra: { level: String(after) } }) +
-      (roles.length ? `\nNeue Rolle: ${roles.map(r => `<@&${r.id}>`).join(', ')}` : '');
     const target = member.guild.channels.cache.get(cfg.channel) || opts.channel;
-    if (target?.isTextBased?.()) await target.send({ content: text, allowedMentions: { users: [member.id] } }).catch(() => {});
+    if (target?.isTextBased?.()) await target.send(levelUpPayload(member, after, roles)).catch(() => {});
   }
   return { level: after, xp: d.xp, levelUp: after > before };
 }
@@ -124,14 +158,14 @@ async function setXp(member, xp) {
   const d = getData(member.guild.id, member.id);
   d.xp = Math.max(0, Math.round(xp));
   store.set('levels', key(member.guild.id, member.id), d);
-  const lvl = levelFromXp(d.xp).level;
+  const lvl = levelFromXp(d.xp, member.guild.id).level;
   await applyRewards(member, lvl);
   return lvl;
 }
 
 async function rankPayload(member) {
   const d = getData(member.guild.id, member.id);
-  const { level, xpIn, xpNeed } = levelFromXp(d.xp);
+  const { level, xpIn, xpNeed } = levelFromXp(d.xp, member.guild.id);
   const rank = rankOf(member.guild.id, member.id) || '–';
   const png = await cards.rankCard(member, { level, xpIn, xpNeed, rank, totalXp: d.xp }).catch(() => null);
   if (png) return { files: [new AttachmentBuilder(png, { name: 'rang.png' })] };
@@ -141,4 +175,74 @@ async function rankPayload(member) {
   };
 }
 
-module.exports = { needFor, levelFromXp, xpForLevel, getData, leaderboard, rankOf, onMessage, addXp, voiceTick, setXp, rankPayload, applyRewards };
+/** Bestenliste als Bild (Top 10) – wie beim bisherigen ETC. Bot */
+async function leaderboardImage(guild, limit = 10) {
+  const top = leaderboard(guild.id).filter(e => e.xp > 0).slice(0, limit);
+  if (!top.length) return null;
+  const entries = await Promise.all(top.map(async e => {
+    const m = guild.members.cache.get(e.userId) || await guild.members.fetch(e.userId).catch(() => null);
+    const u = m?.user || await guild.client.users.fetch(e.userId).catch(() => null);
+    return {
+      name: m?.displayName || u?.globalName || u?.username || 'Unbekannt',
+      avatar: (m || u)?.displayAvatarURL?.({ extension: 'png', size: 128 }) || null,
+      level: levelFromXp(e.xp, guild.id).level, xp: e.xp,
+    };
+  }));
+  return cards.leaderboardCard(entries, { title: 'ETC.', subtitle: 'BESTENLISTE' });
+}
+
+// ---------------- Import (bisherige XP übernehmen) ----------------
+/**
+ * Liest eine Liste mit XP ein. Erlaubt:
+ *  - JSON: {"<id>": 12345}, [{"id": "...", "xp": 123}], {"players": [{"id","xp","level"}]} (z. B. MEE6-Export)
+ *  - CSV/TXT: id,xp  oder  name,xp  oder  id;level  (Trennzeichen , ; Tab; Kopfzeile optional; 114.451 = 114451)
+ * Ohne ID wird der Name mit den Mitgliedern des Servers abgeglichen.
+ */
+function parseImport(text) {
+  const rows = [];
+  const push = (who, xp, level) => rows.push({ who: String(who ?? '').trim(), xp: xp == null ? null : Number(String(xp).replace(/[.\s]/g, '').replace(',', '.')), level: level == null ? null : Number(level) });
+  const trimmed = text.trim().replace(/^﻿/, '');
+  if (/^[[{]/.test(trimmed)) {
+    const d = JSON.parse(trimmed);
+    const list = Array.isArray(d) ? d : (d.players || d.users || d.leaderboard || d.levels || null);
+    if (list) for (const e of list) push(e.id ?? e.userId ?? e.user_id ?? e.discordId ?? e.name ?? e.username, e.xp ?? e.totalXp ?? e.total_xp ?? e.experience ?? e.XP, e.level);
+    else for (const [k, v] of Object.entries(d)) push(k, typeof v === 'object' ? (v.xp ?? v.totalXp) : v, typeof v === 'object' ? v.level : null);
+    return rows;
+  }
+  for (const line of trimmed.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const parts = line.split(/[;,\t|]/).map(x => x.trim()).filter(Boolean);
+    if (parts.length < 2) continue;
+    if (/^(id|user|name|nutzer|mitglied)/i.test(parts[0]) && /xp|level|punkte/i.test(parts[1])) continue; // Kopfzeile
+    const val = parts[1];
+    if (/level/i.test(line) && !/xp/i.test(line)) push(parts[0], null, parseInt(val, 10));
+    else push(parts[0], val, parts[2] && /^\d+$/.test(parts[2]) ? parts[2] : null);
+  }
+  return rows;
+}
+
+async function importXp(guild, text, { mode = 'set' } = {}) {
+  const rows = parseImport(text);
+  await guild.members.fetch().catch(() => {});
+  const byName = new Map();
+  for (const m of guild.members.cache.values()) {
+    for (const n of [m.user.username, m.user.globalName, m.displayName, m.nickname]) if (n) byName.set(n.toLowerCase(), m.id);
+  }
+  let imported = 0;
+  const missing = [];
+  for (const r of rows) {
+    const id = /^\d{17,20}$/.test(r.who) ? r.who : byName.get(r.who.toLowerCase());
+    let xp = Number.isFinite(r.xp) ? r.xp : (Number.isFinite(r.level) ? xpForLevel(r.level, guild.id) : null);
+    if (!id || xp == null || xp < 0) { missing.push(r.who || '?'); continue; }
+    const d = getData(guild.id, id);
+    d.xp = Math.round(mode === 'add' ? (d.xp || 0) + xp : xp);
+    store.set('levels', key(guild.id, id), d);
+    imported++;
+  }
+  return { imported, missing, total: rows.length };
+}
+
+module.exports = {
+  CURVES, curve, levelFromXp, xpForLevel, getData, leaderboard, rankOf, onMessage, addXp, voiceTick, setXp,
+  rankPayload, applyRewards, levelUpPayload, leaderboardImage, parseImport, importXp,
+};

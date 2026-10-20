@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Bild-Karten (Willkommen & Rang) mit @napi-rs/canvas.
+ * Bild-Karten (Willkommen, Rang, Bestenliste) mit @napi-rs/canvas.
  * Ist das Paket nicht verfügbar, gibt jede Funktion null zurück und der Bot nutzt normale Embeds.
  */
 const path = require('path');
@@ -140,4 +140,86 @@ function roundRect(ctx, x, y, w, h, r) {
 
 const fmt = n => (n >= 1000 ? (n / 1000).toFixed(1).replace('.0', '') + 'k' : String(n));
 
-module.exports = { welcomeCard, rankCard, available: () => !!C };
+async function loadUrl(url) {
+  if (!url) return null;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    return await C.loadImage(Buffer.from(await res.arrayBuffer()));
+  } catch {
+    return null;
+  }
+}
+
+const MEDALS = ['#f5b301', '#c9d1dc', '#d9822b']; // Gold, Silber, Bronze
+const ICON = path.join(__dirname, '..', '..', 'assets', 'icon', 'etc-bot-256.png');
+
+/**
+ * Bestenliste als Bild (Top 10): Platz, Profilbild, Name, Level · XP, Balken im Verhältnis zum Ersten.
+ * entries: [{ name, avatar (URL), level, xp }]
+ */
+async function leaderboardCard(entries, { title = 'ETC.', subtitle = 'BESTENLISTE' } = {}) {
+  if (!C || !entries.length) return null;
+  const S = 2; // doppelte Auflösung für scharfe Schrift
+  const w = 600, rowH = 52, gap = 8, head = 78, pad = 16;
+  const h = head + entries.length * (rowH + gap) + pad;
+  const canvas = C.createCanvas(w * S, h * S);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(S, S);
+  ctx.fillStyle = '#050505';
+  ctx.fillRect(0, 0, w, h);
+
+  // Kopf: Bot-Icon + Titel
+  const icon = await C.loadImage(ICON).catch(() => null);
+  if (icon) {
+    ctx.save(); ctx.beginPath(); ctx.arc(pad + 20, 38, 20, 0, Math.PI * 2); ctx.clip();
+    ctx.drawImage(icon, pad, 18, 40, 40); ctx.restore();
+    ctx.strokeStyle = ACCENT; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(pad + 20, 38, 21, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.fillStyle = ACCENT;
+  ctx.font = '26px "Poppins ExtraBold"';
+  ctx.fillText(title, pad + 52, 47);
+  const tw = ctx.measureText(title).width;
+  ctx.fillStyle = DIM;
+  ctx.font = '15px "Poppins ExtraBold"';
+  ctx.fillText(subtitle, pad + 60 + tw, 46);
+  ctx.fillStyle = '#1a0000';
+  ctx.fillRect(pad, head - 12, w - pad * 2, 2);
+
+  const top = Math.max(1, entries[0].xp);
+  const avatars = await Promise.all(entries.map(e => loadUrl(e.avatar)));
+  entries.forEach((e, i) => {
+    const y = head + i * (rowH + gap);
+    const medal = MEDALS[i];
+    ctx.fillStyle = i < 3 ? '#140000' : '#0e0e0e';
+    roundRect(ctx, pad, y, w - pad * 2, rowH, 10); ctx.fill();
+    if (medal) { ctx.fillStyle = medal; roundRect(ctx, pad, y, 4, rowH, 2); ctx.fill(); }
+    // Platz
+    ctx.fillStyle = medal || '#b80000';
+    ctx.font = '17px "Poppins ExtraBold"';
+    ctx.textAlign = 'center';
+    ctx.fillText(String(i + 1), pad + 30, y + rowH / 2 + 6);
+    ctx.textAlign = 'left';
+    // Profilbild
+    const ax = pad + 66, ay = y + rowH / 2, ar = 17;
+    ctx.save(); ctx.beginPath(); ctx.arc(ax, ay, ar, 0, Math.PI * 2); ctx.clip();
+    if (avatars[i]) ctx.drawImage(avatars[i], ax - ar, ay - ar, ar * 2, ar * 2);
+    else { ctx.fillStyle = TRACK; ctx.fillRect(ax - ar, ay - ar, ar * 2, ar * 2); }
+    ctx.restore();
+    if (medal) { ctx.strokeStyle = medal; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ax, ay, ar + 1.5, 0, Math.PI * 2); ctx.stroke(); }
+    // Name + Level/XP
+    ctx.fillStyle = '#ffffff';
+    ctx.font = fitText(ctx, e.name, 250, 15, 'Poppins ExtraBold');
+    ctx.fillText(e.name, ax + 28, y + 23);
+    ctx.fillStyle = '#b80000';
+    ctx.font = '11px "Poppins Bold"';
+    ctx.fillText(`Level ${e.level}  ·  ${e.xp.toLocaleString('de-DE')} XP`, ax + 28, y + 40);
+    // Balken im Verhältnis zum Ersten
+    const bw = 150, bx = w - pad - 16 - bw, by = y + rowH / 2 - 3;
+    ctx.fillStyle = TRACK; roundRect(ctx, bx, by, bw, 6, 3); ctx.fill();
+    ctx.fillStyle = medal || ACCENT; roundRect(ctx, bx, by, Math.max(6, bw * (e.xp / top)), 6, 3); ctx.fill();
+  });
+  return canvas.encode('png');
+}
+
+module.exports = { welcomeCard, rankCard, leaderboardCard, available: () => !!C };

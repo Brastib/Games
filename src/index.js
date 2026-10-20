@@ -25,6 +25,7 @@ const moderation = require('./modules/moderation');
 const quests = require('./modules/quests');
 const clips = require('./modules/clips');
 const extras = require('./modules/extras');
+const autoposts = require('./modules/autoposts');
 const web = require('./web/server');
 
 const client = new Client({
@@ -78,6 +79,8 @@ async function tick() {
     await lockdown.processTimers(client);
     await antiraid.processTimers(client);
     await extras.processReminders(client);
+    await tempvoice.processTimers(client);
+    await autoposts.check(client);
   } catch (e) {
     console.error('[zeitplaner]', e);
   } finally {

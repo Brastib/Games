@@ -1,15 +1,15 @@
 'use strict';
 const {
-  SlashCommandBuilder, PermissionFlagsBits: P, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, InviteTargetType,
+  SlashCommandBuilder, PermissionFlagsBits: P, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
 } = require('discord.js');
 const { getConfig } = require('../lib/config');
 const { COLORS, ok, err, respond, EPHEMERAL } = require('../lib/embeds');
 const { truncate } = require('../lib/util');
 const music = require('../modules/music/player');
-const { resolve, suggest, lyrics } = require('../modules/music/resolve');
-const quests = require('../modules/quests');
+const { suggest, lyrics } = require('../modules/music/resolve');
+const service = require('../modules/music/service');
+const { ACTIVITIES, inviteFor } = require('../lib/activities');
 
-const WATCH_TOGETHER_ID = '880218394199220334'; // offizielle Discord-Aktivität "Watch Together" (YouTube)
 
 /** Prüft Sprachkanal, DJ-Rolle usw. Gibt Fehlertext oder null zurück. */
 function check(i, { needPlayer = true, dj = false } = {}) {
@@ -56,16 +56,8 @@ async function allSounds(guild) {
   return [...(own?.values() || []), ...(defaultSounds?.values() || [])];
 }
 
-async function joinFor(i) {
-  const vc = i.member.voice.channel;
-  const me = i.guild.members.me;
-  const perms = vc.permissionsFor(me);
-  if (!perms?.has(P.Connect) || !perms.has(P.Speak)) throw new Error(`Ich darf in ${vc} nicht beitreten oder sprechen.`);
-  const p = music.getOrCreate(i.guild);
-  const cfg = getConfig(i.guild.id).music;
-  p.textChannel = i.guild.channels.cache.get(cfg.channel) || i.channel;
-  await p.connect(vc);
-  return p;
+function joinFor(i) {
+  return service.join(i.guild, i.member.voice.channel, i.channel);
 }
 
 const simple = (name, desc, dj, fn) => ({
@@ -95,20 +87,10 @@ module.exports = [
       if (!q && !file) return respond(i, err('Gib einen Link, einen Songnamen oder eine Datei an.'));
       if (file && !/^(audio|video)\//.test(file.contentType || '')) return respond(i, err('Das ist keine Audio- oder Videodatei.'));
       await i.deferReply();
-      let result;
       try {
-        result = await resolve(q || '', i.user.id, file);
-      } catch (x) { return respond(i, err(`Nichts gefunden: ${truncate(x.message, 300)}`)); }
-      let p;
-      try { p = await joinFor(i); } catch (x) { return respond(i, err(`Konnte dem Sprachkanal nicht beitreten: ${x.message}`)); }
-      const wasIdle = !p.current;
-      const added = await p.add(result.tracks, { front: i.options.getBoolean('als_naechstes') ?? false });
-      quests.progress(i.member, 'music', 1, i.channel);
-      const t = result.tracks[0];
-      if (result.playlist) return respond(i, ok(`📃 **${added}** Songs aus **${truncate(result.playlist, 100)}** hinzugefügt.`));
-      return respond(i, new EmbedBuilder().setColor(COLORS.ok)
-        .setDescription(`${wasIdle ? '▶️ **Spiele:**' : `➕ **Hinzugefügt** (Platz ${p.queue.indexOf(t) + 1}):`} [${truncate(t.title, 150)}](${/^https?:/.test(t.url) ? t.url : 'https://discord.com'}) · \`${music.fmtTime(t.duration)}\` · ${t.source}`)
-        .setThumbnail(t.thumbnail || null));
+        const r = await service.play({ guild: i.guild, member: i.member, voiceChannel: i.member.voice.channel, textChannel: i.channel, query: q || '', attachment: file, front: i.options.getBoolean('als_naechstes') ?? false });
+        return respond(i, service.resultEmbed(r));
+      } catch (x) { return respond(i, err(truncate(x.message, 400))); }
     },
   },
   simple('pause', 'Musik pausieren', false, async (i, p) => { p.pause(); await p.updateNowPlaying(); return respond(i, ok('⏸️ Pausiert.'), { ephemeral: false }); }),
@@ -246,19 +228,21 @@ module.exports = [
     },
   },
   {
-    data: new SlashCommandBuilder().setName('watch').setDescription('YouTube gemeinsam im Sprachkanal schauen (Discord „Watch Together“)'),
+    data: new SlashCommandBuilder().setName('watch').setDescription('YouTube gemeinsam schauen oder eine andere Discord-Aktivität im Sprachkanal starten')
+      .addStringOption(o => o.setName('aktivitaet').setDescription('Welche Aktivität? (Standard: Watch Together / YouTube)').addChoices(...ACTIVITIES.slice(0, 25).map(a => ({ name: `${a.emoji} ${a.name}`.slice(0, 100), value: a.id })))),
     async execute(i) {
       const vc = i.member.voice.channel;
       if (!vc) return respond(i, err('Geh zuerst in einen Sprachkanal.'));
+      const act = ACTIVITIES.find(a => a.id === (i.options.getString('aktivitaet') || ACTIVITIES[0].id));
       try {
-        const inv = await vc.createInvite({ targetType: InviteTargetType.EmbeddedApplication, targetApplication: WATCH_TOGETHER_ID, maxAge: 86400, maxUses: 0 });
+        const url = await inviteFor(vc, act.id);
         return respond(i, {
-          embeds: [new EmbedBuilder().setColor(COLORS.brand).setTitle('📺 Watch Together')
-            .setDescription(`Klick auf den Button – dann startet in ${vc} die YouTube-Aktivität. Dort einfach den Link einfügen oder suchen.\n\nAlle im Kanal schauen synchron mit. Die Bildqualität wählt der YouTube-Player (je nach Video und Gerät).`)],
-          components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(`https://discord.gg/${inv.code}`).setLabel('Watch Together starten').setEmoji('▶️'))],
+          embeds: [new EmbedBuilder().setColor(COLORS.brand).setTitle(`${act.emoji} ${act.name}`)
+            .setDescription(`Klick auf den Button – dann startet die Aktivität in ${vc}. Alle im Kanal können mitmachen.${act.id === ACTIVITIES[0].id ? '\n\nYouTube-Link einfügen oder suchen – alle schauen synchron. Die Bildqualität wählt der YouTube-Player.' : ''}`)],
+          components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(url).setLabel('Starten').setEmoji('▶️'))],
         }, { ephemeral: false });
       } catch (x) {
-        return respond(i, err(`Discord hat die Aktivität abgelehnt (${x.message}). Alternative: Im Sprachkanal unten auf 🚀 „Aktivitäten“ → „Watch Together“.`));
+        return respond(i, err(`Discord hat die Aktivität abgelehnt (${x.message}). Alternative: Im Sprachkanal unten auf 🚀 „Aktivitäten“.`));
       }
     },
   },

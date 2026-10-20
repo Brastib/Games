@@ -1,5 +1,5 @@
 'use strict';
-const { SlashCommandBuilder, PermissionFlagsBits: P, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits: P, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = require('discord.js');
 const { getConfig, saveConfig } = require('../lib/config');
 const { COLORS, ok, err, respond } = require('../lib/embeds');
 const leveling = require('../modules/leveling');
@@ -8,7 +8,7 @@ const store = require('../lib/store');
 const PAGE = 10;
 
 const BOARDS = {
-  xp: { title: 'Level', fmt: e => `Level **${leveling.levelFromXp(e.xp).level}** · ${e.xp.toLocaleString('de-DE')} XP` },
+  xp: { title: 'Level', fmt: (e, cfg, g) => `Level **${leveling.levelFromXp(e.xp, g).level}** · ${e.xp.toLocaleString('de-DE')} XP` },
   coins: { title: 'Münzen', fmt: (e, cfg) => `**${(e.coins || 0).toLocaleString('de-DE')}** ${cfg.economy.emoji}` },
   voiceMin: { title: 'Sprachzeit', fmt: e => `**${Math.floor((e.voiceMin || 0) / 60)} Std. ${(e.voiceMin || 0) % 60} Min.**` },
   clips: { title: 'Clips', fmt: e => `**${e.clips || 0}** Clips` },
@@ -23,7 +23,7 @@ function leaderboardPayload(guild, page, by = 'xp') {
   const medals = ['🥇', '🥈', '🥉'];
   const lines = list.slice(page * PAGE, page * PAGE + PAGE).map((e, idx) => {
     const pos = page * PAGE + idx;
-    return `${medals[pos] || `**${pos + 1}.**`} <@${e.userId}> · ${BOARDS[by].fmt(e, cfg)}`;
+    return `${medals[pos] || `**${pos + 1}.**`} <@${e.userId}> · ${BOARDS[by].fmt(e, cfg, guild.id)}`;
   });
   return {
     embeds: [new EmbedBuilder().setColor(COLORS.brand).setTitle(`🏆 Bestenliste · ${BOARDS[by].title}`).setDescription(lines.join('\n') || 'Noch keine Einträge.').setFooter({ text: `${guild.name} · Seite ${page + 1}/${pages}` })],
@@ -49,8 +49,24 @@ module.exports = [
   {
     data: new SlashCommandBuilder().setName('leaderboard').setDescription('Bestenliste des Servers')
       .addStringOption(o => o.setName('nach').setDescription('Wonach sortieren?').addChoices(
-        { name: 'Level / XP', value: 'xp' }, { name: 'Münzen', value: 'coins' }, { name: 'Sprachzeit', value: 'voiceMin' }, { name: 'Clips', value: 'clips' })),
-    async execute(i) { return i.reply(leaderboardPayload(i.guild, 0, i.options.getString('nach') || 'xp')); },
+        { name: 'Level / XP', value: 'xp' }, { name: 'Münzen', value: 'coins' }, { name: 'Sprachzeit', value: 'voiceMin' }, { name: 'Clips', value: 'clips' }))
+      .addBooleanOption(o => o.setName('liste').setDescription('Als Textliste statt Bild')),
+    async execute(i) {
+      const by = i.options.getString('nach') || 'xp';
+      if (by === 'xp' && i.options.getBoolean('liste') !== true) {
+        await i.deferReply();
+        const png = await leveling.leaderboardImage(i.guild).catch(() => null);
+        if (png) {
+          return respond(i, {
+            content: '🏆 **Die aktuelle Bestenliste!** Wer schreibt sich diese Runde nach oben?',
+            files: [new AttachmentBuilder(png, { name: 'bestenliste.png' })],
+            components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('lb:xp:0').setLabel('Ganze Liste').setEmoji('📜').setStyle(ButtonStyle.Secondary))],
+          });
+        }
+        return respond(i, leaderboardPayload(i.guild, 0, by));
+      }
+      return i.reply(leaderboardPayload(i.guild, 0, by));
+    },
   },
   {
     data: new SlashCommandBuilder().setName('level').setDescription('Level verwalten (Team)')
@@ -66,6 +82,11 @@ module.exports = [
         .addIntegerOption(o => o.setName('level').setDescription('Ab Level').setRequired(true).setMinValue(1).setMaxValue(500))
         .addRoleOption(o => o.setName('rolle').setDescription('Rolle').setRequired(true)))
       .addSubcommand(s => s.setName('rewards').setDescription('Alle Belohnungen anzeigen'))
+      .addSubcommand(s => s.setName('import').setDescription('Bisherige XP übernehmen (Datei: ID/Name + XP, z. B. vom alten Bot)')
+        .addAttachmentOption(o => o.setName('datei').setDescription('CSV, TXT oder JSON').setRequired(true))
+        .addStringOption(o => o.setName('modus').setDescription('XP ersetzen oder dazurechnen?').addChoices({ name: 'Ersetzen (Standard)', value: 'set' }, { name: 'Dazurechnen', value: 'add' })))
+      .addSubcommand(s => s.setName('formel').setDescription('Level-Formel wählen')
+        .addStringOption(o => o.setName('formel').setDescription('Formel').setRequired(true).addChoices({ name: 'ETC. – Level L ab 100 × L² XP (wie bisher)', value: 'etc' }, { name: 'MEE6', value: 'mee6' })))
       .addSubcommand(s => s.setName('noxp').setDescription('Kanal oder Rolle ohne XP (nochmal = wieder mit XP)')
         .addChannelOption(o => o.setName('kanal').setDescription('Kanal'))
         .addRoleOption(o => o.setName('rolle').setDescription('Rolle'))),
@@ -75,7 +96,7 @@ module.exports = [
       const member = i.options.getMember('mitglied');
       if (['set', 'addxp', 'reset'].includes(sub) && !member) return respond(i, err('Diese Person ist nicht auf dem Server.'));
       if (sub === 'set') {
-        const lvl = await leveling.setXp(member, leveling.xpForLevel(i.options.getInteger('level')));
+        const lvl = await leveling.setXp(member, leveling.xpForLevel(i.options.getInteger('level'), i.guild.id));
         return respond(i, ok(`${member} ist jetzt Level **${lvl}**.`));
       }
       if (sub === 'addxp') {
@@ -99,6 +120,22 @@ module.exports = [
       if (sub === 'rewards') {
         const list = Object.entries(cfg.rewards).sort((a, b) => a[0] - b[0]).map(([l, r]) => `Level **${l}** → <@&${r}>`);
         return respond(i, new EmbedBuilder().setColor(COLORS.brand).setTitle('🎁 Level-Belohnungen').setDescription(list.join('\n') || 'Noch keine. `/level reward`'));
+      }
+      if (sub === 'import') {
+        const file = i.options.getAttachment('datei');
+        if (file.size > 2 * 1024 * 1024) return respond(i, err('Die Datei ist größer als 2 MB.'));
+        await i.deferReply({ flags: 64 });
+        try {
+          const text = await (await fetch(file.url)).text();
+          const r = await leveling.importXp(i.guild, text, { mode: i.options.getString('modus') || 'set' });
+          return respond(i, new EmbedBuilder().setColor(r.imported ? COLORS.ok : COLORS.err).setTitle('📥 XP-Import')
+            .setDescription(`**${r.imported}** von ${r.total} Einträgen übernommen.${r.missing.length ? `\n\nNicht gefunden (Name/ID passt zu keinem Mitglied): ${r.missing.slice(0, 30).join(', ')}${r.missing.length > 30 ? ' …' : ''}` : ''}\n\nRollen-Belohnungen werden beim nächsten Level-Up vergeben. Bestenliste: \`/leaderboard\``));
+        } catch (e) { return respond(i, err(`Datei konnte nicht gelesen werden: ${e.message}`)); }
+      }
+      if (sub === 'formel') {
+        cfg.formula = i.options.getString('formel');
+        saveConfig(i.guild.id);
+        return respond(i, ok(`Level-Formel: **${leveling.CURVES[cfg.formula].label}**. Die XP bleiben gleich, nur die Level werden neu berechnet.`));
       }
       if (sub === 'noxp') {
         const ch = i.options.getChannel('kanal');

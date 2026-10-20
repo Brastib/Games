@@ -1,11 +1,71 @@
 'use strict';
-const { SlashCommandBuilder, PermissionFlagsBits: P, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits: P, EmbedBuilder, ChannelType } = require('discord.js');
 const { getConfig, saveConfig } = require('../lib/config');
 const { COLORS, ok, err, respond } = require('../lib/embeds');
 const quests = require('../modules/quests');
+const autoposts = require('../modules/autoposts');
+
+const DAY_CHOICES = autoposts.WEEKDAYS.map((name, value) => ({ name, value }));
+const timeOk = t => /^([01]?\d|2[0-3]):[0-5]\d$/.test(t || '');
 const economy = require('../modules/economy');
 
 module.exports = [
+  {
+    data: new SlashCommandBuilder().setName('autopost').setDescription('Automatische Wochen-Posts: Tierfoto und Bestenliste')
+      .setDefaultMemberPermissions(P.ManageGuild)
+      .addSubcommand(s => s.setName('tierfoto').setDescription('🐱🐶 Wöchentliches Tierfoto einstellen')
+        .addBooleanOption(o => o.setName('an').setDescription('an?'))
+        .addChannelOption(o => o.setName('kanal').setDescription('Wohin posten?').addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
+        .addIntegerOption(o => o.setName('tag').setDescription('Wochentag').addChoices(...DAY_CHOICES))
+        .addStringOption(o => o.setName('uhrzeit').setDescription('Uhrzeit, z. B. 18:00').setMaxLength(5))
+        .addStringOption(o => o.setName('quelle').setDescription('Woher kommen die Fotos?').addChoices(...Object.entries(autoposts.SOURCES).map(([value, name]) => ({ name, value }))))
+        .addChannelOption(o => o.setName('sammelkanal').setDescription('Kanal mit euren Tierfotos (für Quelle „Eigener Sammel-Kanal“)').addChannelTypes(ChannelType.GuildText))
+        .addStringOption(o => o.setName('text').setDescription('Text über dem Foto').setMaxLength(300)))
+      .addSubcommand(s => s.setName('bestenliste').setDescription('🏆 Wöchentliche Bestenliste als Bild einstellen')
+        .addBooleanOption(o => o.setName('an').setDescription('an?'))
+        .addChannelOption(o => o.setName('kanal').setDescription('Wohin posten?').addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
+        .addIntegerOption(o => o.setName('tag').setDescription('Wochentag').addChoices(...DAY_CHOICES))
+        .addStringOption(o => o.setName('uhrzeit').setDescription('Uhrzeit, z. B. 12:00').setMaxLength(5))
+        .addStringOption(o => o.setName('text').setDescription('Text über der Bestenliste').setMaxLength(300)))
+      .addSubcommand(s => s.setName('jetzt').setDescription('Sofort posten (zum Testen)')
+        .addStringOption(o => o.setName('was').setDescription('Was?').setRequired(true).addChoices({ name: 'Tierfoto', value: 'animal' }, { name: 'Bestenliste', value: 'leaderboard' })))
+      .addSubcommand(s => s.setName('status').setDescription('Einstellungen anzeigen')),
+    async execute(i) {
+      const sub = i.options.getSubcommand();
+      const posts = getConfig(i.guild.id).posts;
+      const line = (label, p) => `**${label}:** ${p.enabled ? '🟢 an' : '⚫ aus'} · ${p.channel ? `<#${p.channel}>` : 'kein Kanal'} · jeden **${autoposts.WEEKDAYS[p.weekday]}** um **${p.time} Uhr**`;
+      if (sub === 'status') {
+        return respond(i, new EmbedBuilder().setColor(COLORS.brand).setTitle('📅 Automatische Posts').setDescription([
+          line('🐱🐶 Tierfoto', posts.animal) + ` · Quelle: ${autoposts.SOURCES[posts.animal.source]}${posts.animal.source === 'pool' && posts.animal.poolChannel ? ` (<#${posts.animal.poolChannel}>)` : ''}`,
+          line('🏆 Bestenliste', posts.leaderboard),
+        ].join('\n')));
+      }
+      if (sub === 'jetzt') {
+        await i.deferReply({ flags: 64 });
+        const type = i.options.getString('was');
+        try {
+          const ch = await autoposts.runNow(i.guild, type, i.guild.channels.cache.get(posts[type].channel) || i.channel);
+          return respond(i, ok(`Gepostet in ${ch}.`));
+        } catch (e) { return respond(i, err(e.message)); }
+      }
+      const p = posts[sub === 'tierfoto' ? 'animal' : 'leaderboard'];
+      const time = i.options.getString('uhrzeit');
+      if (time && !timeOk(time)) return respond(i, err('Uhrzeit bitte so: `18:00`'));
+      p.enabled = i.options.getBoolean('an') ?? (p.enabled || !!i.options.getChannel('kanal'));
+      p.channel = i.options.getChannel('kanal')?.id || p.channel;
+      p.weekday = i.options.getInteger('tag') ?? p.weekday;
+      if (time) p.time = time.padStart(5, '0');
+      p.text = i.options.getString('text') || p.text;
+      if (sub === 'tierfoto') {
+        p.source = i.options.getString('quelle') || p.source;
+        p.poolChannel = i.options.getChannel('sammelkanal')?.id || p.poolChannel;
+        if (p.source === 'pool' && !p.poolChannel) return respond(i, err('Für „Eigener Sammel-Kanal“ bitte auch `sammelkanal` angeben.'));
+      }
+      if (p.enabled && !p.channel) return respond(i, err('Bitte einen Kanal angeben.'));
+      saveConfig(i.guild.id);
+      return respond(i, ok(`${line(sub === 'tierfoto' ? '🐱🐶 Tierfoto' : '🏆 Bestenliste', p)}\nTesten: \`/autopost jetzt\``));
+    },
+  },
   {
     data: new SlashCommandBuilder().setName('quests').setDescription('Deine täglichen Quests und deine Serie')
       .addUserOption(o => o.setName('mitglied').setDescription('Wessen Quests?')),

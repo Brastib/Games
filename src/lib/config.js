@@ -60,7 +60,9 @@ function defaults() {
     temptext: { category: null },
     tickets: { enabled: false, category: null, supportRoles: [], logChannel: null, counter: 0, maxOpen: 1 },
     levels: {
-      enabled: true, channel: null, message: 'GG {user}, du bist jetzt **Level {level}**! 🎉',
+      // formula: 'etc' = wie der bisherige ETC. Bot (Level L braucht insgesamt 100·L² XP), 'mee6' = MEE6-Kurve
+      // style: 'embed' = „⬆️ Level Up!“-Karte mit Profilbild, 'text' = einfache Nachricht
+      enabled: true, channel: null, message: '{user} hat **Level {level}** erreicht! 🎉', formula: 'etc', style: 'embed',
       rewards: {}, stackRewards: true, noXpChannels: [], noXpRoles: [], multiplier: 1,
       voice: { enabled: true, perMinute: 8, minMembers: 2 },
       clips: {
@@ -74,6 +76,17 @@ function defaults() {
     autoresponders: [],
     stats: { enabled: false, category: null, members: null, humans: null, boosts: null },
     suggestions: { channel: null, counter: 0 },
+    // Automatische Wochen-Posts. weekday: 0 = Sonntag … 6 = Samstag, time: "HH:MM" (deutsche Zeit)
+    posts: {
+      animal: {
+        enabled: false, channel: null, weekday: 0, time: '18:00', source: 'mixed', poolChannel: null,
+        text: '🐱🐶 **Hier ist dein wöchentliches Tierfoto!**', lastRun: null, used: [],
+      },
+      leaderboard: {
+        enabled: false, channel: null, weekday: 0, time: '12:00',
+        text: '🏆 **Die aktuelle Bestenliste!** Wer schreibt sich diese Runde nach oben?', lastRun: null,
+      },
+    },
   };
 }
 
