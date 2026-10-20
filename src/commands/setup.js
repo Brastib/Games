@@ -303,6 +303,20 @@ module.exports = [
     execute: i => dashboard.show(i),
   },
   {
+    data: new SlashCommandBuilder().setName('update').setDescription('Neueste Version holen und neu starten (nur Bot-Besitzer)')
+      .setDefaultMemberPermissions(P.Administrator),
+    async execute(i) {
+      if (!(await require('../modules/migrate').isBotOwner(i.user, i.client))) return respond(i, err('Nur der Besitzer des Bots darf /update benutzen.'));
+      await i.deferReply({ flags: 64 });
+      try {
+        const r = await require('../lib/selfupdate').run();
+        if (!r.changed) return respond(i, ok(`Schon aktuell: \`${r.version}\``));
+        await respond(i, ok(`Neue Version: \`${r.version}\`\nStarte neu – in ca. 10 Sekunden wieder da.`));
+        setTimeout(() => process.kill(process.pid, 'SIGTERM'), 1500); // sauber beenden, systemd startet neu
+      } catch (e) { return respond(i, err(`Update fehlgeschlagen: ${e.message}`)); }
+    },
+  },
+  {
     // „Neuer Bot“: nur für den Besitzer des Bots (Developer Portal) – für alle anderen ausgeblendet
     data: new SlashCommandBuilder().setName('nb').setDescription('Neuer Bot: Einstellungen und XP vom alten Bot übernehmen (nur Bot-Besitzer)')
       .setDefaultMemberPermissions(P.Administrator)
