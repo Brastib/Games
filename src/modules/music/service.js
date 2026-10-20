@@ -8,6 +8,7 @@ const { COLORS } = require('../../lib/embeds');
 const { truncate } = require('../../lib/util');
 const music = require('./player');
 const { resolve } = require('./resolve');
+const filter = require('./filter');
 
 /** Verbindet den Bot mit dem Sprachkanal (ohne etwas abzuspielen) */
 async function join(guild, voiceChannel, textChannel) {
@@ -27,8 +28,15 @@ async function join(guild, voiceChannel, textChannel) {
  * @returns {Promise<{tracks: object[], playlist: string|null, added: number, wasIdle: boolean, position: number}>}
  */
 async function play({ guild, member, voiceChannel, textChannel, query = '', attachment = null, front = false }) {
-  if (!getConfig(guild.id).music.enabled) throw new Error('Musik ist auf diesem Server ausgeschaltet.');
+  const cfg = getConfig(guild.id);
+  if (!cfg.music.enabled) throw new Error('Musik ist auf diesem Server ausgeschaltet.');
+  const words = cfg.automod.badwords.words || [];
+  if (filter.check([query], cfg.music.filter, words)) throw new Error('🚫 Dieser Suchbegriff ist durch den Musik-Filter gesperrt.');
   const result = await resolve(query, member.id, attachment);
+  const allowed = result.tracks.filter(t => !filter.check([t.title, t.author], cfg.music.filter, words));
+  if (!allowed.length) throw new Error('🚫 Dieser Titel ist durch den Musik-Filter gesperrt.');
+  result.blocked = result.tracks.length - allowed.length;
+  result.tracks = allowed;
   const p = await join(guild, voiceChannel, textChannel);
   const wasIdle = !p.current;
   const added = await p.add(result.tracks, { front });
@@ -37,7 +45,7 @@ async function play({ guild, member, voiceChannel, textChannel, query = '', atta
 }
 
 function resultEmbed(r) {
-  if (r.playlist) return new EmbedBuilder().setColor(COLORS.ok).setDescription(`📃 **${r.added}** Songs aus **${truncate(r.playlist, 100)}** hinzugefügt.`);
+  if (r.playlist) return new EmbedBuilder().setColor(COLORS.ok).setDescription(`📃 **${r.added}** Songs aus **${truncate(r.playlist, 100)}** hinzugefügt.${r.blocked ? ` 🚫 ${r.blocked} vom Musik-Filter gesperrt.` : ''}`);
   const t = r.tracks[0];
   return new EmbedBuilder().setColor(COLORS.ok)
     .setDescription(`${r.wasIdle ? '▶️ **Spiele:**' : `➕ **Hinzugefügt** (Platz ${r.position}):`} [${truncate(t.title, 150)}](${/^https?:/.test(t.url) ? t.url : 'https://discord.com'}) · \`${music.fmtTime(t.duration)}\` · ${t.source}`)

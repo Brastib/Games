@@ -70,9 +70,12 @@ module.exports = [
     data: new SlashCommandBuilder().setName('quests').setDescription('Deine täglichen Quests und deine Serie')
       .addUserOption(o => o.setName('mitglied').setDescription('Wessen Quests?')),
     async execute(i) {
-      if (!getConfig(i.guild.id).quests.enabled) return respond(i, err('Quests sind auf diesem Server ausgeschaltet.'));
+      const qc = getConfig(i.guild.id).quests;
+      if (!qc.enabled) return respond(i, err('Quests sind auf diesem Server ausgeschaltet.'));
+      if (qc.channel && i.channelId !== qc.channel) return respond(i, err(`/quests geht nur in <#${qc.channel}>.`));
       const member = i.options.getMember('mitglied') || i.member;
-      return respond(i, quests.embedFor(member), { ephemeral: member.id === i.user.id ? false : true });
+      // Mit eigenem Quest-Kanal (wie beim alten Bot) sieht nur die Person selbst die Antwort
+      return respond(i, quests.embedFor(member), { ephemeral: !!qc.channel || member.id !== i.user.id });
     },
   },
   {

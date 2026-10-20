@@ -21,15 +21,20 @@ Vorbilder waren Carl-bot und MEE6, aber alles ist kostenlos und gehört dir.
 | 🚨 **Anti-Raid** / ☢️ **Anti-Nuke** | Beitrittswellen → automatischer Lockdown. Gehackte Admins oder fremde Bots, die Kanäle/Rollen löschen oder massenhaft bannen, werden sofort entmachtet; Gelöschtes wird wiederhergestellt. |
 | 🔨 **Moderation** | `/ban` (auch auf Zeit), `/kick`, `/timeout`, `/warn`, `/purge` mit Filtern, `/modlogs`, Fall-Nummern, Logs. |
 | 🔊 **Temp-Sprachkanäle** | Beliebig viele Hubs („➕ Kanal erstellen“, im Dashboard wählbar, je mit eigenem Namen/Limit/Kategorie). Im **Chat des neuen Sprachkanals** erscheint das Bedienfeld: Name, Limit, Sperren, Verstecken, Bitrate, Region, Erlauben, Rauswerfen, **Bannen/Entbannen**, Übernehmen, Übertragen, Zurücksetzen. Name, Limit und Bannliste werden pro Person gemerkt. |
-| 🎵 **Musik** | `/play` mit YouTube-Link oder -Playlist, SoundCloud, Spotify-Song (wird auf YouTube gesucht), Radio-Stream, MP3-Link, eigene Datei oder einfach Songname. Warteschlange, Buttons (Pause, Skip, Stop, Wiederholen, Mischen, ±10 s, Lautstärke), `/filter` (Bass-Boost, Nightcore, Slowed + Reverb, 8D, Karaoke …), `/seek`, `/lyrics`. |
+| 🎵 **Musik** | Musik-Filter (gesperrte Begriffe, erkennt Schreibweisen wie L4nds3r). `/play` mit YouTube-Link oder -Playlist, SoundCloud, Spotify-Song (wird auf YouTube gesucht), Radio-Stream, MP3-Link, eigene Datei oder einfach Songname. Warteschlange, Buttons (Pause, Skip, Stop, Wiederholen, Mischen, ±10 s, Lautstärke), `/filter` (Bass-Boost, Nightcore, Slowed + Reverb, 8D, Karaoke …), `/seek`, `/lyrics`. |
 | 🔈 **Sounds** | `/sound play` spielt Discord-Soundboard-Sounds (Standard + eigene) im Sprachkanal, `/sound add` lädt eigene Sounds hoch. |
 | 📺 **YouTube schauen** | `/watch` startet die Discord-Aktivität **Watch Together** im Sprachkanal: Alle schauen das YouTube-Video synchron. |
 | 🗓️ **Tages-Quests** | Jeden Tag eigene Aufgaben pro Person (Nachrichten, Sprachzeit, Clips posten, 🔥 sammeln, Songs abspielen, Antworten, Reaktionen …). Belohnung XP + Münzen, Bonus für alle geschafft, **Serie** (Streak). `/quests` |
-| ⭐ **Level & Clips** | XP für Nachrichten, **Zeit im Sprachkanal** und **Clips** im Clip-Kanal (Videos, Medal, Twitch-Clips, Shorts …). 🔥-Likes geben dem Ersteller XP, die besten Clips landen in der **Hall of Fame**. Level-Formel **ETC.** wie beim alten Bot (Level L ab 100 × L² XP) oder **MEE6**. Level-Up als Embed mit Profilbild und „XP für nächstes Level“. Rang-Bildkarte, Bestenliste **als Bild** (oder Liste nach XP, Münzen, Sprachzeit, Clips), Rollen-Belohnungen. **XP-Übernahme** vom alten Bot: `/level import` mit CSV- oder JSON-Datei. |
+| ⭐ **Level & Clips** | XP für Nachrichten, **Zeit im Sprachkanal** und **Clips** im Clip-Kanal (Videos, Medal, Twitch-Clips, Shorts …). 🔥-Likes geben dem Ersteller XP, die besten Clips landen in der **Hall of Fame**. XP pro Nachricht als Bereich (15–25), **XP-Boost für den Server-Tag**, eigene Voice-XP für **PlayStation** (braucht PRESENCE INTENT), Level-Formel **ETC.** wie beim alten Bot (Level L ab 100 × L² XP) oder **MEE6**. Level-Up als Embed mit Profilbild und „XP für nächstes Level“. Rang-Bildkarte, Bestenliste **als Bild** (oder Liste nach XP, Münzen, Sprachzeit, Clips), Rollen-Belohnungen. **XP-Übernahme** vom alten Bot: `/level import` mit CSV- oder JSON-Datei. |
 | 🪙 **Münzen** | `/daily` mit Serie, `/balance`, `/pay`, **Rollen-Shop** (`/shop`). |
 | 👋 **Willkommen & Regeln** | Willkommen mit Bildkarte, Abschied, Auto-Rollen, Regeln mit „Akzeptieren“-Button + Captcha. |
 | 🎫 **Tickets** | Button → privater Kanal, Übernehmen, Schließen mit Protokoll-Datei. |
 | 📅 **Wochen-Posts** | Jede Woche automatisch ein **Tierfoto** (Hunde, Katzen oder aus eurem eigenen Sammel-Kanal mit Nennung) und die **Bestenliste als Bild** – Kanal, Wochentag, Uhrzeit und Text im Dashboard oder mit `/autopost`. |
+| 👥 **Mitglieder (Dashboard)** | Alle Mitglieder als Kacheln mit Level, XP-Balken und Rang. Suche, Filter, Sortierung. Antippen → Level-Ring, Statistiken, „auf dem Server seit“ (sekundengenau), Rollen geben/entfernen, Spitzname, Level/XP/Münzen setzen, Timeout, Verwarnen, Kick, Bann. |
+| 🧮 **Zählspiel** | Nacheinander hochzählen, niemand zweimal hintereinander, Rekord, eigene Texte. |
+| 🎮 **Gratis-Spiele** | Kostenlose Spiele von Epic Games und Steam automatisch ankündigen, abgelaufene Angebote werden wieder gelöscht. |
+| 🚨 **Notfall-Alarm** | Meldung per Discord-Webhook bei Absturz oder Verbindungsverlust, „wieder online“ danach. |
+| 💾 **Backups** | Täglich automatisch pro Server, „Jetzt sichern“, herunterladen, zurückspielen (vorher wird der aktuelle Stand gesichert). |
 | 🎉 **Extras** | Gewinnspiele, Umfragen, Vorschläge mit Abstimmung (`/suggest`), Erinnerungen (`/remind`), Auto-Antworten, Statistik-Kanäle (Mitgliederzahl), Embed-Baukasten, Rollen per Button. |
 
 ---
@@ -53,7 +58,7 @@ Du brauchst 4 kostenlose Konten: **Discord Developer Portal**, **GitHub** (hast 
 1. Öffne <https://discord.com/developers/applications> → **New Application** → Namen eingeben.
 2. Links **Bot**:
    - **Reset Token** → Token kopieren und sicher notieren (*wie ein Passwort – niemals teilen!*).
-   - **SERVER MEMBERS INTENT** und **MESSAGE CONTENT INTENT** einschalten → **Save Changes**.
+   - **SERVER MEMBERS INTENT** und **MESSAGE CONTENT INTENT** einschalten → **Save Changes**. Optional **PRESENCE INTENT** (nur für eigene PlayStation-Voice-XP).
      (Ohne die beiden startet der Bot trotzdem, aber Linkschutz, AutoMod, Willkommen und Anti-Raid funktionieren dann nicht. Das steht dann rot im Log und im Dashboard.)
 3. Links **OAuth2**:
    - **Client ID** kopieren.
@@ -126,7 +131,7 @@ sudo npm i -g pm2 && pm2 start src/index.js --name discord-bot && pm2 save && pm
 
 ```bash
 npm install
-npm run check   # 45 Selbsttests ohne Discord: Befehle, Linkschutz, Lockdown, Temp-Voice, AutoMod, Level-Formeln, XP-Import,
+npm run check   # 54 Selbsttests ohne Discord: Befehle, Linkschutz, Lockdown, Temp-Voice, AutoMod, Level-Formeln, XP-Import,
                 # Quests, Münzen, Clips, Dashboard-API, Passwort-Login + Sperre, Eingabeprüfung, Audio-Kette (ffmpeg → Opus),
                 # Bildkarten, Wochen-Posts (Zeitplan inkl. Sommer-/Winterzeit), Rot-Schwarz-Farben
 npm start

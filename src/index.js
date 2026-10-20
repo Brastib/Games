@@ -26,10 +26,15 @@ const quests = require('./modules/quests');
 const clips = require('./modules/clips');
 const extras = require('./modules/extras');
 const autoposts = require('./modules/autoposts');
+const counting = require('./modules/counting');
+const freegames = require('./modules/freegames');
+const alert = require('./modules/alert');
+const backups = require('./modules/backups');
+const platforms = require('./lib/platforms');
 const web = require('./web/server');
 
 const client = new Client({
-  intents: [I.Guilds, I.GuildMembers, I.GuildMessages, I.MessageContent, I.GuildVoiceStates, I.GuildModeration, I.GuildMessageReactions, I.GuildExpressions],
+  intents: [I.Guilds, I.GuildMembers, I.GuildMessages, I.MessageContent, I.GuildVoiceStates, I.GuildModeration, I.GuildMessageReactions, I.GuildExpressions, I.GuildPresences],
   partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.User, Partials.Reaction],
   allowedMentions: { parse: ['users'], repliedUser: false },
 });
@@ -43,7 +48,9 @@ const safe = (name, fn) => async (...args) => {
 // Stattdessen läuft er ohne sie weiter und meldet laut, was dann nicht geht.
 const PRIVILEGED = [
   { intent: I.GuildMembers, flags: (1 << 14) | (1 << 15), name: 'SERVER MEMBERS INTENT', loses: 'Willkommen, Verifizierung beim Beitritt, Anti-Raid, Beitritts-Logs, Mitglieder-Statistik' },
-  { intent: I.MessageContent, flags: (1 << 18) | (1 << 19), name: 'MESSAGE CONTENT INTENT', loses: 'Linkschutz, AutoMod, Auto-Antworten, Clip-XP (Anhänge)' },
+  { intent: I.MessageContent, flags: (1 << 18) | (1 << 19), name: 'MESSAGE CONTENT INTENT', loses: 'Linkschutz, AutoMod, Auto-Antworten, Zählspiel, Clip-XP (Anhänge)' },
+  // freiwillig: nur für eigene PlayStation-Voice-XP
+  { intent: I.GuildPresences, flags: (1 << 12) | (1 << 13), name: 'PRESENCE INTENT', loses: 'eigene Voice-XP für PlayStation', optional: true },
 ];
 client.limitedIntents = [];
 async function checkIntents() {
@@ -52,12 +59,15 @@ async function checkIntents() {
   if (!app) return; // Prüfung nicht möglich – normaler Login entscheidet
   const missing = PRIVILEGED.filter(p => !(app.flags & p.flags));
   if (!missing.length) return;
-  client.limitedIntents = missing.map(p => ({ name: p.name, loses: p.loses }));
   client.options.intents = new IntentsBitField(client.options.intents.bitfield & ~missing.reduce((a, p) => a | p.intent, 0)).freeze();
+  for (const p of missing.filter(x => x.optional)) console.log(`[bot] ${p.name} ist aus – ${p.loses} ist deshalb nicht aktiv (freiwillig).`);
+  const required = missing.filter(p => !p.optional);
+  client.limitedIntents = required.map(p => ({ name: p.name, loses: p.loses }));
+  if (!required.length) return;
   console.warn([
     '',
     '⚠️  Eingeschränkter Modus: Im Developer Portal → „Bot“ → „Privileged Gateway Intents“ ist ausgeschaltet:',
-    ...missing.map(p => `   • ${p.name} – ohne funktioniert nicht: ${p.loses}`),
+    ...required.map(p => `   • ${p.name} – ohne funktioniert nicht: ${p.loses}`),
     '   Einschalten, speichern, Bot neu starten.',
     '',
   ].join('\n'));
@@ -107,6 +117,7 @@ async function tick() {
     await extras.processReminders(client);
     await tempvoice.processTimers(client);
     await autoposts.check(client);
+    await freegames.check(client);
   } catch (e) {
     console.error('[zeitplaner]', e);
   } finally {
@@ -127,6 +138,9 @@ client.once(Events.ClientReady, safe('ready', async c => {
   tick();
   setInterval(() => leveling.voiceTick(c).catch(e => console.error('[voice-xp]', e)), 60_000).unref();
   setInterval(() => extras.updateStats(c).catch(() => {}), 10 * 60_000).unref();
+  setInterval(() => { try { backups.daily(c); } catch (e) { console.error('[backup]', e); } }, 10 * 60_000).unref();
+  setTimeout(() => { try { backups.daily(c); } catch (e) { console.error('[backup]', e); } }, 60_000).unref();
+  await alert.onReady(c).catch(e => console.error('[alarm]', e));
   setInterval(() => clips.cleanup(), 12 * 3_600_000).unref();
   // Mitgliederlisten laden (für Statistik, Bestenlisten, Schutz)
   if (c.options.intents.has(I.GuildMembers)) for (const g of c.guilds.cache.values()) await g.members.fetch().catch(() => {});
@@ -140,6 +154,7 @@ client.on(Events.InteractionCreate, onInteraction);
 client.on(Events.MessageCreate, safe('message', async m => {
   if (!m.guild || m.author.bot) return;
   if (await automod.handle(m)) return;
+  await counting.onMessage(m);
   await leveling.onMessage(m);
   await clips.onMessage(m);
   await quests.progress(m.member, 'msgs', 1, m.channel);
@@ -188,9 +203,20 @@ client.on(Events.GuildAuditLogEntryCreate, safe('audit', async (entry, guild) =>
   await logs.auditEntry(entry, guild);
 }));
 client.on(Events.GuildCreate, g => console.log(`[bot] Neuer Server: ${g.name} (${g.memberCount} Mitglieder)`));
+client.on('raw', platforms.onRaw);
+client.on(Events.ShardDisconnect, () => alert.onDisconnect());
+client.on(Events.ShardReconnecting, () => alert.onDisconnect());
+client.on(Events.ShardResume, () => alert.onConnected(client).catch(() => {}));
+client.on(Events.ShardReady, () => alert.onConnected(client).catch(() => {}));
 client.on(Events.Error, e => console.error('[discord]', e.message));
 client.on(Events.Warn, w => console.warn('[discord]', w));
 process.on('unhandledRejection', e => console.error('[unbehandelt]', e));
+process.on('uncaughtException', async e => {
+  console.error('[absturz]', e);
+  await alert.onCrash(client, e);
+  await store.flush().catch(() => {});
+  process.exit(1);
+});
 
 // ---------- Web-Dashboard + Statusseite (hält den Bot beim Hoster außerdem wach) ----------
 web.start(client);
@@ -215,6 +241,7 @@ setInterval(() => {
 
 async function shutdown(sig) {
   console.log(`[bot] ${sig} empfangen – speichere und beende …`);
+  alert.onShutdown();
   await store.flush().catch(() => {});
   await client.destroy().catch(() => {});
   process.exit(0);

@@ -4,6 +4,7 @@
  * Alles, was hier nicht steht, kann über das Dashboard nicht verändert werden.
  */
 const { ChannelType } = require('discord.js');
+const { WEBHOOK_RE } = require('../modules/alert');
 
 const TEXT = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 const VOICE = [ChannelType.GuildVoice, ChannelType.GuildStageVoice];
@@ -49,6 +50,18 @@ const v = {
   words: () => x => {
     if (!Array.isArray(x) || x.length > 300) fail('Liste ungültig');
     return [...new Set(x.map(w => String(w).toLowerCase().trim()).filter(Boolean))].map(w => (w.length <= 60 ? w : fail('Wort zu lang')));
+  },
+  webhook: () => x => (x === null || x === '' ? null
+    : typeof x === 'string' && WEBHOOK_RE.test(x.trim()) ? x.trim() : fail('Das ist keine Discord-Webhook-Adresse (https://discord.com/api/webhooks/…)')),
+  // Musik-Filter: "wort" oder "/regulärer ausdruck/"
+  terms: () => x => {
+    if (!Array.isArray(x) || x.length > 300) fail('Liste ungültig');
+    return [...new Set(x.map(t => String(t).trim()).filter(Boolean))].map(t => {
+      if (t.length > 120) fail('Begriff zu lang');
+      const re = /^\/(.+)\/$/.exec(t);
+      if (re) { try { new RegExp(re[1], 'iu'); } catch { fail(`„${t}“ ist kein gültiger Ausdruck`); } }
+      return t;
+    });
   },
   users: () => x => {
     if (!Array.isArray(x) || x.length > 50) fail('Liste ungültig');
@@ -122,6 +135,14 @@ const SCHEMA = {
 
   'levels.enabled': v.bool(), 'levels.channel': v.channel(TEXT), 'levels.message': v.str(500, 1), 'levels.multiplier': v.num(0.1, 10),
   'levels.formula': v.oneOf('etc', 'mee6'), 'levels.style': v.oneOf('embed', 'text'),
+  'levels.msgXp.min': v.int(0, 500), 'levels.msgXp.max': v.int(0, 500), 'levels.voice.psPerMinute': v.int(0, 100),
+  'levels.tagBoost.enabled': v.bool(), 'levels.tagBoost.percent': v.int(1, 500), 'quests.channel': v.channel(TEXT),
+  'music.filter.enabled': v.bool(), 'music.filter.useBadwords': v.bool(), 'music.filter.terms': v.terms(),
+  'counting.channel': v.channel([ChannelType.GuildText]), 'counting.resetOnFail': v.bool(), 'counting.enabled': v.bool(),
+  'counting.welcome': v.str(500, 1), 'counting.failMessage': v.str(500, 1),
+  'freegames.enabled': v.bool(), 'freegames.channel': v.channel(TEXT), 'freegames.deleteExpired': v.bool(), 'freegames.role': v.role(),
+  'alert.enabled': v.bool(), 'alert.webhook': v.webhook(), 'alert.mentions': v.users(), 'alert.message': v.str(500, 1),
+  'backups.enabled': v.bool(), 'backups.keep': v.int(1, 30),
   'levels.noXpChannels': v.channels(), 'levels.noXpRoles': v.roles(), 'levels.stackRewards': v.bool(), 'levels.rewards': v.rewards(),
   'levels.voice.enabled': v.bool(), 'levels.voice.perMinute': v.int(0, 100), 'levels.voice.minMembers': v.int(1, 10),
   'levels.clips.enabled': v.bool(), 'levels.clips.channels': v.channels(TEXT.concat([ChannelType.GuildForum])), 'levels.clips.xp': v.int(0, 1000),
@@ -136,7 +157,7 @@ const SCHEMA = {
   'posts.animal.enabled': v.bool(), 'posts.animal.channel': v.channel(TEXT), 'posts.animal.weekday': v.int(0, 6), 'posts.animal.time': v.time(),
   'posts.animal.source': v.oneOf('mixed', 'dogs', 'cats', 'pool'), 'posts.animal.poolChannel': v.channel([ChannelType.GuildText]), 'posts.animal.text': v.str(300, 1),
   'posts.leaderboard.enabled': v.bool(), 'posts.leaderboard.channel': v.channel(TEXT), 'posts.leaderboard.weekday': v.int(0, 6),
-  'posts.leaderboard.time': v.time(), 'posts.leaderboard.text': v.str(300, 1),
+  'posts.leaderboard.time': v.time(), 'posts.leaderboard.text': v.str(300, 1), 'posts.leaderboard.everyDays': v.int(1, 30),
 
   autoresponders: v.autoresponders(),
   'stats.enabled': v.bool(),

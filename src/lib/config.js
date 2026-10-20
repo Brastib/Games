@@ -64,15 +64,30 @@ function defaults() {
       // style: 'embed' = „⬆️ Level Up!“-Karte mit Profilbild, 'text' = einfache Nachricht
       enabled: true, channel: null, message: '{user} hat **Level {level}** erreicht! 🎉', formula: 'etc', style: 'embed',
       rewards: {}, stackRewards: true, noXpChannels: [], noXpRoles: [], multiplier: 1,
-      voice: { enabled: true, perMinute: 8, minMembers: 2 },
+      msgXp: { min: 15, max: 25 }, // XP pro Nachricht (zufällig in diesem Bereich, höchstens 1× pro Minute)
+      // psPerMinute: eigene Voice-XP, wenn Discord eine PS4/PS5-Aktivität meldet (0 = wie normal; braucht PRESENCE INTENT)
+      voice: { enabled: true, perMinute: 8, psPerMinute: 0, minMembers: 2 },
+      tagBoost: { enabled: false, percent: 25 }, // Extra-XP für alle, die den Server-Tag dieses Servers tragen
       clips: {
         enabled: true, channels: [], xp: 40, cooldownMinutes: 5,
         likeEmoji: '🔥', likeXp: 5, maxLikeXp: 100, hallOfFame: null, hallThreshold: 5,
       },
     },
-    quests: { enabled: true, perDay: 3, rewardMultiplier: 1, announce: true },
+    quests: { enabled: true, perDay: 3, rewardMultiplier: 1, announce: true, channel: null }, // channel: /quests nur dort
     economy: { enabled: true, name: 'Münzen', emoji: '🪙', daily: 100, shop: [] },
-    music: { enabled: true, djRole: null, defaultVolume: 80, maxQueue: 200, leaveMinutes: 3, channel: null },
+    music: {
+      enabled: true, djRole: null, defaultVolume: 80, maxQueue: 200, leaveMinutes: 3, channel: null,
+      // Gesperrte Begriffe (Titel, Suchbegriff, Kanal): "wort" oder "/regulärer ausdruck/" – Schreibweisen wie L4nds3r werden erkannt
+      filter: { enabled: true, terms: [], useBadwords: true },
+    },
+    counting: {
+      enabled: false, channel: null, current: 0, lastUser: null, record: 0, recordBy: null, resetOnFail: true,
+      welcome: '🧮 **Zählspiel!** Schreibt nacheinander die nächste Zahl. Niemand darf zweimal hintereinander zählen.',
+      failMessage: '❌ {user} hat sich verzählt – richtig wäre **{expected}** gewesen. Rekord: **{record}**. Wir fangen wieder bei **1** an!',
+    },
+    freegames: { enabled: false, channel: null, deleteExpired: true, role: null },
+    alert: { enabled: false, webhook: null, mentions: [], message: '🚨 **ETC. Bot ist offline!** Bitte nachsehen.' },
+    backups: { enabled: true, keep: 7 },
     autoresponders: [],
     stats: { enabled: false, category: null, members: null, humans: null, boosts: null },
     suggestions: { channel: null, counter: 0 },
@@ -83,7 +98,7 @@ function defaults() {
         text: '🐱🐶 **Hier ist dein wöchentliches Tierfoto!**', lastRun: null, used: [],
       },
       leaderboard: {
-        enabled: false, channel: null, weekday: 0, time: '12:00',
+        enabled: false, channel: null, weekday: 0, everyDays: 7, time: '12:00',
         text: '🏆 **Die aktuelle Bestenliste!** Wer schreibt sich diese Runde nach oben?', lastRun: null,
       },
     },
@@ -120,9 +135,12 @@ function getConfig(guildId) {
   return cfg;
 }
 
+/** Nach einer Wiederherstellung: Einstellungen neu aus dem Speicher lesen */
+function reloadConfig(guildId) { cache.delete(guildId); return getConfig(guildId); }
+
 function saveConfig(guildId) {
   const cfg = getConfig(guildId);
   store.set('guilds', guildId, cfg);
 }
 
-module.exports = { getConfig, saveConfig, defaults, DEFAULT_ALLOW };
+module.exports = { getConfig, saveConfig, reloadConfig, defaults, DEFAULT_ALLOW };

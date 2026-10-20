@@ -520,6 +520,116 @@ async function test(name, fn) {
     assert.strictEqual(winter.minutes, 18 * 60, 'Winterzeit: 17 Uhr UTC = 18 Uhr in Berlin');
   });
 
+  console.log('\n🧩 Funktionen vom alten Bot');
+  await test('Zählspiel: richtig, doppelt, falsch, Rekord, Neustart bei Fehler', async () => {
+    const counting = require('../src/modules/counting');
+    assert.strictEqual(counting.parseNumber('42 juhu'), 42);
+    assert.strictEqual(counting.parseNumber('hallo 3'), null);
+    const cfg = getConfig('g-count').counting;
+    Object.assign(cfg, { enabled: true, channel: 'cnt', current: 0, lastUser: null, record: 0, resetOnFail: true });
+    const sent = [], reacts = [];
+    const msg = (author, content) => ({ guild: { id: 'g-count' }, channel: { id: 'cnt', send: async m => { sent.push(m.content || m); } }, author: { id: author }, content, react: async e => { reacts.push(e); } });
+    await counting.onMessage(msg('a', '1'));
+    await counting.onMessage(msg('b', '2'));
+    assert.deepStrictEqual([cfg.current, cfg.record, reacts.join('')], [2, 2, '✅✅']);
+    await counting.onMessage(msg('b', '3'));
+    assert.strictEqual(reacts.at(-1), '❌'); assert.match(sent.at(-1), /zweimal hintereinander/);
+    assert.strictEqual(cfg.current, 0, 'zurück auf 0');
+    await counting.onMessage(msg('a', '5'));
+    assert.match(sent.at(-1), /richtig wäre \*\*1\*\*/);
+    assert.strictEqual(cfg.record, 2, 'Rekord bleibt');
+    assert(await counting.onMessage(msg('a', 'nur reden')), 'Text im Kanal stört nicht');
+    assert.strictEqual(reacts.length, 4);
+  });
+  await test('Musik-Filter erkennt Schreibweisen, lässt Harmloses durch', () => {
+    const mf = require('../src/modules/music/filter');
+    const cfg = { enabled: true, terms: ['landser', 'sieg heil', '/\\bkill\\s+all\\b/'], useBadwords: true };
+    assert.strictEqual(mf.normalize('L4nds3r'), 'landser');
+    for (const t of ['Landser - Lied', 'L4nds3r', 'l-a-n-d-s-e-r', 'S i e g H e i l', 'KILL ALL']) assert(mf.check([t], cfg), t);
+    for (const t of ['Blink-182 - All The Small Things', 'Lofi Beats', 'Skill all day']) assert(!mf.check([t], cfg), t);
+    assert(mf.check(['Mein Song', 'Kanal Doofi'], cfg, ['doofi']), 'Wortfilter der Moderation gilt mit');
+    assert(!mf.check(['Landser'], { ...cfg, enabled: false }));
+  });
+  await test('Gratis-Spiele: posten, nicht doppelt, abgelaufene löschen', async () => {
+    const fgm = require('../src/modules/freegames');
+    const raw = { id: 3820, title: 'GetHigh.EXE (Epic Games) Giveaway', worth: '$1.99', end_date: '2026-11-02 23:59:00', platforms: 'PC, Epic Games Store', open_giveaway_url: 'https://www.gamerpower.com/open/x', image: 'https://www.gamerpower.com/x.jpg', description: 'Spiel' };
+    const g1 = fgm.normalizeGame(raw);
+    assert.deepStrictEqual([g1.title, g1.platform, g1.worth, g1.endsAt], ['GetHigh.EXE', 'Epic Games', '$1.99', Date.UTC(2026, 10, 2, 23, 59)]);
+    const g2 = fgm.normalizeGame({ ...raw, id: 3821, title: 'Portal (Steam) Giveaway', platforms: 'PC, Steam', end_date: 'N/A' });
+    const posted = [], deleted = [];
+    const ch = { id: 'fg', isTextBased: () => true, send: async p => { posted.push(p); return { id: 'm' + posted.length }; }, messages: { delete: async id => { deleted.push(id); } } };
+    const guild = { id: 'g-fg', channels: { cache: new Collection([['fg', ch]]) } };
+    Object.assign(getConfig('g-fg').freegames, { enabled: true, channel: 'fg', deleteExpired: true });
+    const now = Date.UTC(2026, 9, 20);
+    assert.deepStrictEqual(await fgm.runGuild(guild, [g1, g2], now), { posted: 2, removed: 0 });
+    assert.strictEqual(posted[0].embeds[0].data.title, 'GetHigh.EXE');
+    assert.deepStrictEqual(await fgm.runGuild(guild, [g1, g2], now + 3_600_000), { posted: 0, removed: 0 }, 'nicht doppelt');
+    const r = await fgm.runGuild(guild, [g2], Date.UTC(2026, 10, 3));
+    assert.deepStrictEqual(r, { posted: 0, removed: 1 }); assert.deepStrictEqual(deleted, ['m1']);
+  });
+  await test('Notfall-Alarm: nur echte Webhooks, Personen werden angepingt', async () => {
+    const alertM = require('../src/modules/alert');
+    assert(alertM.WEBHOOK_RE.test('https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz_-1234'));
+    assert(!alertM.WEBHOOK_RE.test('https://evil.example/api/webhooks/1/x'));
+    Object.assign(getConfig('g-al').alert, { enabled: true, webhook: 'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz_-1234', mentions: ['111111111111111111'] });
+    const calls = [];
+    const realFetch = global.fetch;
+    global.fetch = async (url, opts) => { calls.push({ url, body: JSON.parse(opts.body) }); return { ok: true }; };
+    try {
+      const n = await alertM.send({ guilds: { cache: new Collection([['g-al', { id: 'g-al' }], ['g-other', { id: 'g-other' }]]) } }, 'Test');
+      assert.strictEqual(n, 1);
+      assert.match(calls[0].body.content, /<@111111111111111111> Test/);
+      assert.deepStrictEqual(calls[0].body.allowed_mentions.users, ['111111111111111111']);
+    } finally { global.fetch = realFetch; }
+  });
+  await test('Backups: sichern, ändern, zurückspielen (+ Sicherung davor), Anzahl begrenzt', () => {
+    const bk = require('../src/modules/backups');
+    store.set('levels', 'g-bk:u1', { xp: 500 });
+    getConfig('g-bk').levels.multiplier = 2; saveConfig('g-bk');
+    const first = bk.create('g-bk', 'manuell');
+    store.set('levels', 'g-bk:u1', { xp: 9999 }); store.set('levels', 'g-bk:u2', { xp: 1 });
+    getConfig('g-bk').levels.multiplier = 5; saveConfig('g-bk');
+    bk.restore('g-bk', first.id);
+    assert.strictEqual(store.get('levels', 'g-bk:u1').xp, 500);
+    assert(!store.get('levels', 'g-bk:u2'), 'später Hinzugekommenes ist weg');
+    assert.strictEqual(getConfig('g-bk').levels.multiplier, 2, 'Einstellungen zurück');
+    assert(bk.list('g-bk').some(b => b.reason === 'vor Wiederherstellung'));
+    getConfig('g-bk').backups.keep = 2;
+    for (let i = 0; i < 4; i++) { store.delete('backups', `g-bk:${Date.now()}`); bk.create('g-bk', 'manuell'); }
+    assert(bk.list('g-bk').filter(b => b.reason !== 'vor Wiederherstellung').length <= 2);
+  });
+  await test('Bestenliste täglich / alle N Tage', () => {
+    const ap = require('../src/modules/autoposts');
+    const p = { enabled: true, channel: 'c', weekday: 0, time: '12:00', everyDays: 1, lastRun: '2026-10-19' };
+    const at = (day, h) => ({ weekday: 2, minutes: h * 60, day });
+    assert(ap.isDue(p, at('2026-10-20', 12)), 'täglich: heute fällig');
+    assert(!ap.isDue(p, at('2026-10-20', 11)), 'erst ab 12 Uhr');
+    assert(!ap.isDue({ ...p, lastRun: '2026-10-20' }, at('2026-10-20', 13)), 'nur einmal am Tag');
+    assert(!ap.isDue({ ...p, everyDays: 3, lastRun: '2026-10-18' }, at('2026-10-20', 13)), 'alle 3 Tage: noch nicht');
+    assert(ap.isDue({ ...p, everyDays: 3, lastRun: '2026-10-17' }, at('2026-10-20', 13)), 'alle 3 Tage: jetzt');
+    assert(!ap.isDue({ ...p, everyDays: 7 }, at('2026-10-20', 13)), 'wöchentlich nur am Wochentag');
+  });
+  await test('Server-Tag-Boost und PlayStation-Erkennung', () => {
+    const lvm = require('../src/modules/leveling');
+    const plat = require('../src/lib/platforms');
+    const cfg = { tagBoost: { enabled: true, percent: 25 } };
+    const mem = gid => ({ guild: { id: 'g-tag' }, user: { primaryGuild: { identityEnabled: true, identityGuildId: gid } } });
+    assert.strictEqual(lvm.tagBoost(mem('g-tag'), cfg), 1.25);
+    assert.strictEqual(lvm.tagBoost(mem('fremd'), cfg), 1, 'fremder Server-Tag zählt nicht');
+    assert.strictEqual(lvm.tagBoost(mem('g-tag'), { tagBoost: { enabled: false, percent: 25 } }), 1);
+    plat.onRaw({ t: 'PRESENCE_UPDATE', d: { user: { id: 'ps' }, activities: [{ name: 'EA FC', platform: 'ps5' }] } });
+    assert(plat.onPlayStation('ps'));
+    plat.onRaw({ t: 'PRESENCE_UPDATE', d: { user: { id: 'ps' }, activities: [{ name: 'Spotify' }] } });
+    assert(!plat.onPlayStation('ps'));
+  });
+  await test('Dashboard prüft Webhook, Filter-Ausdrücke und neue Felder', () => {
+    const c = getConfig('g-s');
+    const ok = applyChanges(c, { 'alert.webhook': 'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz', 'music.filter.terms': ['Landser', '/sieg\\s*heil/'], 'posts.leaderboard.everyDays': 1, 'levels.msgXp.max': 25, 'counting.channel': '111' }, fg, { isOwner: false });
+    assert.deepStrictEqual(ok.errors, {});
+    const bad = applyChanges(c, { 'alert.webhook': 'https://example.com/hook', 'music.filter.terms': ['/[/'], 'counting.current': 99, 'backups.keep': 0 }, fg, { isOwner: false });
+    assert.deepStrictEqual(Object.keys(bad.errors).sort(), ['alert.webhook', 'backups.keep', 'counting.current', 'music.filter.terms']);
+  });
+
   console.log('\n🎨 Rot-Schwarz-Theme');
   await test('Keine blauen/grünen Buttons und Embed-Farben (außer frei wählbaren Rollen-Buttons)', () => {
     const { COLORS } = require('../src/lib/embeds');

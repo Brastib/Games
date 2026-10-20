@@ -579,6 +579,10 @@ const SECTIONS = [
       ['levels.message', 'textarea', 'Level-Up-Nachricht', null, 'Platzhalter: {user} {level}'],
       ['levels.style', 'select', 'Level-Up als', { embed: 'Embed mit Profilbild', text: 'Einfacher Text' }],
       ['levels.formula', 'select', 'Level-Formel', { etc: 'ETC. – Level L ab 100·L² XP', mee6: 'MEE6 – wie beim MEE6-Bot' }],
+      ['levels.msgXp.min', 'number', 'XP pro Nachricht – mindestens'],
+      ['levels.msgXp.max', 'number', 'XP pro Nachricht – höchstens (max. 1× pro Minute)'],
+      ['levels.tagBoost.enabled', 'toggle', 'XP-Boost für alle mit dem Server-Tag dieses Servers'],
+      ['levels.tagBoost.percent', 'number', 'Boost in %'],
       ['levels.multiplier', 'number', 'XP-Multiplikator', null, null, 0.1],
       ['levels.stackRewards', 'toggle', 'Belohnungs-Rollen behalten'],
       ['levels.rewards', 'rewards', 'Rollen-Belohnungen'],
@@ -588,6 +592,7 @@ const SECTIONS = [
     { title: 'Sprach-XP', fields: [
       ['levels.voice.enabled', 'toggle', 'XP für Zeit im Sprachkanal'],
       ['levels.voice.perMinute', 'number', 'XP pro Minute'],
+      ['levels.voice.psPerMinute', 'number', 'XP pro Minute auf PlayStation (0 = wie oben; braucht PRESENCE INTENT)'],
       ['levels.voice.minMembers', 'number', 'Mindestens Personen im Kanal'],
     ] },
     { title: 'Clips', note: 'Clips (Videos, Medal, Twitch-Clips, Shorts …) im Clip-Kanal geben XP. Likes geben dem Ersteller XP. Die besten Clips landen in der Hall of Fame.', fields: [
@@ -608,6 +613,7 @@ const SECTIONS = [
       ['quests.perDay', 'number', 'Quests pro Tag'],
       ['quests.rewardMultiplier', 'number', 'Belohnungs-Multiplikator', null, null, 0.1],
       ['quests.announce', 'toggle', 'Geschaffte Quests im Chat melden'],
+      ['quests.channel', 'channel', '/quests nur in diesem Kanal (leer = überall)', TXT],
     ] },
     { title: 'Münzen', fields: [
       ['economy.enabled', 'toggle', 'Münzen an'],
@@ -625,6 +631,11 @@ const SECTIONS = [
       ['music.maxQueue', 'number', 'Max. Songs in der Warteschlange'],
       ['music.leaveMinutes', 'number', 'Verlassen nach Minuten ohne Musik'],
       ['music.channel', 'channel', 'Kanal für „Läuft gerade“ (leer = wo /play benutzt wird)', TXT],
+    ] },
+    { title: 'Musik-Filter', note: 'Sperrt Titel, bevor sie in die Warteschlange kommen. Geprüft werden Suchbegriff, Titel und Kanal. Schreibweisen wie L4nds3r oder l-a-n-d-s-e-r werden erkannt. /ausdruck/ = regulärer Ausdruck.', fields: [
+      ['music.filter.enabled', 'toggle', 'Musik-Filter an'],
+      ['music.filter.useBadwords', 'toggle', 'Wortfilter aus der Moderation auch hier anwenden'],
+      ['music.filter.terms', 'list', 'Gesperrte Begriffe', 'begriff'],
     ] },
   ] },
   { id: 'tickets', label: 'Tickets', cards: [
@@ -645,18 +656,46 @@ const SECTIONS = [
       ['posts.animal.poolChannel', 'channel', 'Sammel-Kanal', [CT.text]],
       ['posts.animal.text', 'textarea', 'Text über dem Foto'],
     ] },
-    { title: '🏆 Bestenliste', action: ['postLeaderboard', 'Jetzt posten (Test)'], note: 'Jede Woche die Top 10 als Bild – wie bisher.', fields: [
-      ['posts.leaderboard.enabled', 'toggle', 'Wöchentliche Bestenliste an'],
+    { title: '🏆 Bestenliste', action: ['postLeaderboard', 'Jetzt posten (Test)'], note: 'Die Top 10 als Bild – wie bisher. Der Wochentag gilt nur bei „Jede Woche“.', fields: [
+      ['posts.leaderboard.enabled', 'toggle', 'Automatische Bestenliste an'],
       ['posts.leaderboard.channel', 'channel', 'Kanal', TXT],
+      ['posts.leaderboard.everyDays', 'select', 'Wie oft?', { 1: 'Jeden Tag', 2: 'Alle 2 Tage', 3: 'Alle 3 Tage', 7: 'Jede Woche (Wochentag unten)', 14: 'Alle 2 Wochen' }],
       ['posts.leaderboard.weekday', 'select', 'Wochentag', WEEKDAYS],
       ['posts.leaderboard.time', 'time', 'Uhrzeit (deutsche Zeit)'],
       ['posts.leaderboard.text', 'textarea', 'Text über der Bestenliste'],
+    ] },
+  ] },
+  { id: 'games', label: 'Spiele', cards: [
+    { title: '🧮 Zählspiel', action: ['countingStart', 'Spiel (neu) starten ab Zahl', 'number'], note: 'Nacheinander hochzählen, niemand zweimal hintereinander. ✅ richtig, ❌ falsch, 💯 bei Hundertern, 🏆 bei neuem Rekord.', fields: [
+      ['counting.enabled', 'toggle', 'Zählspiel an'],
+      ['counting.channel', 'channel', 'Zähl-Kanal', [CT.text]],
+      ['counting.resetOnFail', 'toggle', 'Bei Fehler wieder bei 1 anfangen'],
+      ['counting.welcome', 'textarea', 'Willkommensnachricht beim Start'],
+      ['counting.failMessage', 'textarea', 'Meldung bei falscher Zahl', null, 'Platzhalter: {user} {expected} {number} {record}'],
+    ] },
+    { title: '🎮 Gratis-Spiele', action: ['freegamesNow', 'Jetzt prüfen und posten'], note: 'Kündigt kostenlose Spiele von Epic Games und Steam an (alle 3 Stunden geprüft) und löscht die Nachricht, sobald das Angebot vorbei ist.', fields: [
+      ['freegames.enabled', 'toggle', 'Gratis-Spiele ankündigen'],
+      ['freegames.channel', 'channel', 'Kanal', TXT],
+      ['freegames.role', 'role', 'Rolle anpingen (leer = niemand)'],
+      ['freegames.deleteExpired', 'toggle', 'Abgelaufene Angebote löschen'],
     ] },
   ] },
   { id: 'extras', label: 'Extras', cards: [
     { title: 'Auto-Antworten', fields: [['autoresponders', 'autoresponders', 'Auto-Antworten']] },
     { title: 'Statistik-Kanäle', action: ['setupStats', 'Statistik-Kanäle anlegen'], fields: [['stats.enabled', 'toggle', 'Mitgliederzahl usw. als Kanalnamen']] },
     { title: 'Vorschläge', fields: [['suggestions.channel', 'channel', 'Kanal für /suggest', TXT]] },
+  ] },
+  { id: 'system', label: 'System', cards: [
+    { title: '🚨 Notfall-Alarm', action: ['alertTest', 'Test-Alarm senden'], note: 'Meldet über einen Discord-Webhook, wenn der Bot über 2 Minuten keine Verbindung zu Discord hat, abstürzt oder nach einem unerwarteten Ende wieder da ist. Ist der ganze Hoster weg, kann der Bot nichts senden – dafür den E-Mail-Alarm von cron-job.org nutzen.', fields: [
+      ['alert.enabled', 'toggle', 'Notfall-Alarm an'],
+      ['alert.webhook', 'text', 'Webhook-Adresse (Kanal → Integrationen → Webhooks)'],
+      ['alert.mentions', 'list', 'Diese Personen anpingen (Nutzer-IDs)', '123456789012345678'],
+      ['alert.message', 'textarea', 'Alarm-Nachricht'],
+    ] },
+    { title: '💾 Backups', custom: 'backups', note: 'Täglich automatisch. Vor jeder Wiederherstellung wird der aktuelle Stand zusätzlich gesichert.', fields: [
+      ['backups.enabled', 'toggle', 'Tägliche Backups'],
+      ['backups.keep', 'number', 'Wie viele behalten?'],
+    ] },
   ] },
 ];
 const LABELS = {};
@@ -774,7 +813,11 @@ function cardEl(card) {
   let act = null;
   if (card.action) {
     const [type, label, needs] = card.action;
-    if (needs === 'channel') {
+    if (needs === 'number') {
+      const num = h('input', { class: 'inp num', type: 'number', inputmode: 'numeric', min: 0, value: 0, 'aria-label': label });
+      act = h('div', { class: 'field' }, h('label', {}, label), h('div', { class: 'chips' }, num,
+        h('button', { class: 'btn small', onclick: e => action(type, { resetTo: Number(num.value) || 0 }, e.currentTarget) }, 'Start')));
+    } else if (needs === 'channel') {
       let chosen = null;
       act = h('div', { class: 'field stack' }, h('label', {}, label), h('div', { class: 'chips' },
         selectEl(channelOptions(TXT), null, v => { chosen = v; }, 'Kanal wählen …'),
@@ -784,8 +827,25 @@ function cardEl(card) {
     }
   }
   return h('section', { class: 'card' }, h('h3', {}, card.title), card.note ? h('p', { class: 'note' }, card.note) : null,
-    locked ? h('p', { class: 'note' }, '🔒 Nur der Server-Inhaber kann das ändern.') : null, fields, act);
+    locked ? h('p', { class: 'note' }, '🔒 Nur der Server-Inhaber kann das ändern.') : null, fields, act, card.custom ? CUSTOM[card.custom]() : null);
 }
+
+// ---------- Eigene Karten-Inhalte ----------
+const CUSTOM = {
+  backups() {
+    const box = h('div', { class: 'msec' }, h('p', { class: 'note' }, 'Lade Sicherungen …'));
+    const draw = list => box.replaceChildren(
+      h('div', { class: 'act', style: 'margin-bottom:10px' }, h('button', { class: 'btn small', onclick: async e => { await action('backupCreate', {}, e.currentTarget); } }, 'Jetzt sichern')),
+      list.length ? h('ul', { class: 'hist' }, list.map(b => h('li', {}, '💾',
+        h('div', {}, new Date(b.at).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }),
+          h('small', {}, `${b.reason} · ${Math.max(1, Math.round(b.size / 1024))} KB · ${b.counts.levels || 0} Level-Einträge`)),
+        S.demo ? null : h('a', { class: 'btn small ghost', href: `/api/guild/${S.g.guild.id}/backups/${b.id}/download`, download: '' }, '⬇'),
+        S.g.isOwner ? twoStep('Zurückspielen', 'Wirklich?', () => action('backupRestore', { backupId: b.id })) : null)))
+        : h('p', { class: 'empty' }, 'Noch keine Sicherung.'));
+    api(`/guild/${S.g.guild.id}/backups`).then(r => draw(r.backups)).catch(e => box.replaceChildren(h('p', { class: 'note' }, e.message)));
+    return box;
+  },
+};
 
 // ---------- Übersicht ----------
 function overview() {
@@ -1146,17 +1206,21 @@ function demoData() {
       lockdown: { active: false, since: 0, until: 0, reason: '' },
       tempvoice: { enabled: true, panelInChat: true, hubs: [{ id: byName('➕ Kanal erstellen'), category: vc.id, nameTemplate: '🔊 {name}', limit: 0 }, { id: byName('➕ Gaming-Kanal'), category: vc.id, nameTemplate: '🎮 {name}s Runde', limit: 5 }] },
       tickets: { enabled: true, supportRoles: ['501'], logChannel: byName('mod-log'), maxOpen: 1 },
-      levels: { enabled: true, channel: null, message: 'GG {user}, du bist jetzt **Level {level}**! 🎉', style: 'embed', formula: 'etc', multiplier: 1, stackRewards: true, rewards: { 10: '505', 25: '504' }, noXpChannels: [], noXpRoles: [],
-        voice: { enabled: true, perMinute: 8, minMembers: 2 },
+      levels: { enabled: true, channel: null, message: 'GG {user}, du bist jetzt **Level {level}**! 🎉', style: 'embed', formula: 'etc', msgXp: { min: 15, max: 25 }, tagBoost: { enabled: true, percent: 25 }, multiplier: 1, stackRewards: true, rewards: { 10: '505', 25: '504' }, noXpChannels: [], noXpRoles: [],
+        voice: { enabled: true, perMinute: 5, psPerMinute: 10, minMembers: 2 },
         clips: { enabled: true, channels: [byName('clips')], xp: 40, cooldownMinutes: 5, likeEmoji: '🔥', likeXp: 5, maxLikeXp: 100, hallOfFame: byName('hall-of-fame'), hallThreshold: 5 } },
-      quests: { enabled: true, perDay: 3, rewardMultiplier: 1, announce: true },
+      quests: { enabled: true, perDay: 3, rewardMultiplier: 1, announce: true, channel: null },
       economy: { enabled: true, name: 'Münzen', emoji: '🪙', daily: 100, shop: [{ roleId: '503', price: 5000, description: 'Glänzender Name' }] },
-      music: { enabled: true, djRole: '502', defaultVolume: 80, maxQueue: 200, leaveMinutes: 3, channel: byName('musik') },
+      music: { enabled: true, djRole: '502', defaultVolume: 80, maxQueue: 200, leaveMinutes: 3, channel: byName('musik'), filter: { enabled: true, useBadwords: true, terms: ['landser', '/sieg\\s*heil/'] } },
       autoresponders: [{ trigger: 'ip', response: 'Unsere Server-IP: play.meinserver.de', match: 'contains', reply: true }],
       stats: { enabled: false }, suggestions: { channel: null },
+      counting: { enabled: true, channel: byName('allgemein'), current: 41, record: 128, resetOnFail: true, welcome: '🧮 **Zählspiel!** Schreibt nacheinander die nächste Zahl.', failMessage: '❌ {user} hat sich verzählt – richtig wäre **{expected}** gewesen.' },
+      freegames: { enabled: true, channel: byName('allgemein'), role: null, deleteExpired: true },
+      alert: { enabled: false, webhook: null, mentions: [], message: '🚨 **ETC. Bot ist offline!** Bitte nachsehen.' },
+      backups: { enabled: true, keep: 7 },
       posts: {
         animal: { enabled: true, channel: byName('allgemein'), weekday: 0, time: '18:00', source: 'mixed', poolChannel: null, text: '🐱🐶 **Hier ist dein wöchentliches Tierfoto!**' },
-        leaderboard: { enabled: true, channel: byName('allgemein'), weekday: 0, time: '12:00', text: '🏆 **Die aktuelle Bestenliste!** Wer schreibt sich diese Runde nach oben?' },
+        leaderboard: { enabled: true, channel: byName('allgemein'), weekday: 0, everyDays: 1, time: '12:00', text: '🏆 **Die aktuelle Bestenliste!** Wer schreibt sich diese Runde nach oben?' },
       },
     },
   };
@@ -1187,6 +1251,7 @@ let DEMO = null;
 async function demoApi(path, opts) {
   DEMO ||= demoData();
   if (path === '/me') return { user: { id: '9', name: 'Vorschau' }, guilds: [{ id: '1', name: 'Mein Server', iconUrl: null, botPresent: true }, { id: '2', name: 'Zweiter Server', iconUrl: null, botPresent: false, invite: '#' }] };
+  if (/\/backups$/.test(path)) return { backups: [0, 1, 2].map(i => ({ id: Date.now() - i * 86_400_000, at: Date.now() - i * 86_400_000 - 3_600_000, reason: i ? 'täglich' : 'manuell', size: 48_000 - i * 900, counts: { levels: 24 } })) };
   const mm = /^\/guild\/[^/]+\/members(?:\/(\d+))?(\/action)?$/.exec(path);
   if (mm) {
     DEMO_MEMBERS ||= demoMembers();

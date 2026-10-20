@@ -294,6 +294,25 @@ function start(client) {
       } else if (type === 'postAnimal' || type === 'postLeaderboard') {
         const ch = await require('../modules/autoposts').runNow(g, type === 'postAnimal' ? 'animal' : 'leaderboard');
         message = `Gepostet in #${ch.name}.`;
+      } else if (type === 'countingStart') {
+        const ch = await require('../modules/counting').start(g, { resetTo: Number(req.body.resetTo) || 0 });
+        message = `Zählspiel läuft in #${ch.name}.`;
+      } else if (type === 'freegamesNow') {
+        const fg = require('../modules/freegames');
+        const games = await fg.fetchGames();
+        const r = await fg.runGuild(g, games);
+        message = games.length ? `${r.posted} neu gepostet, ${r.removed} abgelaufene entfernt (${games.length} gerade gratis).` : 'Gerade gibt es keine Gratis-Spiele.';
+      } else if (type === 'alertTest') {
+        const n = await require('../modules/alert').send(client, '🧪 **Test-Alarm** aus dem Dashboard – der Notfall-Alarm funktioniert.', { onlyGuild: g.id });
+        if (!n) throw new Error('Nicht gesendet: Alarm einschalten und eine gültige Webhook-Adresse eintragen.');
+        message = 'Test-Alarm gesendet.';
+      } else if (type === 'backupCreate') {
+        const r = require('../modules/backups').create(g.id, 'manuell');
+        message = `Gesichert (${Math.max(1, Math.round(r.size / 1024))} KB).`;
+      } else if (type === 'backupRestore') {
+        if (!a.isOwner) throw new Error('Nur der Server-Inhaber kann ein Backup zurückspielen.');
+        const r = require('../modules/backups').restore(g.id, req.body.backupId);
+        message = `Wiederhergestellt (${r.restored} Einträge). Der vorherige Stand wurde vorher gesichert.`;
       } else if (type === 'setupStats') {
         await require('../modules/extras').setupStats(g);
         message = 'Statistik-Kanäle erstellt.';
@@ -307,6 +326,20 @@ function start(client) {
   });
 
   require('./members').mount(api, { client, access });
+
+  // ---------- Backups ----------
+  api.get('/guild/:id/backups', async (req, res) => {
+    const a = await access(req, res); if (!a) return;
+    res.json({ backups: require('../modules/backups').list(a.guild.id) });
+  });
+  api.get('/guild/:id/backups/:bid/download', async (req, res) => {
+    const a = await access(req, res); if (!a) return;
+    const b = require('../modules/backups').get(a.guild.id, req.params.bid);
+    if (!b) return res.status(404).json({ error: 'Sicherung nicht gefunden.' });
+    const day = new Date(b.at).toISOString().slice(0, 16).replace(/[:T]/g, '-');
+    res.set('Content-Disposition', `attachment; filename="etc-bot-backup-${a.guild.id}-${day}.json"`);
+    res.json(b);
+  });
 
   app.use('/api', api);
 

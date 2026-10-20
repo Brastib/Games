@@ -28,8 +28,14 @@ function timeToMinutes(t) {
   const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || ''));
   return m ? Number(m[1]) * 60 + Number(m[2]) : 0;
 }
+const dayNumber = day => Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
+
+/** everyDays 7 = wöchentlich am Wochentag; sonst alle N Tage (1 = täglich) ab dem letzten Post */
 function isDue(p, now = nowParts()) {
-  return p.enabled && p.channel && now.weekday === Number(p.weekday) && now.minutes >= timeToMinutes(p.time) && p.lastRun !== now.day;
+  if (!p.enabled || !p.channel || p.lastRun === now.day || now.minutes < timeToMinutes(p.time)) return false;
+  const every = Number(p.everyDays) || 7;
+  if (every === 7) return now.weekday === Number(p.weekday);
+  return !p.lastRun || dayNumber(now.day) - dayNumber(p.lastRun) >= every;
 }
 
 async function download(url, maxBytes = 8 * 1024 * 1024) {

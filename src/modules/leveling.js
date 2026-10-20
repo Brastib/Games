@@ -7,6 +7,7 @@
  * XP: 15–25 pro Nachricht (höchstens einmal pro Minute), Sprachzeit, Clips, Quests.
  */
 const { AttachmentBuilder, EmbedBuilder, GatewayIntentBits } = require('discord.js');
+const platforms = require('../lib/platforms');
 const store = require('../lib/store');
 const { getConfig } = require('../lib/config');
 const { COLORS } = require('../lib/embeds');
@@ -99,6 +100,12 @@ function levelUpPayload(member, level, roles = []) {
  * XP gutschreiben (Nachrichten, Sprachzeit, Clips, Quests …) und Level-Aufstieg verkünden.
  * @param {{ channel?: any, stat?: string, statAmount?: number, ignoreMultiplier?: boolean, silent?: boolean }} opts
  */
+/** Extra-XP für Mitglieder, die den Server-Tag genau dieses Servers sichtbar tragen */
+function tagBoost(member, cfg) {
+  const t = cfg.tagBoost, pg = member.user?.primaryGuild;
+  return t?.enabled && pg?.identityEnabled && pg.identityGuildId === member.guild.id ? 1 + (t.percent || 0) / 100 : 1;
+}
+
 async function addXp(member, amount, opts = {}) {
   if (!member?.guild || member.user.bot) return null;
   const cfg = getConfig(member.guild.id).levels;
@@ -107,7 +114,7 @@ async function addXp(member, amount, opts = {}) {
   const d = getData(member.guild.id, member.id);
   if (opts.stat) d[opts.stat] = (d[opts.stat] || 0) + (opts.statAmount ?? 1);
   const before = levelFromXp(d.xp, member.guild.id).level;
-  d.xp = Math.max(0, d.xp + Math.round(amount * (opts.ignoreMultiplier ? 1 : (cfg.multiplier || 1))));
+  d.xp = Math.max(0, d.xp + Math.round(amount * (opts.ignoreMultiplier ? 1 : (cfg.multiplier || 1) * tagBoost(member, cfg))));
   store.set('levels', k, d);
   const after = levelFromXp(d.xp, member.guild.id).level;
   if (after > before && !opts.silent) {
@@ -133,7 +140,8 @@ async function onMessage(message) {
   }
   d.last = now;
   store.set('levels', key(message.guild.id, message.author.id), d);
-  await addXp(message.member, randomInt(15, 25), { channel: message.channel, stat: 'msgs' });
+  const { min = 15, max = 25 } = cfg.msgXp || {};
+  await addXp(message.member, randomInt(Math.min(min, max), Math.max(min, max)), { channel: message.channel, stat: 'msgs' });
 }
 
 /** Jede Minute: XP für Zeit im Sprachkanal (nicht allein, nicht taub, nicht im AFK-Kanal). */
@@ -147,7 +155,8 @@ async function voiceTick(client) {
       if (humans.size < (v?.minMembers || 2)) continue;
       for (const m of humans.values()) {
         if (m.voice.selfDeaf || m.voice.serverDeaf) continue;
-        if (cfg.levels.enabled && v?.enabled) await addXp(m, v.perMinute || 8, { channel: ch, stat: 'voiceMin' });
+        const rate = v?.psPerMinute && platforms.onPlayStation(m.id) ? v.psPerMinute : v?.perMinute || 8;
+        if (cfg.levels.enabled && v?.enabled) await addXp(m, rate, { channel: ch, stat: 'voiceMin' });
         require('./quests').progress(m, 'voice', 1, ch);
       }
     }
@@ -244,6 +253,6 @@ async function importXp(guild, text, { mode = 'set' } = {}) {
 }
 
 module.exports = {
-  CURVES, curve, levelFromXp, xpForLevel, getData, leaderboard, rankOf, onMessage, addXp, voiceTick, setXp,
+  CURVES, curve, tagBoost, levelFromXp, xpForLevel, getData, leaderboard, rankOf, onMessage, addXp, voiceTick, setXp,
   rankPayload, applyRewards, levelUpPayload, leaderboardImage, parseImport, importXp,
 };

@@ -54,13 +54,13 @@ async function resolve(query, requester, attachment = null) {
       title: e.title || 'Unbekannter Titel',
       url: e.url && /^https?:/.test(e.url) ? e.url : `https://www.youtube.com/watch?v=${e.id}`,
       duration: e.duration || 0, thumbnail: e.thumbnails?.at(-1)?.url || null, requester,
-      source: sourceOf(e.url || 'youtube'),
+      source: sourceOf(e.url || 'youtube'), author: e.channel || e.uploader || null,
     });
     if (!isUrl(query)) return { tracks: [mk(entries[0])], playlist: null };
     return { tracks: entries.map(mk), playlist: d.title || 'Playlist' };
   }
   return {
-    tracks: [{ title: d.title || query, url: d.webpage_url || query, duration: d.duration || 0, thumbnail: d.thumbnail || null, isLive: !!d.is_live, requester, source: sourceOf(d.webpage_url || query) }],
+    tracks: [{ title: d.title || query, url: d.webpage_url || query, duration: d.duration || 0, thumbnail: d.thumbnail || null, isLive: !!d.is_live, requester, source: sourceOf(d.webpage_url || query), author: d.channel || d.uploader || null }],
     playlist: null,
   };
 }
