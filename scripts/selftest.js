@@ -309,10 +309,14 @@ async function test(name, fn) {
     assert(economy.transfer('g-q', 'u3', 'u4', 40));
     assert.strictEqual(economy.balance('g-q', 'u4'), 40);
   });
-  await test('Level-Up wird gemeldet', async () => {
+  await test('Level-Ups standardmäßig still, mit Schalter gemeldet', async () => {
     const m = fakeMember('u5');
-    const r = await lv.addXp(m, 150, { channel: m.channel });
-    assert(r.levelUp && r.level === 1 && m.sent.length === 1);
+    const still = await lv.addXp(m, 150, { channel: m.channel });
+    assert(still.levelUp && still.level === 1 && m.sent.length === 0, 'Standard: keine Meldung (nachschauen mit /lvl)');
+    getConfig(m.guild.id).levels.announce = true;
+    const r = await lv.addXp(m, 300, { channel: m.channel });
+    assert(r.levelUp && r.level === 2 && m.sent.length === 1);
+    getConfig(m.guild.id).levels.announce = false;
   });
 
   console.log('\n🎬 Clips');
@@ -716,6 +720,7 @@ async function test(name, fn) {
     const av = () => 'https://cdn.discordapp.com/embed/avatars/0.png';
     const member = { id: 'q1', user: { id: 'q1', bot: false, username: 'q', displayAvatarURL: av }, displayName: 'q', displayAvatarURL: av, guild: { id: 'g-quiet', channels: { cache: new Collection() } }, roles: { cache: new Collection() } };
     getConfig('g-quiet').quiet = true;
+    getConfig('g-quiet').levels.announce = true;
     const r = await lv.addXp(member, 500, { channel: ch });
     assert(r.levelUp && posted.length === 0, 'kein Post im Ruhemodus');
     getConfig('g-quiet').quiet = false;

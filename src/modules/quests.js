@@ -103,7 +103,8 @@ async function progress(member, type, amount = 1, channel = null) {
   }
   store.set('quests', k, s);
   if (cfg.quests.announce && !cfg.quiet && channel?.isTextBased?.()) {
-    const m = await channel.send({ content: `<@${member.id}>`, embeds: [new EmbedBuilder().setColor(COLORS.ok).setDescription(lines.join('\n'))], allowedMentions: { users: [member.id] } }).catch(() => null);
+    // Kein Ping – der Name steht nur im Text
+    const m = await channel.send({ embeds: [new EmbedBuilder().setColor(COLORS.ok).setDescription(`<@${member.id}>\n${lines.join('\n')}`)], allowedMentions: { parse: [] } }).catch(() => null);
     if (m) setTimeout(() => m.delete().catch(() => {}), 30_000);
   }
 }

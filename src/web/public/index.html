@@ -580,7 +580,9 @@ const SECTIONS = [
   { id: 'levels', label: 'Level & Clips', cards: [
     { title: 'Level', fields: [
       ['levels.enabled', 'toggle', 'Level-System an'],
-      ['levels.channel', 'channel', 'Level-Up-Kanal (leer = gleicher Kanal)', TXT],
+      ['levels.announce', 'toggle', 'Level-Ups automatisch posten (aus = still, nachschauen mit /lvl)'],
+      ['levels.channel', 'channel', 'Level-Kanal (Level-Ups und /lvl)', TXT],
+      ['levels.lvlOnlyInChannel', 'toggle', '/lvl nur im Level-Kanal'],
       ['levels.message', 'textarea', 'Level-Up-Nachricht', null, 'Platzhalter: {user} {level}'],
       ['levels.style', 'select', 'Level-Up als', { embed: 'Embed mit Profilbild', text: 'Einfacher Text' }],
       ['levels.formula', 'select', 'Level-Formel', { etc: 'ETC. – Level L ab 100·L² XP', mee6: 'MEE6 – wie beim MEE6-Bot' }],

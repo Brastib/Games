@@ -36,6 +36,19 @@ function leaderboardPayload(guild, page, by = 'xp') {
 
 module.exports = [
   {
+    data: new SlashCommandBuilder().setName('lvl').setDescription('📊 Dein Level, XP und Rang (im Level-Kanal)')
+      .addUserOption(o => o.setName('mitglied').setDescription('Wessen Level?')),
+    async execute(i) {
+      const cfg = getConfig(i.guild.id).levels;
+      if (cfg.lvlOnlyInChannel && cfg.channel && i.channelId !== cfg.channel) return respond(i, err(`/lvl geht im Level-Kanal: <#${cfg.channel}>`));
+      const member = i.options.getMember('mitglied') || i.member;
+      if (member.user.bot) return respond(i, err('Bots sammeln keine XP.'));
+      await i.deferReply();
+      if (member.id === i.user.id) require('../modules/quests').progress(i.member, 'rank', 1);
+      return respond(i, await leveling.rankPayload(member));
+    },
+  },
+  {
     data: new SlashCommandBuilder().setName('rank').setDescription('Dein Level und Rang (oder von jemand anderem)')
       .addUserOption(o => o.setName('mitglied').setDescription('Wessen Rang?')),
     async execute(i) {

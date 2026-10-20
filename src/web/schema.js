@@ -134,7 +134,7 @@ const SCHEMA = {
   'tickets.enabled': v.bool(), 'tickets.supportRoles': v.roles(), 'tickets.logChannel': v.channel(TEXT), 'tickets.maxOpen': v.int(1, 5),
 
   'levels.enabled': v.bool(), 'levels.channel': v.channel(TEXT), 'levels.message': v.str(500, 1), 'levels.multiplier': v.num(0.1, 10),
-  'levels.formula': v.oneOf('etc', 'mee6'), 'levels.style': v.oneOf('embed', 'text'),
+  'levels.formula': v.oneOf('etc', 'mee6'), 'levels.style': v.oneOf('embed', 'text'), 'levels.announce': v.bool(), 'levels.lvlOnlyInChannel': v.bool(),
   'levels.msgXp.min': v.int(0, 500), 'levels.msgXp.max': v.int(0, 500), 'levels.voice.psPerMinute': v.int(0, 100),
   'levels.tagBoost.enabled': v.bool(), 'levels.tagBoost.percent': v.int(1, 500), 'quests.channel': v.channel(TEXT),
   'music.filter.enabled': v.bool(), 'music.filter.useBadwords': v.bool(), 'music.filter.terms': v.terms(),

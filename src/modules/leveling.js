@@ -117,7 +117,7 @@ async function addXp(member, amount, opts = {}) {
   d.xp = Math.max(0, d.xp + Math.round(amount * (opts.ignoreMultiplier ? 1 : (cfg.multiplier || 1) * tagBoost(member, cfg))));
   store.set('levels', k, d);
   const after = levelFromXp(d.xp, member.guild.id).level;
-  if (after > before && !opts.silent && !getConfig(member.guild.id).quiet) {
+  if (after > before && !opts.silent && !getConfig(member.guild.id).quiet && cfg.announce !== false) {
     const roles = await applyRewards(member, after);
     const target = member.guild.channels.cache.get(cfg.channel) || opts.channel;
     if (target?.isTextBased?.()) await target.send(levelUpPayload(member, after, roles)).catch(() => {});

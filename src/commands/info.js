@@ -38,7 +38,7 @@ const HELP = {
   },
   community: {
     label: 'Level, Quests & Münzen', emoji: '⭐',
-    text: '**Level:** XP für Nachrichten, **Sprachzeit** und **Clips** (🔥-Likes geben dem Ersteller XP, die besten landen in der Hall of Fame). `/rank` · `/leaderboard` (XP, Münzen, Sprachzeit, Clips) · `/level reward|set|addxp|noxp`\n**Tages-Quests:** `/quests` – jeden Tag neue Aufgaben, Bonus und Serie.\n**Münzen:** `/daily` · `/balance` · `/pay` · `/shop view|add|remove|give`',
+    text: '**Level:** XP für Nachrichten, **Sprachzeit** und **Clips** (🔥-Likes geben dem Ersteller XP, die besten landen in der Hall of Fame). `/lvl` (im Level-Kanal) · `/rank` · `/leaderboard` (XP, Münzen, Sprachzeit, Clips) · `/level reward|set|addxp|noxp`\n**Tages-Quests:** `/quests` – jeden Tag neue Aufgaben, Bonus und Serie.\n**Münzen:** `/daily` · `/balance` · `/pay` · `/shop view|add|remove|give`',
   },
   fun: {
     label: 'Extras', emoji: '🎉',

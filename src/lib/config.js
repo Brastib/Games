@@ -68,7 +68,8 @@ function defaults() {
     levels: {
       // formula: 'etc' = wie der bisherige ETC. Bot (Level L braucht insgesamt 100·L² XP), 'mee6' = MEE6-Kurve
       // style: 'embed' = „⬆️ Level Up!“-Karte mit Profilbild, 'text' = einfache Nachricht
-      enabled: true, channel: null, message: '{user} hat **Level {level}** erreicht! 🎉', formula: 'etc', style: 'embed',
+      // announce: Level-Ups automatisch posten (aus = still, nachschauen mit /lvl); lvlOnlyInChannel: /lvl nur im Level-Kanal
+      enabled: true, channel: null, message: '{user} hat **Level {level}** erreicht! 🎉', formula: 'etc', style: 'embed', announce: false, lvlOnlyInChannel: true,
       rewards: {}, stackRewards: true, noXpChannels: [], noXpRoles: [], multiplier: 1,
       msgXp: { min: 15, max: 25 }, // XP pro Nachricht (zufällig in diesem Bereich, höchstens 1× pro Minute)
       // psPerMinute: eigene Voice-XP, wenn Discord eine PS4/PS5-Aktivität meldet (0 = wie normal; braucht PRESENCE INTENT)
