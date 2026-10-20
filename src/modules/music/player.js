@@ -10,7 +10,21 @@ const {
   entersState, StreamType, NoSubscriberBehavior,
 } = require('@discordjs/voice');
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const fs = require('fs');
 const ffmpegPath = require('ffmpeg-static');
+
+// Neuere npm-Versionen blockieren den ffmpeg-Download beim Installieren – dann hier einmal nachladen
+let ffmpegReady = null;
+function ensureFfmpeg() {
+  if (fs.existsSync(ffmpegPath)) return Promise.resolve();
+  ffmpegReady ||= new Promise((resolve, reject) => {
+    console.log('[musik] ffmpeg fehlt – lade es herunter …');
+    const p = spawn(process.execPath, [require.resolve('ffmpeg-static/install.js')], { cwd: require('path').dirname(require.resolve('ffmpeg-static/package.json')), stdio: 'ignore' });
+    p.on('exit', code => (fs.existsSync(ffmpegPath) ? resolve() : reject(new Error(`ffmpeg konnte nicht geladen werden (Code ${code})`))));
+    p.on('error', reject);
+  }).finally(() => { ffmpegReady = null; });
+  return ffmpegReady;
+}
 const ytdlp = require('./ytdlp');
 const { getConfig } = require('../../lib/config');
 const { COLORS } = require('../../lib/embeds');
@@ -95,6 +109,7 @@ class GuildPlayer {
 
   /** Startet einen Song (optional ab Sekunde seek). mode 'pipe' = Fallback, falls direktes Streamen scheitert. */
   async startTrack(track, seek = 0, mode = 'direct') {
+    await ensureFfmpeg();
     const old = this.proc;
     const procs = [];
     const args = ['-hide_banner', '-loglevel', 'error'];
@@ -105,7 +120,8 @@ class GuildPlayer {
       args.push('-i', track.url);
     } else if (mode === 'pipe') {
       const bin = await ytdlp.ensure();
-      const yt = spawn(bin, ['--no-warnings', '-q', '-f', 'bestaudio/best', '-o', '-', track.url], { stdio: ['ignore', 'pipe', 'ignore'] });
+      const yt = spawn(bin, ['--no-warnings', '-q', ...ytdlp.jsRuntimeArgs(bin), '-f', 'bestaudio/best', '-o', '-', track.url], { stdio: ['ignore', 'pipe', 'pipe'] });
+      yt.stderr.on('data', d => { const t = String(d).trim(); if (/ERROR/.test(t)) this.lastError = t.slice(-300); });
       procs.push(yt);
       stdinSource = yt.stdout;
       if (seek > 0) args.push('-ss', String(seek));
@@ -143,14 +159,30 @@ class GuildPlayer {
   async onIdle() {
     const finished = this.current;
     if (!finished) return;
-    const quickFail = Date.now() - this.startedAt < 5000;
-    if (quickFail && this.lastError && !finished.direct && finished.mode !== 'pipe') {
+    // Bricht ein Song nach weniger als 5 Sekunden ab, ist er nicht „fertig“, sondern kaputt – auch ohne Fehlertext
+    const quickFail = Date.now() - this.startedAt < 5000 && !finished.isLive;
+    if (quickFail) this.lastError ||= 'Der Stream ist sofort abgebrochen.';
+    if (quickFail && !finished.direct && finished.mode !== 'pipe') {
       // Direktes Streamen klappte nicht → über yt-dlp-Pipe nochmal versuchen
       try { return await this.startTrack(finished, this.offset, 'pipe'); } catch { /* weiter zum nächsten */ }
     }
-    if (quickFail && this.lastError) this.say(`⚠️ **${truncate(finished.title, 80)}** konnte nicht abgespielt werden. Überspringe …`);
     this.killProcs();
-    if (!quickFail || !this.lastError) {
+    if (quickFail) {
+      this.failStreak = (this.failStreak || 0) + 1;
+      console.warn(`[musik] „${finished.title}“ ging nicht: ${this.lastError}`);
+      if (this.failStreak >= 3) {
+        // Notbremse gegen Endlos-Schleifen und Chat-Spam
+        this.queue = [];
+        this.loop = 'off';
+        this.current = null;
+        this.failStreak = 0;
+        await this.deleteNowPlaying();
+        this.say(`⛔ Musik gestoppt: 3 Songs hintereinander gingen nicht.\n-# Grund: ${truncate(this.lastError, 250)}`);
+        return;
+      }
+      this.say(`⚠️ **${truncate(finished.title, 80)}** ging nicht – überspringe.\n-# Grund: ${truncate(this.lastError, 200)}`);
+    } else {
+      this.failStreak = 0;
       if (this.loop === 'track') { try { return await this.startTrack(finished, 0); } catch { /* weiter */ } }
       if (this.loop === 'queue') this.queue.push(finished);
       this.history.push(finished);
@@ -173,8 +205,17 @@ class GuildPlayer {
       await this.startTrack(next, 0);
       await this.sendNowPlaying();
     } catch (e) {
-      this.say(`⚠️ **${truncate(next.title, 80)}** übersprungen: ${truncate(e.message, 200)}`);
       this.current = null;
+      this.failStreak = (this.failStreak || 0) + 1;
+      console.warn(`[musik] „${next.title}“ übersprungen: ${e.message}`);
+      if (this.failStreak >= 3) {
+        this.queue = [];
+        this.loop = 'off';
+        this.failStreak = 0;
+        this.say(`⛔ Musik gestoppt: 3 Songs hintereinander gingen nicht.\n-# Grund: ${truncate(e.message, 250)}`);
+        return;
+      }
+      this.say(`⚠️ **${truncate(next.title, 80)}** übersprungen: ${truncate(e.message, 200)}`);
       return this.playNext();
     }
   }

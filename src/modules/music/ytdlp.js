@@ -109,4 +109,4 @@ async function streamInfo(url) {
   return { url: d.url, headers: d.http_headers || {}, isLive: !!d.is_live, duration: d.duration || 0, title: d.title, thumbnail: d.thumbnail };
 }
 
-module.exports = { ensure, info, streamInfo, run, get path() { return binPath; } };
+module.exports = { ensure, info, streamInfo, run, jsRuntimeArgs, get path() { return binPath; } };

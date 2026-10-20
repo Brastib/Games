@@ -487,6 +487,34 @@ async function test(name, fn) {
     }
   });
 
+  await test('Musik-Notbremse: kaputte Songs → höchstens 3 Meldungen, dann Stopp (kein Spam)', async () => {
+    const { GuildPlayer } = require('../src/modules/music/player');
+    const p = new GuildPlayer({ id: 'g-spam', channels: { cache: new Collection() } });
+    const said = [];
+    p.textChannel = { send: async m => { said.push(m.content); return { delete: async () => {} }; } };
+    p.startTrack = async () => { throw new Error('ffmpeg fehlt'); };
+    p.queue = [1, 2, 3, 4, 5].map(n => ({ title: `Song ${n}`, url: 'x' }));
+    await p.playNext();
+    assert.strictEqual(said.length, 3, said.join(' | '));
+    assert.match(said[2], /Musik gestoppt/);
+    assert.strictEqual(p.queue.length, 0);
+    // Sofortiger Abbruch ohne Fehlertext zählt als Fehler und schaltet die Wiederholung nicht in eine Schleife
+    const q = new GuildPlayer({ id: 'g-spam2', channels: { cache: new Collection() } });
+    const said2 = [];
+    q.textChannel = { send: async m => { said2.push(m.content); return { delete: async () => {} }; } };
+    let starts = 0;
+    q.startTrack = async () => { starts++; q.startedAt = Date.now(); };
+    q.sendNowPlaying = async () => {};
+    q.loop = 'queue';
+    q.current = { title: 'Kaputt', url: 'x', direct: true };
+    q.startedAt = Date.now();
+    for (let n = 0; n < 6 && q.current; n++) await q.onIdle();
+    assert.strictEqual(starts, 0, 'kaputter Song wird bei Wiederholung nicht endlos neu gestartet');
+    assert.strictEqual(q.queue.length, 0, 'und nicht wieder hinten angehängt');
+    assert(said2.some(t => /ging nicht/.test(t) && /sofort abgebrochen/.test(t)), said2.join(' | '));
+    p.player.stop(true); q.player.stop(true);
+  });
+
   console.log('\n🖼️  Bildkarten');
   const cards = require('../src/lib/cards');
   await test('Willkommens- und Rangkarte rendern', async () => {
