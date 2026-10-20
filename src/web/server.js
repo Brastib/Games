@@ -95,6 +95,7 @@ function start(client) {
     speicher: store.kind, betrugs_domains: lf.phishingCount(), dashboard: oauthReady() || passwordReady(),
     fehlende_intents: client.limitedIntents?.map(x => x.name) || [],
     dashboard_adresse: require('../modules/tunnel').url(),
+    version: require('../lib/version'),
     laptop: (({ temp, level, battery, load, memUsed }) => ({ temperatur: temp, zustand: level, akku: battery, last: load, ram_prozent: memUsed }))(require('../modules/health').status()),
   });
   app.get('/health', (req, res) => res.json(status()));

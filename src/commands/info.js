@@ -68,6 +68,7 @@ module.exports = [
         `**Antwortzeit:** ${Math.round(i.client.ws.ping)} ms`,
         `**Online seit:** ${formatDuration(process.uptime() * 1000)}`,
         `**Server:** ${i.client.guilds.cache.size} · **Speicher:** ${store.kind} · **RAM:** ${mem.toFixed(0)} MB`,
+        `**Version:** \`${require('../lib/version').slice(0, 70)}\``,
         `**Betrugs-Datenbank:** ${lf.phishingCount().toLocaleString('de-DE')} Domains`,
         `**discord.js** ${djsVersion} · **Node** ${process.version}`,
       ].join('\n')));

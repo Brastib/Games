@@ -155,6 +155,7 @@ client.once(Events.ClientReady, safe('ready', async c => {
   extras.updateStats(c).catch(() => {});
   const invite = `https://discord.com/oauth2/authorize?client_id=${c.user.id}&permissions=8&scope=bot%20applications.commands`;
   console.log(`[bot] Einladungslink: ${invite}`);
+  console.log(`[bot] Version: ${require('./lib/version')}`);
 }));
 
 client.on(Events.InteractionCreate, onInteraction);
