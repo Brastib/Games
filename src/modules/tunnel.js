@@ -34,7 +34,7 @@ async function notifyOwner(client, url) {
   const owners = app?.owner?.members ? [...app.owner.members.keys()] : app?.owner ? [app.owner.id] : [];
   for (const id of [...owners, ...(process.env.OWNER_IDS || '').split(/[\s,]+/).filter(Boolean)]) {
     const user = await client.users.fetch(id).catch(() => null);
-    await user?.send(`🌐 **Neue Dashboard-Adresse:** ${url}\n-# Die Adresse ändert sich, wenn der Laptop neu startet – ich schicke dir dann die neue. Auch per \`/dashboard\`.`).catch(() => {});
+    await user?.send(`🌐 **Neue Dashboard-Adresse:** ${url}\n-# Die Adresse ändert sich, wenn der Laptop neu startet – ich schicke dir dann die neue. Jederzeit auch per \`/tunnel\`.`).catch(() => {});
   }
 }
 

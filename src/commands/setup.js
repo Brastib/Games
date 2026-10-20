@@ -303,6 +303,21 @@ module.exports = [
     execute: i => dashboard.show(i),
   },
   {
+    data: new SlashCommandBuilder().setName('tunnel').setDescription('Link zum Dashboard (vom Handy oder anderen PC aus)')
+      .setDefaultMemberPermissions(P.ManageGuild),
+    async execute(i) {
+      const url = require('../modules/tunnel').url() || process.env.DASHBOARD_URL || null;
+      const port = process.env.PORT || 3000;
+      const lan = Object.values(require('os').networkInterfaces()).flat().find(n => n && n.family === 'IPv4' && !n.internal)?.address;
+      return respond(i, new EmbedBuilder().setColor(COLORS.brand).setTitle('🌐 Dashboard')
+        .setDescription([
+          url ? `**Von überall:** ${url}` : '**Von überall:** noch keine Adresse – der Tunnel startet gerade (kommt per DM, sobald er läuft).',
+          lan ? `**Im selben WLAN:** http://${lan}:${port}` : null,
+          '-# Die Tunnel-Adresse ändert sich, wenn der Laptop neu startet.',
+        ].filter(Boolean).join('\n')));
+    },
+  },
+  {
     data: new SlashCommandBuilder().setName('update').setDescription('Neueste Version holen und neu starten (nur Bot-Besitzer)')
       .setDefaultMemberPermissions(P.Administrator),
     async execute(i) {
