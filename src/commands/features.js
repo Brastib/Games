@@ -152,8 +152,9 @@ module.exports = [
         .addStringOption(o => o.setName('modus').setDescription('Buttons oder Auswahlmenü').addChoices({ name: 'Buttons', value: 'buttons' }, { name: 'Auswahlmenü', value: 'select' }))
         .addBooleanOption(o => o.setName('nur_eine').setDescription('Nur eine Rolle gleichzeitig erlaubt?'))
         .addStringOption(o => o.setName('rollen').setDescription('Gleich mehrere Rollen, mit Komma: Repo, Rounds, Helldivers II').setMaxLength(1500)))
-      .addSubcommand(s => s.setName('add').setDescription('Rolle zum Panel hinzufügen (im Kanal des Panels)')
-        .addRoleOption(o => o.setName('rolle').setDescription('Rolle').setRequired(true))
+      .addSubcommand(s => s.setName('add').setDescription('Rolle(n) zum Panel hinzufügen (im Kanal des Panels)')
+        .addRoleOption(o => o.setName('rolle').setDescription('Eine Rolle'))
+        .addStringOption(o => o.setName('rollen').setDescription('Oder gleich mehrere, mit Komma: Repo, Rounds, Helldivers II').setMaxLength(1500))
         .addStringOption(o => o.setName('nachricht_id').setDescription('Nur nötig, wenn mehrere Panels im Kanal sind'))
         .addStringOption(o => o.setName('beschriftung').setDescription('Text auf dem Button').setMaxLength(80))
         .addStringOption(o => o.setName('emoji').setDescription('Emoji, z. B. 🎮'))
@@ -179,8 +180,19 @@ module.exports = [
         const id = i.options.getString('nachricht_id')?.trim() || rolepanels.latestIn(i.guild.id, i.channelId);
         if (!id) return respond(i, err('In diesem Kanal gibt es kein Rollen-Panel. Geh in den Kanal mit dem Panel oder gib `nachricht_id` an.'));
         if (sub === 'add') {
-          await rolepanels.addRole(i.guild, id, { role: i.options.getRole('rolle'), label: i.options.getString('beschriftung'), emoji: i.options.getString('emoji'), style: i.options.getString('farbe') || 'rot' });
-          return respond(i, ok('Rolle hinzugefügt.'));
+          const single = i.options.getRole('rolle');
+          const list = rolepanels.parseRoleList(i.guild, i.options.getString('rollen'));
+          if (!single && !list.roles.length) return respond(i, err(list.missing.length ? `Nicht gefunden: ${list.missing.join(', ')}` : 'Gib `rolle` oder `rollen` an.'));
+          if (!list.roles.length) {
+            await rolepanels.addRole(i.guild, id, { role: single, label: i.options.getString('beschriftung'), emoji: i.options.getString('emoji'), style: i.options.getString('farbe') || 'rot' });
+            return respond(i, ok('Rolle hinzugefügt.'));
+          }
+          await i.deferReply({ flags: 64 });
+          const added = [], failed = [...list.missing.map(m => `„${m}“ nicht gefunden`)];
+          for (const role of [single, ...list.roles].filter((r, n, a) => r && a.findIndex(x => x?.id === r.id) === n)) {
+            await rolepanels.addRole(i.guild, id, { role, style: i.options.getString('farbe') || 'rot' }).then(() => added.push(`${role}`)).catch(e => failed.push(`${role.name}: ${e.message}`));
+          }
+          return respond(i, (added.length ? ok : err)([added.length ? `**Hinzugefügt:** ${added.join(' ')}` : 'Keine Rolle hinzugefügt.', failed.length ? `⚠️ ${failed.join(' · ')}` : null].filter(Boolean).join('\n')));
         }
         await rolepanels.removeRole(i.guild, id, i.options.getRole('rolle').id);
         return respond(i, ok('Rolle entfernt.'));

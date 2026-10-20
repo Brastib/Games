@@ -860,7 +860,7 @@ async function test(name, fn) {
     delete process.env.DASHBOARD_URL;
   });
 
-  await test('Lockdown-Alarm: Tondatei ok (Opus, ~16 s), Standard-Grund, Warnung + Entwarnung im Chat', async () => {
+  await test('Lockdown-Alarm: Tondatei ok (Opus, ~16 s), Standard-Grund, Warnung + Entwarnung im Haupt-Chat', async () => {
     const ld = require('../src/modules/lockdown');
     assert(fs.statSync(ld.ALARM_SOUND).size > 50_000, 'Tondatei fehlt');
     const { spawnSync } = require('child_process');
@@ -869,7 +869,9 @@ async function test(name, fn) {
     const g = fakeGuild();
     g.id = 'g-alarm';
     const posts = [];
-    g.systemChannel = { id: 'sys', isTextBased: () => true, send: async m => { posts.push(m.embeds[0].data); } };
+    const sysPosts = [];
+    g.systemChannel = { id: 'sys', isTextBased: () => true, send: async m => { sysPosts.push(m.embeds[0].data); } };
+    g.channels.cache.get('allgemein').send = async m => { posts.push(m.embeds[0].data); };
     g.members = { me: { id: 'bot' } };
     getConfig('g-alarm').lockdownAlarm.voice = false; // Sprachkanäle gibt es im Test nicht
     await ld.start(g, { by: { id: 'u', tag: 'u' } });
@@ -877,9 +879,23 @@ async function test(name, fn) {
     assert(posts.some(p => p.title === '🚨 LOCKDOWN AKTIV' && /Auf Befehl von Basti/.test(p.description)));
     await ld.end(g, { by: { id: 'u', tag: 'u' } });
     assert(posts.some(p => p.title === '✅ Entwarnung'));
+    assert.strictEqual(sysPosts.length, 0, 'Warnung landet im Chat, nicht im System-Kanal');
   });
 
   console.log('\n🎨 Rot-Schwarz-Theme');
+  await test('Lockdown-Warnung geht in den Haupt-Chat, nicht in den versteckten System-/Log-Kanal', () => {
+    const { alarmChannel } = require('../src/modules/lockdown');
+    const { PermissionsBitField: PB, ChannelType: CT } = require('discord.js');
+    const role = (id, perms = 0n) => ({ id, managed: false, permissions: new PB(perms) });
+    const roles = [role('g-chat'), role('mitglied'), role('admin', PB.Flags.Administrator)];
+    const ch = (id, name, viewers) => ({ id, name, type: CT.GuildText, isTextBased: () => true, permissionsFor: r => ({ has: () => viewers.includes(r.id) }) });
+    const logs = ch('logs', '╟𝐋𝐨𝐠𝐬', ['admin']), regeln = ch('regeln', '╙ℹ️𝐑𝐞𝐠𝐞𝐥𝐧', ['g-chat', 'mitglied', 'admin']), chat = ch('chat', '╟💬𝐄𝐓𝐂-𝐂𝐡𝐚𝐭', ['mitglied', 'admin']);
+    const g = { id: 'g-chat', systemChannelId: 'logs', systemChannel: logs, members: {}, roles: { cache: new Map(roles.map(r => [r.id, r])) }, channels: { cache: new Map([logs, regeln, chat].map(c => [c.id, c])) } };
+    assert.strictEqual(alarmChannel(g, getConfig('g-chat')).id, 'chat');
+    g.channels.cache.delete('chat');
+    assert.strictEqual(alarmChannel(g, getConfig('g-chat')).id, 'regeln', 'ohne Chat: ein Kanal, den Mitglieder sehen');
+    assert.strictEqual(alarmChannel(g, { ...getConfig('g-chat'), lockdownAlarm: { chatChannel: 'logs' } }).id, 'logs', 'eingestellter Kanal gewinnt');
+  });
   await test('Keine blauen/grünen Buttons und Embed-Farben (außer frei wählbaren Rollen-Buttons)', () => {
     const { COLORS } = require('../src/lib/embeds');
     for (const [k, c] of Object.entries(COLORS)) {

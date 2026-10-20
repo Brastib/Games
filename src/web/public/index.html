@@ -474,7 +474,7 @@ const SECTIONS = [
   { id: 'protect', label: 'Schutz', cards: [
     { title: '🚨 Lockdown-Alarm', note: 'Beim Lockdown geht der Bot nacheinander in jeden besetzten Sprachkanal und spielt Sirene + Durchsage „Lockdown aktiv – bitte verlassen Sie den Voice-Kanal“. Dazu eine Warnung im Chat und am Ende eine Entwarnung.', fields: [
       ['lockdownAlarm.voice', 'toggle', 'Sirene + Durchsage in den Sprachkanälen'],
-      ['lockdownAlarm.chatChannel', 'channel', 'Warnung in diesem Kanal (leer = System-Kanal)', TXT],
+      ['lockdownAlarm.chatChannel', 'channel', 'Warnung in diesem Kanal (leer = Haupt-Chat automatisch)', TXT],
       ['lockdownAlarm.reason', 'text', 'Grund, wenn keiner angegeben wird'],
     ] },
     { title: 'Linkschutz', note: 'GIFs (Tenor, Giphy, Klipy), hochgeladene Dateien, YouTube, Twitch und Discord sind immer erlaubt. Blockiert werden Betrug, IP-Logger, Kurz-Links und Fälschungen.', fields: [

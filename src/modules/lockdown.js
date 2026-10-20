@@ -25,6 +25,29 @@ function isStaffRole(role, cfg) {
   return p.has(P.Administrator) || p.has(P.ManageGuild) || p.has(P.ManageMessages) || p.has(P.ModerateMembers);
 }
 
+/**
+ * Wohin die Lockdown-Warnung geht: der eingestellte Kanal – sonst der Haupt-Chat, den normale Mitglieder sehen.
+ * Der System-Kanal ist oft ein versteckter Log-Kanal (so auf ETC.), da würde die Warnung niemand lesen.
+ */
+function alarmChannel(guild, cfg) {
+  const set = guild.channels.cache.get(cfg.lockdownAlarm?.chatChannel);
+  if (set?.isTextBased?.()) return set;
+  try {
+    const me = guild.members.me;
+    const roles = [...guild.roles.cache.values()].filter(r => !r.managed && !isStaffRole(r, cfg));
+    const pub = [...guild.channels.cache.values()].filter(c => c.type === ChannelType.GuildText
+      && (!me || c.permissionsFor(me)?.has([P.ViewChannel, P.SendMessages, P.EmbedLinks]))
+      && roles.some(r => c.permissionsFor(r)?.has(P.ViewChannel)));
+    const name = c => c.name.normalize('NFKC');
+    return pub.find(c => /chat|allgemein|general|plauder|talk/i.test(name(c)))
+      || pub.find(c => c.id === guild.systemChannelId)
+      || pub.sort((a, b) => (b.members?.size || 0) - (a.members?.size || 0))[0]
+      || guild.systemChannel;
+  } catch {
+    return guild.systemChannel;
+  }
+}
+
 function snapshot(channel, id, keys) {
   const ow = channel.permissionOverwrites.cache.get(id);
   const prev = {};
@@ -127,7 +150,7 @@ async function start(guild, opts = {}) {
       }
     }
     // Warnung im Chat (auch wenn der Lockdown aus dem Dashboard oder automatisch kommt)
-    const alarmCh = guild.channels.cache.get(cfg.lockdownAlarm?.chatChannel) || guild.systemChannel;
+    const alarmCh = alarmChannel(guild, cfg);
     if (alarmCh?.isTextBased?.() && alarmCh.id !== opts.announceChannel?.id && !(opts.announceAll && locked.includes(alarmCh))) {
       await alarmCh.send({ embeds: [new EmbedBuilder().setColor(COLORS.protect).setTitle('🚨 LOCKDOWN AKTIV')
         .setDescription(`Der Server ist gesperrt. **Bitte verlasst die Sprachkanäle** und wartet auf Entwarnung.
@@ -180,7 +203,7 @@ async function end(guild, { by = null, auto = false } = {}) {
       .setTitle('🔓 Lockdown beendet')
       .setDescription(`${auto ? 'Automatisch nach Ablauf der Zeit' : `Von ${by ? `<@${by.id}>` : 'unbekannt'}`} · Dauer: ${formatDuration(duration)}`)
       .setTimestamp());
-    const alarmCh = guild.channels.cache.get(cfg.lockdownAlarm?.chatChannel) || guild.systemChannel;
+    const alarmCh = alarmChannel(guild, cfg);
     await alarmCh?.send?.({ embeds: [new EmbedBuilder().setColor(COLORS.ok).setTitle('✅ Entwarnung').setDescription('Der Lockdown ist vorbei, alles ist wieder offen.').setTimestamp()] }).catch(() => {});
     return { restored };
   } finally {
@@ -262,4 +285,4 @@ async function voiceAlarm(guild, { only = null, test = false } = {}) {
   return played;
 }
 
-module.exports = { voiceAlarm, ALARM_SOUND, start, end, lockChannel, unlockChannel, processTimers };
+module.exports = { alarmChannel, voiceAlarm, ALARM_SOUND, start, end, lockChannel, unlockChannel, processTimers };
