@@ -2,6 +2,8 @@
 # Auto-Update: holt neue Versionen von GitHub und startet den Bot neu.
 # Läuft alle 5 Minuten per systemd-Timer (als root, Git/npm aber als Besitzer des Ordners).
 set -euo pipefail
+# runuser liegt in /usr/sbin – im systemd-PATH fehlt das manchmal
+export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
 OWNER="$(stat -c %U "$DIR")"
 as_owner() { runuser -u "$OWNER" -- "$@"; }

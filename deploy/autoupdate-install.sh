@@ -10,7 +10,7 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-Environment=PATH=$NODE_DIR:/usr/local/bin:/usr/bin:/bin
+Environment=PATH=$NODE_DIR:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/bin/bash $DIR/deploy/autoupdate.sh
 UNIT
 sudo tee /etc/systemd/system/etc-bot-update.timer >/dev/null <<UNIT
