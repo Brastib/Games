@@ -39,12 +39,18 @@ function ensure() {
   if (ready) return ready;
   ready = (async () => {
     if (binPath && fs.existsSync(binPath)) return binPath;
-    const sys = onPath();
-    if (sys) { binPath = sys; return binPath; }
+    // Eigene, aktuelle Version bevorzugen – ein yt-dlp vom System ist oft veraltet (YouTube ändert ständig etwas)
     const local = path.join(BIN_DIR, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
     const fresh = fs.existsSync(local) && Date.now() - fs.statSync(local).mtimeMs < 7 * 86_400_000;
-    if (!fresh) await download(local);
-    binPath = local;
+    try {
+      if (!fresh) await download(local);
+      binPath = local;
+    } catch (e) {
+      const sys = onPath();
+      if (!sys && !fs.existsSync(local)) throw e;
+      binPath = fs.existsSync(local) ? local : sys; // notfalls ältere eigene oder System-Version
+      console.warn(`[musik] yt-dlp-Download fehlgeschlagen (${e.message}) – nutze ${binPath}`);
+    }
     return binPath;
   })().catch(e => { ready = null; throw e; });
   return ready;
@@ -59,11 +65,21 @@ function cookieArgs() {
   return ['--cookies', cookieFile];
 }
 
+/** Ab yt-dlp 2025.11 gibt es --js-runtimes; ältere Versionen würden mit „no such option“ abbrechen */
+const jsSupport = new Map();
+function jsRuntimeArgs(bin) {
+  if (!jsSupport.has(bin)) {
+    const v = spawnSync(bin, ['--version'], { encoding: 'utf8', timeout: 15_000 }).stdout?.trim() || '';
+    jsSupport.set(bin, /^\d{4}\.\d{2}\.\d{2}/.test(v) && v >= '2025.11.01');
+  }
+  return jsSupport.get(bin) ? ['--js-runtimes', `node:${process.execPath}`] : [];
+}
+
 function run(args, timeout = 45_000) {
   return ensure().then(bin => new Promise((resolve, reject) => {
     // YouTube verlangt inzwischen eine JavaScript-Laufzeit für seine Prüfaufgaben – sonst fehlen die Audio-Formate.
     // Wir nehmen das Node, mit dem der Bot selbst läuft.
-    execFile(bin, ['--no-warnings', '--ignore-config', '--js-runtimes', `node:${process.execPath}`, ...cookieArgs(), ...args], { maxBuffer: 64 * 1024 * 1024, timeout }, (error, stdout, stderr) => {
+    execFile(bin, ['--no-warnings', '--ignore-config', ...jsRuntimeArgs(bin), ...cookieArgs(), ...args], { maxBuffer: 64 * 1024 * 1024, timeout }, (error, stdout, stderr) => {
       if (error) {
         const msg = String(stderr || error.message);
         if (/confirm your age|age[- ]restricted|inappropriate for some users/i.test(msg)) return reject(new Error('Dieses Video ist altersbeschränkt.'));
