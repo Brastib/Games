@@ -1,0 +1,206 @@
+'use strict';
+/**
+ * Startpunkt des Bots.
+ * Benötigte Umgebungsvariablen: DISCORD_TOKEN (Pflicht), MONGODB_URI (für Hosting ohne feste Festplatte, z. B. Render).
+ */
+try { process.loadEnvFile(); } catch { /* keine .env-Datei – Variablen kommen vom Hoster */ }
+
+const http = require('http');
+const crypto = require('crypto');
+const { Client, Events, GatewayIntentBits: I, Partials, ActivityType } = require('discord.js');
+const store = require('./lib/store');
+const lf = require('./lib/linkFilter');
+const { onInteraction, commands } = require('./handlers/interactions');
+const automod = require('./modules/automod');
+const leveling = require('./modules/leveling');
+const logs = require('./modules/logs');
+const antiraid = require('./modules/antiraid');
+const antinuke = require('./modules/antinuke');
+const lockdown = require('./modules/lockdown');
+const tempvoice = require('./modules/tempvoice');
+const temptext = require('./modules/temptext');
+const giveaways = require('./modules/giveaways');
+const verify = require('./modules/verify');
+const welcome = require('./modules/welcome');
+const moderation = require('./modules/moderation');
+
+const client = new Client({
+  intents: [I.Guilds, I.GuildMembers, I.GuildMessages, I.MessageContent, I.GuildVoiceStates, I.GuildModeration],
+  partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.User],
+  allowedMentions: { parse: ['users'], repliedUser: false },
+});
+
+const safe = (name, fn) => async (...args) => {
+  try { await fn(...args); } catch (e) { console.error(`[${name}]`, e); }
+};
+
+// ---------- Befehle bei Discord anmelden (nur wenn sie sich geändert haben) ----------
+async function registerCommands() {
+  const body = commands.map(c => c.data.toJSON());
+  const hash = crypto.createHash('sha1').update(JSON.stringify(body)).digest('hex');
+  if (process.env.DEV_GUILD_ID) {
+    const g = await client.guilds.fetch(process.env.DEV_GUILD_ID);
+    await g.commands.set(body);
+    console.log(`[befehle] ${body.length} Befehle auf Test-Server ${g.name} registriert.`);
+    return;
+  }
+  if (store.get('meta', 'cmdhash') === hash && !process.env.FORCE_REGISTER) {
+    console.log(`[befehle] ${body.length} Befehle unverändert.`);
+    return;
+  }
+  await client.application.commands.set(body);
+  store.set('meta', 'cmdhash', hash);
+  console.log(`[befehle] ${body.length} Befehle global registriert.`);
+}
+
+// ---------- Zeitplaner: Zeit-Banns, Temp-Kanäle, Gewinnspiele, Lockdown-Ende ----------
+let ticking = false;
+async function tick() {
+  if (ticking || !client.isReady()) return;
+  ticking = true;
+  try {
+    await moderation.processTempBans(client);
+    await temptext.processTimers(client);
+    await giveaways.processTimers(client);
+    await lockdown.processTimers(client);
+    await antiraid.processTimers(client);
+  } catch (e) {
+    console.error('[zeitplaner]', e);
+  } finally {
+    ticking = false;
+  }
+}
+
+// ---------- Ereignisse ----------
+client.once(Events.ClientReady, safe('ready', async c => {
+  console.log(`[bot] Eingeloggt als ${c.user.tag} auf ${c.guilds.cache.size} Server(n).`);
+  c.user.setPresence({ activities: [{ name: '/help · Server-Schutz aktiv', type: ActivityType.Watching }], status: 'online' });
+  await registerCommands().catch(e => console.error('[befehle] Registrierung fehlgeschlagen:', e.message));
+  await tempvoice.cleanup(c).catch(() => {});
+  lf.loadPhishingLists().catch(() => {});
+  setInterval(() => lf.loadPhishingLists().catch(() => {}), 6 * 3_600_000).unref();
+  setInterval(tick, 20_000).unref();
+  tick();
+  const invite = `https://discord.com/oauth2/authorize?client_id=${c.user.id}&permissions=8&scope=bot%20applications.commands`;
+  console.log(`[bot] Einladungslink: ${invite}`);
+}));
+
+client.on(Events.InteractionCreate, onInteraction);
+
+client.on(Events.MessageCreate, safe('message', async m => {
+  if (await automod.handle(m)) return;
+  await leveling.onMessage(m);
+}));
+client.on(Events.MessageUpdate, safe('messageUpdate', async (oldM, newM) => {
+  if (newM.partial) newM = await newM.fetch().catch(() => null);
+  if (!newM) return;
+  await logs.messageUpdate(oldM, newM);
+  if (oldM.content !== newM.content) await automod.handle(newM, { edited: true });
+}));
+client.on(Events.MessageDelete, safe('messageDelete', logs.messageDelete));
+client.on(Events.MessageBulkDelete, safe('bulkDelete', logs.messageBulkDelete));
+
+client.on(Events.GuildMemberAdd, safe('memberAdd', async member => {
+  await logs.memberAdd(member);
+  if (await antiraid.onJoin(member)) return;
+  await verify.onJoin(member);
+  await welcome.onJoin(member);
+}));
+client.on(Events.GuildMemberRemove, safe('memberRemove', async member => {
+  await logs.memberRemove(member);
+  await welcome.onLeave(member);
+}));
+client.on(Events.GuildMemberUpdate, safe('memberUpdate', logs.memberUpdate));
+client.on(Events.VoiceStateUpdate, safe('voice', async (o, n) => {
+  await tempvoice.onVoiceUpdate(o, n);
+  await logs.voiceUpdate(o, n);
+}));
+client.on(Events.ChannelDelete, safe('channelDelete', async ch => {
+  antinuke.rememberChannel(ch);
+  for (const col of ['tempvoice', 'temptext', 'tickets']) store.delete(col, ch.id);
+}));
+client.on(Events.GuildRoleDelete, safe('roleDelete', antinuke.rememberRole));
+client.on(Events.GuildAuditLogEntryCreate, safe('audit', async (entry, guild) => {
+  await antinuke.onAuditEntry(entry, guild);
+  await logs.auditEntry(entry, guild);
+}));
+client.on(Events.GuildCreate, g => console.log(`[bot] Neuer Server: ${g.name} (${g.memberCount} Mitglieder)`));
+client.on(Events.Error, e => console.error('[discord]', e.message));
+client.on(Events.Warn, w => console.warn('[discord]', w));
+process.on('unhandledRejection', e => console.error('[unbehandelt]', e));
+
+// ---------- Web-Server: hält den Bot beim Hoster wach + Statusseite ----------
+const startedAt = Date.now();
+http.createServer((req, res) => {
+  const status = {
+    status: client.isReady() ? 'online' : 'startet',
+    bot: client.user?.tag || null,
+    server: client.guilds.cache.size,
+    ping: Math.round(client.ws.ping),
+    online_seit_sekunden: Math.round((Date.now() - startedAt) / 1000),
+    speicher: store.kind,
+    betrugs_domains: lf.phishingCount(),
+  };
+  if (req.url.startsWith('/health')) {
+    res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+    return res.end(JSON.stringify(status));
+  }
+  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+  res.end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Discord-Bot</title>
+<body style="font-family:system-ui;background:#0b0b0f;color:#eee;display:grid;place-items:center;height:100vh;margin:0">
+<div style="text-align:center"><h1 style="color:${client.isReady() ? '#2ecc71' : '#f1c40f'}">${client.isReady() ? '🟢 Bot ist online' : '🟡 Bot startet …'}</h1>
+<p>${status.bot || ''} · ${status.server} Server · ${status.ping} ms</p></div></body>`);
+}).listen(process.env.PORT || 3000, () => console.log(`[web] Statusseite auf Port ${process.env.PORT || 3000}`));
+
+// Selbst-Ping alle 10 Minuten (Render schläft sonst nach 15 Min. ohne Anfragen ein)
+const keepAliveUrl = process.env.KEEPALIVE_URL || process.env.RENDER_EXTERNAL_URL;
+if (keepAliveUrl) {
+  setInterval(() => fetch(keepAliveUrl.replace(/\/$/, '') + '/health').catch(() => {}), 10 * 60_000).unref();
+  console.log(`[web] Wach-halten aktiv: ${keepAliveUrl}`);
+}
+
+// Wächter: Wenn die Verbindung zu Discord 10 Minuten lang weg ist, neu starten (der Hoster startet den Prozess neu)
+let notReadySince = null;
+setInterval(() => {
+  if (client.isReady()) { notReadySince = null; return; }
+  notReadySince ||= Date.now();
+  if (Date.now() - notReadySince > 10 * 60_000) {
+    console.error('[wächter] Seit 10 Minuten keine Verbindung zu Discord – Neustart.');
+    process.exit(1);
+  }
+}, 60_000).unref();
+
+async function shutdown(sig) {
+  console.log(`[bot] ${sig} empfangen – speichere und beende …`);
+  await store.flush().catch(() => {});
+  await client.destroy().catch(() => {});
+  process.exit(0);
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+// ---------- Start ----------
+(async () => {
+  if (!process.env.DISCORD_TOKEN) {
+    console.error('\n❌ DISCORD_TOKEN fehlt. Trage den Bot-Token beim Hoster als Umgebungsvariable ein (siehe README).\n');
+    process.exit(1);
+  }
+  try {
+    await store.init();
+  } catch (e) {
+    console.error('\n❌ Datenbank-Verbindung fehlgeschlagen:', e.message, '\nPrüfe MONGODB_URI und ob in MongoDB Atlas unter „Network Access“ 0.0.0.0/0 erlaubt ist.\n');
+    process.exit(1);
+  }
+  try {
+    await client.login(process.env.DISCORD_TOKEN);
+  } catch (e) {
+    if (/disallowed intents/i.test(e.message)) {
+      console.error('\n❌ Discord blockiert den Bot: Im Developer Portal unter „Bot“ müssen „SERVER MEMBERS INTENT“ und „MESSAGE CONTENT INTENT“ eingeschaltet sein.\n');
+    } else if (/token/i.test(e.message)) {
+      console.error('\n❌ Der DISCORD_TOKEN ist ungültig. Im Developer Portal unter „Bot“ → „Reset Token“ einen neuen erzeugen.\n');
+    } else {
+      console.error('\n❌ Login fehlgeschlagen:', e.message);
+    }
+    process.exit(1);
+  }
+})();

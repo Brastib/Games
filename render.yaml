@@ -1,0 +1,21 @@
+# Render-Blueprint: Render liest diese Datei und richtet den Bot automatisch ein.
+# Kostenloser Plan. DISCORD_TOKEN und MONGODB_URI fragt Render beim Einrichten ab.
+services:
+  - type: web
+    name: discord-bot
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: TZ
+        value: Europe/Berlin
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: MONGODB_URI
+        sync: false

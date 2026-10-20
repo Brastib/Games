@@ -1,0 +1,20 @@
+{
+  "name": "discord-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Moderation, Serverschutz, Temp-Kanäle, Tickets, Willkommen, Level und mehr",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "check": "node scripts/selftest.js"
+  },
+  "engines": {
+    "node": ">=20.12"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.11",
+    "discord.js": "^14.27.0",
+    "mongodb": "^7.7.0"
+  }
+}

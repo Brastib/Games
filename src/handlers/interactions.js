@@ -1,0 +1,101 @@
+'use strict';
+/**
+ * Verteilt alle Interaktionen (Slash-Befehle, Buttons, Menüs, Formulare) an die richtigen Module.
+ * customId-Schema: "<bereich>:<aktion>[:<wert>]"
+ */
+const { Collection, EmbedBuilder, InteractionContextType } = require('discord.js');
+const { COLORS, err, respond } = require('../lib/embeds');
+const { parseColor, truncate } = require('../lib/util');
+const tempvoice = require('../modules/tempvoice');
+const tickets = require('../modules/tickets');
+const verify = require('../modules/verify');
+const rolepanels = require('../modules/rolepanels');
+const giveaways = require('../modules/giveaways');
+const dashboard = require('../modules/dashboard');
+
+const FILES = ['moderation', 'protection', 'setup', 'features', 'levels', 'info'];
+const commands = new Collection();
+for (const f of FILES) {
+  for (const cmd of require(`../commands/${f}`)) {
+    cmd.data.setContexts?.(InteractionContextType.Guild); // nur auf Servern, nicht in DMs
+    commands.set(cmd.data.name, cmd);
+  }
+}
+const { leaderboardPayload } = require('../commands/levels');
+const { helpPayload } = require('../commands/info');
+
+async function handleEmbedModal(i, channelId) {
+  const ch = i.guild.channels.cache.get(channelId);
+  if (!ch?.isTextBased()) return respond(i, err('Kanal nicht gefunden.'));
+  const get = id => i.fields.getTextInputValue(id)?.trim();
+  const e = new EmbedBuilder().setColor(parseColor(get('color')) ?? COLORS.brand).setDescription(get('description'));
+  if (get('title')) e.setTitle(truncate(get('title'), 256));
+  if (get('footer')) e.setFooter({ text: get('footer') });
+  const img = get('image');
+  if (img) {
+    if (!/^https?:\/\/\S+$/i.test(img)) return respond(i, err('Der Bild-Link muss mit http:// oder https:// beginnen.'));
+    e.setImage(img);
+  }
+  try {
+    await ch.send({ embeds: [e] });
+    return respond(i, { embeds: [new EmbedBuilder().setColor(COLORS.ok).setDescription(`✅ Gepostet in ${ch}.`)] });
+  } catch (x) {
+    return respond(i, err(`Posten fehlgeschlagen: ${x.message}`));
+  }
+}
+
+async function onInteraction(i) {
+  try {
+    if (i.isChatInputCommand()) {
+      if (!i.inGuild()) return respond(i, err('Befehle funktionieren nur auf Servern.'));
+      const cmd = commands.get(i.commandName);
+      if (!cmd) return respond(i, err('Diesen Befehl kenne ich nicht (mehr).'));
+      return await cmd.execute(i);
+    }
+    if (i.isAutocomplete()) {
+      const cmd = commands.get(i.commandName);
+      if (cmd?.autocomplete) return await cmd.autocomplete(i);
+      return;
+    }
+    if (!i.inGuild()) return;
+    const [ns, action, value] = i.customId.split(':');
+
+    if (i.isButton()) {
+      switch (ns) {
+        case 'tv': return await tempvoice.handleButton(i, action);
+        case 'tk': return await tickets.handleButton(i, action);
+        case 'vr': return await verify.handleButton(i);
+        case 'rp': return await rolepanels.onButton(i, action);
+        case 'gw': return await giveaways.onJoin(i);
+        case 'dash': return await dashboard.handleButton(i, [action, value]);
+        case 'lb': return await i.update(leaderboardPayload(i.guild, parseInt(action, 10) || 0));
+      }
+      return;
+    }
+    if (i.isStringSelectMenu()) {
+      if (ns === 'rps') return await rolepanels.onSelect(i);
+      if (ns === 'help') return await i.update(helpPayload(i.values[0]));
+      return;
+    }
+    if (i.isUserSelectMenu()) {
+      if (ns === 'tvs') return await tempvoice.handleSelect(i, action);
+      return;
+    }
+    if (i.isModalSubmit()) {
+      switch (ns) {
+        case 'tvm': return await tempvoice.handleModal(i, action);
+        case 'tkm': return await tickets.onOpenModal(i);
+        case 'vrm': return action === 'setup' ? await verify.finishSetup(i) : await verify.handleCaptcha(i);
+        case 'emb': return await handleEmbedModal(i, action);
+      }
+    }
+  } catch (e) {
+    console.error(`[interaktion ${i.isChatInputCommand?.() ? '/' + i.commandName : i.customId}]`, e);
+    if (i.isRepliable?.()) {
+      const msg = e.code === 50013 ? 'Mir fehlen die nötigen Rechte. Gib mir Administrator oder zieh meine Rolle weiter nach oben.' : `Da ist etwas schiefgelaufen: ${truncate(e.message, 300)}`;
+      await respond(i, err(msg)).catch(() => {});
+    }
+  }
+}
+
+module.exports = { onInteraction, commands };
