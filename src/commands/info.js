@@ -12,7 +12,7 @@ const HELP = {
       '**1.** `/setup quickstart` – legt Logs, Willkommen, Temp-Sprachkanäle und Tickets an',
       '**2.** `/setup rules` – Regeln mit „Akzeptieren“-Button (+ Captcha)',
       '**3.** `/setup modrole` – Team-Rolle eintragen',
-      '**4.** `/dashboard` – alles auf einen Blick, Module an/aus',
+      '**4.** `/dashboard` in Discord oder das **Web-Dashboard** (Adresse deines Bots) – alles einstellen',
       '**5.** Meine Rolle in **Server-Einstellungen → Rollen** ganz nach oben ziehen (wichtig für Schutz & Moderation)',
     ].join('\n'),
   },
@@ -26,15 +26,23 @@ const HELP = {
   },
   channels: {
     label: 'Kanäle & Tickets', emoji: '🔊',
-    text: '**Temp-Sprachkanäle:** Hub betreten → eigener Kanal. Steuerung per Bedienfeld oder `/voice name|limit|lock|unlock|hide|unhide|permit|kick|claim|transfer`.\n**Temp-Textkanäle:** `/tempchannel create|extend|delete` – löschen sich selbst.\n**Tickets:** Button → privater Kanal, Transkript beim Schließen (`/ticket close|add|remove|panel`).',
+    text: '**Temp-Sprachkanäle:** Hub betreten → eigener Kanal. Das **Bedienfeld erscheint im Chat des Sprachkanals**: Name, Limit, Sperren, Verstecken, Bitrate, Region, Erlauben, Rauswerfen, **Bannen/Entbannen**, Übernehmen, Übertragen. Name, Limit und Bannliste werden für deinen nächsten Kanal gemerkt. Auch per `/voice …`.\n**Temp-Textkanäle:** `/tempchannel create|extend|delete` – löschen sich selbst.\n**Tickets:** Button → privater Kanal, Transkript beim Schließen (`/ticket close|add|remove|panel`).',
+  },
+  music: {
+    label: 'Musik & Sounds', emoji: '🎵',
+    text: '`/play` YouTube, SoundCloud, Spotify-Song, Radio, MP3 oder Suche (auch Playlists und eigene Dateien)\n`/pause` · `/resume` · `/skip` · `/stop` · `/queue` · `/nowplaying` · `/remove` · `/shuffle` · `/loop` · `/seek` · `/volume`\n`/filter` Bass-Boost, Nightcore, Slowed + Reverb, 8D, Karaoke …\n`/lyrics` Songtext · `/sound play|add|list` Soundboard · `/watch` YouTube gemeinsam schauen\nDie „Läuft gerade“-Nachricht hat Buttons für alles.',
   },
   members: {
     label: 'Mitglieder', emoji: '👋',
-    text: '**Willkommen/Abschied:** `/setup welcome|goodbye|welcometest` – mit Bildkarte.\n**Auto-Rollen:** `/setup autorole`.\n**Regeln akzeptieren:** `/setup rules`.\n**Rollen zum Selbstabholen:** `/rolepanel create|add|remove` (Buttons oder Menü).\n**Level:** `/rank` · `/leaderboard` · `/level reward|set|addxp|noxp` · `/setup levels`.',
+    text: '**Willkommen/Abschied:** `/setup welcome|goodbye|welcometest` – mit Bildkarte.\n**Auto-Rollen:** `/setup autorole`.\n**Regeln akzeptieren:** `/setup rules`.\n**Rollen zum Selbstabholen:** `/rolepanel create|add|remove` (Buttons oder Menü).',
+  },
+  community: {
+    label: 'Level, Quests & Münzen', emoji: '⭐',
+    text: '**Level:** XP für Nachrichten, **Sprachzeit** und **Clips** (🔥-Likes geben dem Ersteller XP, die besten landen in der Hall of Fame). `/rank` · `/leaderboard` (XP, Münzen, Sprachzeit, Clips) · `/level reward|set|addxp|noxp`\n**Tages-Quests:** `/quests` – jeden Tag neue Aufgaben, Bonus und Serie.\n**Münzen:** `/daily` · `/balance` · `/pay` · `/shop view|add|remove|give`',
   },
   fun: {
     label: 'Extras', emoji: '🎉',
-    text: '`/giveaway start|end|reroll` · `/poll` · `/embed` · `/userinfo` · `/serverinfo` · `/avatar` · `/ping`',
+    text: '`/giveaway start|end|reroll` · `/poll` · `/embed` · `/suggest` · `/remind` · `/autoresponse` · `/userinfo` · `/serverinfo` · `/avatar` · `/ping`\nStatistik-Kanäle: `/setup stats`\n**Web-Dashboard:** alles bequem im Browser einstellen (Adresse des Bots öffnen).',
   },
 };
 

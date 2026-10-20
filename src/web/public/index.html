@@ -1,0 +1,852 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Bot-Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap">
+<style>
+/* Nachtmodus wie die StandBy-Uhr: reines Schwarz, leuchtendes Rot, gedimmtes Rot für Nebensächliches */
+:root {
+  --bg: #000000;
+  --red: #ff1a0d;
+  --red-hi: #ff4636;
+  --dim: #8a0d07;
+  --faint: #3a0603;
+  --line: #240302;
+  --chip: #1c1c1e;
+  --chip-hi: #2c2c2e;
+  --amber: #ff9f0a;
+  --ink: #000000;
+  --f-round: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
+  --r-card: 22px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--red); font-family: var(--f-round); font-weight: 700;
+  -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+}
+a { color: var(--red-hi); }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--red-hi); outline-offset: 2px; border-radius: 10px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* ---------- Kopfzeile ---------- */
+header.top {
+  position: sticky; top: 0; z-index: 20; background: rgba(0,0,0,.92); backdrop-filter: blur(10px);
+  padding-top: env(safe-area-inset-top, 0px); border-bottom: 1px solid var(--line);
+}
+header.top .wrap { display: flex; align-items: center; gap: 12px; min-height: 60px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 900; letter-spacing: .04em; font-size: 18px; text-transform: uppercase; }
+.brand canvas { width: 30px; height: 30px; }
+.grow { flex: 1; min-width: 0; }
+.dots {
+  border: 0; background: var(--chip); border-radius: 999px; height: 40px; min-width: 64px; padding: 0 14px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; color: #8e8e93;
+}
+.dots i { width: 6px; height: 6px; border-radius: 50%; background: #8e8e93; display: block; }
+.dots i:nth-child(3), .dots i:nth-child(4) { width: 6px; height: 12px; border-radius: 3px; }
+.gname { font-weight: 900; font-size: 15px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- StandBy (Uhr + Kalender) ---------- */
+.standby { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(16px, 4vw, 56px); align-items: center; padding-block: clamp(20px, 5vh, 56px); }
+.standby canvas.clock { width: 100%; max-width: 460px; aspect-ratio: 1; justify-self: center; }
+.cal h2 { margin: 0 0 14px; font-size: clamp(30px, 6vw, 58px); font-weight: 900; letter-spacing: .02em; line-height: 1; }
+.cal table { border-collapse: collapse; width: 100%; max-width: 520px; table-layout: fixed; }
+.cal th, .cal td { text-align: center; font-weight: 900; font-size: clamp(16px, 3.4vw, 34px); padding: clamp(4px, 1.1vw, 10px) 0; font-variant-numeric: tabular-nums; }
+.cal th { padding-bottom: clamp(8px, 2vw, 18px); }
+.cal .we { color: var(--dim); }
+.cal .today span {
+  display: inline-grid; place-items: center; width: 1.9em; height: 1.9em; border-radius: 50%; background: var(--red); color: var(--ink);
+}
+.cal .mark span { text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 6px; }
+@media (max-width: 720px) { .standby { grid-template-columns: 1fr; } .standby canvas.clock { max-width: 320px; } }
+
+/* ---------- Login ---------- */
+.login-cta { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-bottom: 48px; text-align: center; }
+.login-cta p { margin: 0; color: var(--dim); max-width: 46ch; font-size: 17px; line-height: 1.45; }
+
+/* ---------- Knöpfe ---------- */
+.btn {
+  border: 0; border-radius: 999px; padding: 14px 24px; font-weight: 900; letter-spacing: .03em; cursor: pointer; text-transform: uppercase;
+  background: var(--red); color: var(--ink); font-size: 15px; display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+  transition: transform .12s ease, background .12s ease;
+}
+.btn:hover { background: var(--red-hi); }
+.btn:active { transform: scale(.97); }
+.btn.ghost { background: var(--chip); color: var(--red); }
+.btn.ghost:hover { background: var(--chip-hi); }
+.btn.big { font-size: 18px; padding: 18px 30px; }
+.btn.small { padding: 9px 16px; font-size: 13px; }
+.btn[disabled] { opacity: .5; cursor: progress; }
+
+/* ---------- Server-Auswahl ---------- */
+.picker h1, .section-title { font-size: clamp(30px, 6vw, 52px); font-weight: 900; margin: 28px 0 18px; text-transform: uppercase; letter-spacing: .02em; line-height: 1; text-wrap: balance; }
+.servers { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; padding-bottom: 40px; }
+.server {
+  border: 1px solid var(--line); border-radius: var(--r-card); padding: 18px 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  background: transparent; cursor: pointer; text-align: center; min-width: 0;
+}
+.server:hover { border-color: var(--dim); }
+.server .ic { width: 72px; height: 72px; border-radius: 50%; background: var(--faint); display: grid; place-items: center; font-size: 26px; font-weight: 900; overflow: hidden; }
+.server .ic img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(1) sepia(1) saturate(9) hue-rotate(-28deg) brightness(.85); }
+.server .nm { font-weight: 900; font-size: 15px; overflow-wrap: anywhere; }
+.server .sub { font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; }
+.server.missing { opacity: .7; }
+
+/* ---------- Bereichs-Navigation ---------- */
+.layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 28px; padding-bottom: 80px; }
+nav.side { position: sticky; top: 80px; align-self: start; display: flex; flex-direction: column; gap: 4px; padding-top: 24px; }
+nav.side button {
+  border: 0; background: transparent; text-align: left; padding: 11px 14px; border-radius: 14px; cursor: pointer;
+  font-weight: 900; font-size: 16px; color: var(--dim); display: flex; gap: 10px; align-items: center;
+}
+nav.side button .n { font-variant-numeric: tabular-nums; width: 1.6em; text-align: right; color: var(--faint); }
+nav.side button:hover { color: var(--red); }
+nav.side button.on { color: var(--ink); background: var(--red); }
+nav.side button.on .n { color: var(--ink); }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; gap: 0; }
+  nav.side {
+    position: sticky; top: calc(61px + env(safe-area-inset-top, 0px)); z-index: 10; flex-direction: row; overflow-x: auto; padding: 10px 0;
+    background: var(--bg); border-bottom: 1px solid var(--line); scrollbar-width: none; margin: 0 -16px; padding-left: 16px; padding-right: 16px;
+  }
+  nav.side::-webkit-scrollbar { display: none; }
+  nav.side button { white-space: nowrap; padding: 9px 14px; font-size: 14px; }
+  nav.side button .n { display: none; }
+}
+
+/* ---------- Karten & Felder ---------- */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; align-items: start; }
+.card { border: 1px solid var(--line); border-radius: var(--r-card); padding: 20px; min-width: 0; }
+.card.alert { border-color: var(--red); }
+.card h3 { margin: 0 0 4px; font-size: 22px; font-weight: 900; text-transform: uppercase; letter-spacing: .02em; display: flex; align-items: center; gap: 10px; }
+.card .note { color: var(--dim); font-size: 14px; margin: 0 0 12px; line-height: 1.45; font-weight: 700; }
+.field { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.field:first-of-type { border-top: 0; }
+.field.stack { grid-template-columns: minmax(0, 1fr); }
+.field label { font-weight: 800; font-size: 16px; color: var(--red); }
+.field .help { grid-column: 1 / -1; font-size: 13px; color: var(--dim); margin-top: -4px; line-height: 1.4; }
+.field.err label { color: var(--amber); }
+.field .errmsg { grid-column: 1 / -1; color: var(--amber); font-size: 13px; }
+
+.inp, select.inp, textarea.inp {
+  background: var(--chip); border: 1px solid transparent; border-radius: 14px; padding: 11px 14px; width: 100%; color: var(--red); font-weight: 800; min-width: 0;
+}
+.inp:focus { border-color: var(--dim); outline: none; }
+textarea.inp { min-height: 96px; resize: vertical; line-height: 1.45; font-weight: 700; }
+input.num { width: 104px; text-align: right; font-variant-numeric: tabular-nums; }
+select.inp { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--dim) 50%), linear-gradient(135deg, var(--dim) 50%, transparent 50%); background-position: calc(100% - 20px) 55%, calc(100% - 14px) 55%; background-size: 6px 6px; background-repeat: no-repeat; padding-right: 36px; }
+
+/* Schalter */
+.sw { position: relative; width: 58px; height: 34px; flex: none; }
+.sw input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+.sw span { position: absolute; inset: 0; border-radius: 999px; background: var(--faint); transition: background .15s; }
+.sw span::after { content: ""; position: absolute; top: 4px; left: 4px; width: 26px; height: 26px; border-radius: 50%; background: var(--dim); transition: transform .15s, background .15s; }
+.sw input:checked + span { background: var(--red); }
+.sw input:checked + span::after { transform: translateX(24px); background: var(--ink); }
+.sw input:focus-visible + span { outline: 3px solid var(--red-hi); outline-offset: 2px; }
+
+/* Chips (Rollen, Kanäle, Listen) */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: var(--chip); border-radius: 999px; padding: 7px 8px 7px 13px; font-size: 14px; font-weight: 800; max-width: 100%; }
+.chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip button { border: 0; background: var(--faint); color: var(--red); width: 22px; height: 22px; border-radius: 50%; cursor: pointer; line-height: 1; font-weight: 900; flex: none; }
+.chips select.inp, .chips input.inp { width: auto; min-width: 160px; flex: 1; padding: 8px 12px; border-radius: 999px; }
+
+/* Tabellen-Editoren */
+.rows { display: grid; gap: 10px; }
+.row { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) auto; align-items: center; background: #0a0101; border: 1px solid var(--line); border-radius: 16px; padding: 10px; }
+.row .x { border: 0; background: var(--faint); color: var(--red); width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-weight: 900; }
+@media (max-width: 560px) {
+  .row { grid-template-columns: minmax(0, 1fr) auto; }
+  .row > :not(.x):not(.num) { grid-column: 1 / -1; }
+  .row .x { grid-column: 2; justify-self: end; }
+}
+
+/* Übersicht */
+.hero { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: clamp(16px, 4vw, 48px); align-items: center; padding: 26px 0 10px; }
+.hero canvas.clock { width: 100%; max-width: 360px; aspect-ratio: 1; justify-self: center; }
+@media (max-width: 720px) { .hero { grid-template-columns: 1fr; } .hero canvas.clock { max-width: 260px; } }
+.statgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 10px; }
+.stat b { display: block; font-size: clamp(30px, 6vw, 54px); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.stat span { display: block; margin-top: 6px; font-size: 13px; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; font-weight: 900; }
+.toggles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.tog { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--chip); border-radius: 16px; padding: 10px 12px; font-weight: 900; font-size: 14px; }
+.lock-panel { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.lock-state { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 18px; }
+.dot { width: 12px; height: 12px; border-radius: 50%; background: var(--dim); flex: none; }
+.dot.live { background: var(--amber); box-shadow: 0 0 0 0 rgba(255,159,10,.6); animation: pulse 1.6s infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,159,10,.6); } 70% { box-shadow: 0 0 0 12px rgba(255,159,10,0); } 100% { box-shadow: 0 0 0 0 rgba(255,159,10,0); } }
+.lb { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.lb li { display: flex; gap: 10px; align-items: baseline; }
+.lb li b { width: 1.8em; font-variant-numeric: tabular-nums; }
+.lb li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb li em { font-style: normal; color: var(--dim); font-size: 14px; }
+
+/* Hinweise, Toast, Menü */
+.banner { margin: 16px 0 0; border: 1px dashed var(--dim); border-radius: 16px; padding: 12px 16px; color: var(--dim); font-size: 14px; line-height: 1.45; }
+.toast {
+  position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 140%); z-index: 50;
+  background: var(--red); color: var(--ink); border-radius: 999px; padding: 12px 20px; font-weight: 900; max-width: calc(100vw - 32px);
+  opacity: 0; visibility: hidden; pointer-events: none; transition: transform .25s ease, opacity .25s ease, visibility .25s;
+}
+.toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; }
+.toast.bad { background: var(--amber); }
+.menu { position: fixed; top: calc(62px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); z-index: 40; background: #0c0c0d; border: 1px solid var(--chip-hi); border-radius: 18px; padding: 8px; min-width: 220px; display: grid; gap: 2px; }
+.menu a, .menu button { display: block; text-align: left; padding: 11px 14px; border-radius: 12px; border: 0; background: transparent; cursor: pointer; text-decoration: none; color: var(--red); font-weight: 800; }
+.menu a:hover, .menu button:hover { background: var(--chip); }
+.empty { color: var(--dim); font-size: 15px; }
+.loading { padding: 80px 0; text-align: center; color: var(--dim); }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><canvas id="miniClock" width="60" height="60" aria-hidden="true"></canvas><span>Dashboard</span></div>
+    <div class="grow"><div class="gname" id="gname"></div></div>
+    <button class="dots" id="menuBtn" aria-label="Menü"><i></i><i></i><i></i><i></i></button>
+  </div>
+</header>
+<main class="wrap" id="app"><div class="loading">Lade …</div></main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+// ====================================================================
+//  Hilfen
+// ====================================================================
+const $ = (s, el = document) => el.querySelector(s);
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'value') el.value = v;
+    else if (k === 'checked') el.checked = !!v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  return el;
+}
+const MONTHS = ['JANUAR', 'FEBRUAR', 'MÄRZ', 'APRIL', 'MAI', 'JUNI', 'JULI', 'AUGUST', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DEZEMBER'];
+const CT = { text: 0, voice: 2, category: 4, news: 5, stage: 13, forum: 15 };
+let toastTimer;
+function toast(text, bad = false) {
+  const t = $('#toast');
+  t.textContent = text;
+  t.className = 'toast show' + (bad ? ' bad' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = 'toast' + (bad ? ' bad' : ''); }, bad ? 4200 : 1800);
+}
+const getPath = (o, p) => p.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
+function setPath(o, p, v) { const ks = p.split('.'); let x = o; for (let i = 0; i < ks.length - 1; i++) x = x[ks[i]] ??= {}; x[ks.at(-1)] = v; }
+
+// ====================================================================
+//  Uhr (wie StandBy) und Kalender
+// ====================================================================
+const RED = '#ff1a0d', DIM = '#8a0d07', FAINT = '#3a0603';
+const FONT = 'ui-rounded, "SF Pro Rounded", Nunito, system-ui, sans-serif';
+function drawClock(cv, { numbers = true } = {}) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const size = cv.clientWidth || cv.width;
+  if (cv.width !== Math.round(size * dpr)) { cv.width = Math.round(size * dpr); cv.height = Math.round(size * dpr); }
+  const c = cv.getContext('2d');
+  const W = cv.width, R = W / 2;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, W, W);
+  c.translate(R, R);
+  const now = new Date();
+  const s = now.getSeconds() + now.getMilliseconds() / 1000, m = now.getMinutes() + s / 60, hr = (now.getHours() % 12) + m / 60;
+  // Striche
+  for (let i = 0; i < 60; i++) {
+    const a = (i / 60) * Math.PI * 2;
+    const big = i % 5 === 0;
+    const passed = i <= Math.floor(s);
+    c.strokeStyle = big ? RED : (passed ? DIM : FAINT);
+    c.lineWidth = W * (big ? 0.012 : 0.009);
+    c.lineCap = 'round';
+    const r1 = R * 0.96, r2 = R * (big ? 0.88 : 0.91);
+    c.beginPath(); c.moveTo(Math.sin(a) * r1, -Math.cos(a) * r1); c.lineTo(Math.sin(a) * r2, -Math.cos(a) * r2); c.stroke();
+  }
+  if (numbers) {
+    c.fillStyle = RED;
+    c.font = `900 ${W * 0.105}px ${FONT}`;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    for (let n = 1; n <= 12; n++) {
+      const a = (n / 12) * Math.PI * 2;
+      c.fillText(String(n), Math.sin(a) * R * 0.74, -Math.cos(a) * R * 0.74 + W * 0.006);
+    }
+  }
+  const hand = (angle, len, width, color, back = 0) => {
+    c.save(); c.rotate(angle); c.strokeStyle = color; c.lineWidth = width; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(0, back); c.lineTo(0, -len); c.stroke(); c.restore();
+  };
+  const ha = (hr / 12) * Math.PI * 2, ma = (m / 60) * Math.PI * 2, sa = (s / 60) * Math.PI * 2;
+  // Stunden- und Minutenzeiger mit dünnem Ansatz wie im Original
+  hand(ha, R * 0.12, W * 0.012, RED); hand(ha, R * 0.5, W * 0.03, RED, -R * 0.12);
+  hand(ma, R * 0.12, W * 0.012, RED); hand(ma, R * 0.8, W * 0.03, RED, -R * 0.12);
+  hand(sa, R * 0.86, W * 0.006, DIM, R * 0.16);
+  c.fillStyle = RED; c.beginPath(); c.arc(0, 0, W * 0.032, 0, Math.PI * 2); c.fill();
+  c.fillStyle = DIM; c.beginPath(); c.arc(0, 0, W * 0.02, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#000'; c.beginPath(); c.arc(0, 0, W * 0.008, 0, Math.PI * 2); c.fill();
+}
+const clocks = new Set();
+(function tick() { for (const cv of clocks) if (cv.isConnected) drawClock(cv, { numbers: cv.dataset.numbers !== '0' }); else clocks.delete(cv); requestAnimationFrame(tick); })();
+function clockEl(cls = 'clock', numbers = true) {
+  const cv = h('canvas', { class: cls, role: 'img', 'aria-label': 'Analoge Uhr' });
+  cv.dataset.numbers = numbers ? '1' : '0';
+  clocks.add(cv);
+  return cv;
+}
+
+function calendarEl(date = new Date(), marks = []) {
+  const y = date.getFullYear(), mo = date.getMonth(), today = date.getDate();
+  const first = (new Date(y, mo, 1).getDay() + 6) % 7; // Montag = 0
+  const days = new Date(y, mo + 1, 0).getDate();
+  const head = h('tr', {}, ['M', 'D', 'M', 'D', 'F', 'S', 'S'].map((d, i) => h('th', { class: i >= 5 ? 'we' : null }, d)));
+  const rows = [];
+  let cells = Array.from({ length: first }, () => h('td'));
+  for (let d = 1; d <= days; d++) {
+    const wd = (first + d - 1) % 7;
+    const cls = [wd >= 5 ? 'we' : '', d === today ? 'today' : '', marks.includes(d) ? 'mark' : ''].join(' ').trim();
+    cells.push(h('td', { class: cls || null }, h('span', {}, String(d))));
+    if (cells.length === 7) { rows.push(h('tr', {}, cells)); cells = []; }
+  }
+  if (cells.length) rows.push(h('tr', {}, cells));
+  return h('div', { class: 'cal' }, h('h2', {}, MONTHS[mo]), h('table', { 'aria-label': `Kalender ${MONTHS[mo]} ${y}` }, h('thead', {}, head), h('tbody', {}, rows)));
+}
+clocks.add($('#miniClock')); $('#miniClock').dataset.numbers = '0';
+
+// ====================================================================
+//  Daten / API (mit Vorschau-Modus, falls kein Bot-Server erreichbar ist)
+// ====================================================================
+const S = { me: null, g: null, section: 'overview', demo: false };
+async function api(path, opts = {}) {
+  if (S.demo) return demoApi(path, opts);
+  const r = await fetch('/api' + path, { credentials: 'same-origin', ...opts, headers: { 'content-type': 'application/json', 'x-requested-with': 'dashboard', ...(opts.headers || {}) } });
+  let data;
+  try { data = await r.json(); } catch { const e = new Error('Keine gültige Antwort'); e.status = -1; throw e; }
+  if (!r.ok) { const e = new Error(data.error || 'Fehler'); e.status = r.status; e.data = data; throw e; }
+  return data;
+}
+
+let saveQueue = {}, saveTimer = null;
+function queueSave(path, value, delay = 450) {
+  setPath(S.g.config, path, value);
+  saveQueue[path] = value;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushSave, delay);
+}
+async function flushSave() {
+  const changes = saveQueue; saveQueue = {};
+  if (!Object.keys(changes).length) return;
+  try {
+    const r = await api(`/guild/${S.g.guild.id}/config`, { method: 'PATCH', body: JSON.stringify({ changes }) });
+    S.g.config = r.config;
+    const errs = Object.entries(r.errors || {});
+    if (errs.length) { toast(`Nicht gespeichert: ${errs.map(([k, v]) => `${labelOf(k)} – ${v}`).join(' · ')}`, true); render(); }
+    else toast('Gespeichert ✓');
+  } catch (e) { toast(e.message, true); }
+}
+async function action(type, extra = {}, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const r = await api(`/guild/${S.g.guild.id}/action`, { method: 'POST', body: JSON.stringify({ type, ...extra }) });
+    Object.assign(S.g, { config: r.config, channels: r.channels, roles: r.roles, stats: r.stats });
+    toast(r.message || 'Erledigt ✓');
+    render();
+  } catch (e) { toast(e.message, true); if (btn) btn.disabled = false; }
+}
+
+// ====================================================================
+//  Bereiche & Felder
+// ====================================================================
+const A_ACTION = { delete: 'Nur löschen', warn: 'Löschen + verwarnen', timeout: 'Löschen + Timeout' };
+const A_HARD = { ...A_ACTION, kick: 'Löschen + kicken', ban: 'Löschen + bannen' };
+const TXT = [CT.text, CT.news];
+const SECTIONS = [
+  { id: 'overview', label: 'Übersicht' },
+  { id: 'protect', label: 'Schutz', cards: [
+    { title: 'Linkschutz', note: 'GIFs (Tenor, Giphy, Klipy), hochgeladene Dateien, YouTube, Twitch und Discord sind immer erlaubt. Blockiert werden Betrug, IP-Logger, Kurz-Links und Fälschungen.', fields: [
+      ['automod.links.enabled', 'toggle', 'Linkschutz an'],
+      ['automod.links.mode', 'select', 'Modus', { smart: 'Smart – nur gefährliche Links', strict: 'Streng – nur Erlaubt-Liste', off: 'Aus' }],
+      ['automod.links.action', 'select', 'Bei unerlaubten Links', A_ACTION],
+      ['automod.links.phishingAction', 'select', 'Bei Betrugs-Links', A_HARD],
+      ['automod.links.phishingMinutes', 'number', 'Timeout bei Betrug (Minuten)'],
+      ['automod.links.allow', 'list', 'Eigene Erlaubt-Liste', 'meineseite.de'],
+      ['automod.links.block', 'list', 'Eigene Sperrliste', 'nervigeseite.com'],
+    ] },
+    { title: 'AutoMod', fields: [
+      ['automod.enabled', 'toggle', 'AutoMod an', null, 'Team und Ausnahmen werden nie gefiltert.'],
+      ['automod.invites.enabled', 'toggle', 'Fremde Einladungen blockieren'],
+      ['automod.invites.allowOwn', 'toggle', 'Einladungen zu diesem Server erlauben'],
+      ['automod.spam.enabled', 'toggle', 'Spam-Schutz'],
+      ['automod.spam.maxMessages', 'number', 'Mehr als … Nachrichten'],
+      ['automod.spam.perSeconds', 'number', '… in Sekunden'],
+      ['automod.spam.duplicates', 'number', 'Gleiche Nachricht so oft = Spam'],
+      ['automod.spam.timeoutMinutes', 'number', 'Spam-Timeout (Minuten)'],
+      ['automod.mentions.enabled', 'toggle', 'Massen-Erwähnungen blockieren'],
+      ['automod.mentions.max', 'number', 'Max. Erwähnungen'],
+      ['automod.caps.enabled', 'toggle', 'GROSSBUCHSTABEN filtern'],
+      ['automod.caps.percent', 'number', 'Ab % Großbuchstaben'],
+      ['automod.exemptRoles', 'roles', 'Ausnahme-Rollen'],
+      ['automod.exemptChannels', 'channels', 'Ausnahme-Kanäle'],
+    ] },
+    { title: 'Wortfilter', fields: [
+      ['automod.badwords.enabled', 'toggle', 'Wortfilter an', null, 'Erkennt auch Schreibweisen wie w0rt oder w*rt.'],
+      ['automod.badwords.action', 'select', 'Strafe', A_ACTION],
+      ['automod.badwords.words', 'list', 'Verbotene Wörter', 'wort'],
+    ] },
+    { title: 'Eskalation', note: 'Automatische Strafen nach Anzahl aktiver Verwarnungen (0 = nie).', fields: [
+      ['automod.escalation.enabled', 'toggle', 'Eskalation an'],
+      ['automod.escalation.timeoutAt', 'number', 'Timeout ab Verwarnungen'],
+      ['automod.escalation.timeoutMinutes', 'number', 'Timeout-Länge (Minuten)'],
+      ['automod.escalation.kickAt', 'number', 'Kick ab Verwarnungen'],
+      ['automod.escalation.banAt', 'number', 'Bann ab Verwarnungen'],
+      ['automod.escalation.expireDays', 'number', 'Verwarnungen verfallen nach Tagen'],
+    ] },
+    { title: 'Anti-Raid', note: 'Erkennt Beitrittswellen und sperrt den Server automatisch.', fields: [
+      ['antiraid.enabled', 'toggle', 'Anti-Raid an'],
+      ['antiraid.joins', 'number', 'Ab Beitritten …'],
+      ['antiraid.seconds', 'number', '… in Sekunden'],
+      ['antiraid.action', 'select', 'Aktion', { lockdown: 'Lockdown + Einladungen pausieren', alert: 'Nur Einladungen pausieren + warnen' }],
+      ['antiraid.minutes', 'number', 'Schutz-Dauer (Minuten)'],
+      ['antiraid.pauseInvites', 'toggle', 'Einladungen & DMs pausieren'],
+      ['antiraid.kickRaiders', 'toggle', 'Raid-Accounts kicken'],
+      ['antiraid.minAccountDays', 'number', 'Mindestalter Account (Tage, 0 = aus)'],
+      ['antiraid.accountAction', 'select', 'Zu neue Accounts', { kick: 'Kicken', ban: 'Bannen', timeout: '7 Tage Timeout' }],
+    ] },
+    { title: 'Anti-Nuke', owner: true, note: 'Stoppt gehackte Admins und fremde Bots. Nur der Server-Inhaber kann das ändern. Die Bot-Rolle muss ganz oben stehen.', fields: [
+      ['antinuke.enabled', 'toggle', 'Anti-Nuke an'],
+      ['antinuke.threshold', 'number', 'Ab Aktionen …'],
+      ['antinuke.seconds', 'number', '… in Sekunden'],
+      ['antinuke.punishment', 'select', 'Strafe', { strip: 'Rollen entfernen + Timeout', kick: 'Kicken', ban: 'Bannen' }],
+      ['antinuke.restore', 'toggle', 'Gelöschtes wiederherstellen'],
+      ['antinuke.blockBots', 'toggle', 'Fremde Bots blockieren'],
+      ['antinuke.trusted', 'list', 'Vertrauenswürdige Nutzer-IDs', '123456789012345678'],
+    ] },
+  ] },
+  { id: 'mod', label: 'Moderation', cards: [
+    { title: 'Team', fields: [['modRoles', 'roles', 'Team-Rollen', null, 'Dürfen Mod-Befehle nutzen und können im Lockdown weiter schreiben.']] },
+    { title: 'Logs', action: ['createLogs', 'Log-Kanäle automatisch anlegen'], fields: [
+      ['logs.fallback', 'channel', 'Alle Logs (Standard)', TXT],
+      ['logs.mod', 'channel', 'Moderation', TXT], ['logs.protection', 'channel', 'Schutz-Alarme', TXT],
+      ['logs.messages', 'channel', 'Nachrichten', TXT], ['logs.members', 'channel', 'Mitglieder', TXT],
+      ['logs.server', 'channel', 'Server', TXT], ['logs.voice', 'channel', 'Sprachkanäle', TXT],
+    ] },
+  ] },
+  { id: 'members', label: 'Willkommen', cards: [
+    { title: 'Willkommen', fields: [
+      ['welcome.enabled', 'toggle', 'Willkommensnachricht'],
+      ['welcome.channel', 'channel', 'Kanal', TXT],
+      ['welcome.message', 'textarea', 'Nachricht', null, 'Platzhalter: {user} {name} {server} {count}'],
+      ['welcome.card', 'toggle', 'Bildkarte anhängen'],
+      ['welcome.dm', 'toggle', 'Zusätzlich Privatnachricht'],
+      ['welcome.dmMessage', 'textarea', 'Privatnachricht'],
+      ['welcome.autoRoles', 'roles', 'Auto-Rollen (Menschen)'],
+      ['welcome.botRoles', 'roles', 'Auto-Rollen (Bots)'],
+    ] },
+    { title: 'Abschied', fields: [
+      ['goodbye.enabled', 'toggle', 'Abschiedsnachricht'],
+      ['goodbye.channel', 'channel', 'Kanal', TXT],
+      ['goodbye.message', 'textarea', 'Nachricht', null, 'Platzhalter: {username} {server} {count}'],
+    ] },
+    { title: 'Regeln akzeptieren', action: ['postRules', 'Regeln posten / aktualisieren'], fields: [
+      ['verify.channel', 'channel', 'Regel-Kanal', TXT],
+      ['verify.role', 'role', 'Rolle nach dem Akzeptieren'],
+      ['verify.unverifiedRole', 'role', 'Rolle bis zum Akzeptieren (optional)'],
+      ['verify.captcha', 'toggle', 'Rechen-Captcha gegen Bots'],
+      ['verify.title', 'text', 'Überschrift'],
+      ['verify.text', 'textarea', 'Regeltext', null, 'Leer lassen = Standardregeln.'],
+    ] },
+  ] },
+  { id: 'voice', label: 'Sprachkanäle', cards: [
+    { title: 'Temp-Sprachkanäle', action: ['createHub', 'Neuen Hub anlegen'], note: 'Wer einen Hub betritt, bekommt einen eigenen Sprachkanal. Das Bedienfeld (Name, Limit, Sperren, Bannen …) erscheint direkt im Chat des neuen Kanals.', fields: [
+      ['tempvoice.enabled', 'toggle', 'Temp-Sprachkanäle an'],
+      ['tempvoice.panelInChat', 'toggle', 'Bedienfeld im Kanal-Chat'],
+      ['tempvoice.hubs', 'hubs', 'Hubs („Kanal erstellen“)'],
+    ] },
+  ] },
+  { id: 'levels', label: 'Level & Clips', cards: [
+    { title: 'Level', fields: [
+      ['levels.enabled', 'toggle', 'Level-System an'],
+      ['levels.channel', 'channel', 'Level-Up-Kanal (leer = gleicher Kanal)', TXT],
+      ['levels.message', 'textarea', 'Level-Up-Nachricht', null, 'Platzhalter: {user} {level}'],
+      ['levels.multiplier', 'number', 'XP-Multiplikator', null, null, 0.1],
+      ['levels.stackRewards', 'toggle', 'Belohnungs-Rollen behalten'],
+      ['levels.rewards', 'rewards', 'Rollen-Belohnungen'],
+      ['levels.noXpChannels', 'channels', 'Kanäle ohne XP'],
+      ['levels.noXpRoles', 'roles', 'Rollen ohne XP'],
+    ] },
+    { title: 'Sprach-XP', fields: [
+      ['levels.voice.enabled', 'toggle', 'XP für Zeit im Sprachkanal'],
+      ['levels.voice.perMinute', 'number', 'XP pro Minute'],
+      ['levels.voice.minMembers', 'number', 'Mindestens Personen im Kanal'],
+    ] },
+    { title: 'Clips', note: 'Clips (Videos, Medal, Twitch-Clips, Shorts …) im Clip-Kanal geben XP. Likes geben dem Ersteller XP. Die besten Clips landen in der Hall of Fame.', fields: [
+      ['levels.clips.enabled', 'toggle', 'Clip-XP an'],
+      ['levels.clips.channels', 'channels', 'Clip-Kanäle', [...TXT, CT.forum]],
+      ['levels.clips.xp', 'number', 'XP pro Clip'],
+      ['levels.clips.cooldownMinutes', 'number', 'Wartezeit zwischen Clip-XP (Minuten)'],
+      ['levels.clips.likeEmoji', 'text', 'Like-Emoji'],
+      ['levels.clips.likeXp', 'number', 'XP pro Like'],
+      ['levels.clips.maxLikeXp', 'number', 'Max. Like-XP pro Clip'],
+      ['levels.clips.hallOfFame', 'channel', 'Hall-of-Fame-Kanal', TXT],
+      ['levels.clips.hallThreshold', 'number', 'Hall of Fame ab Likes'],
+    ] },
+  ] },
+  { id: 'quests', label: 'Quests & Münzen', cards: [
+    { title: 'Tages-Quests', note: 'Jeden Tag eigene Aufgaben pro Person (Nachrichten, Sprachzeit, Clips, Likes, Musik …). Alle geschafft = Bonus und Serie.', fields: [
+      ['quests.enabled', 'toggle', 'Quests an'],
+      ['quests.perDay', 'number', 'Quests pro Tag'],
+      ['quests.rewardMultiplier', 'number', 'Belohnungs-Multiplikator', null, null, 0.1],
+      ['quests.announce', 'toggle', 'Geschaffte Quests im Chat melden'],
+    ] },
+    { title: 'Münzen', fields: [
+      ['economy.enabled', 'toggle', 'Münzen an'],
+      ['economy.name', 'text', 'Name der Währung'],
+      ['economy.emoji', 'text', 'Emoji'],
+      ['economy.daily', 'number', 'Münzen pro /daily'],
+    ] },
+    { title: 'Shop', note: 'Rollen, die man sich mit Münzen kaufen kann (/shop view).', fields: [['economy.shop', 'shop', 'Artikel']] },
+  ] },
+  { id: 'music', label: 'Musik', cards: [
+    { title: 'Musik', note: '/play mit YouTube-, SoundCloud-, Spotify-Song-, Radio- oder MP3-Link. /sound für das Soundboard, /watch für YouTube gemeinsam schauen.', fields: [
+      ['music.enabled', 'toggle', 'Musik an'],
+      ['music.djRole', 'role', 'DJ-Rolle (leer = alle dürfen alles)'],
+      ['music.defaultVolume', 'number', 'Standard-Lautstärke %'],
+      ['music.maxQueue', 'number', 'Max. Songs in der Warteschlange'],
+      ['music.leaveMinutes', 'number', 'Verlassen nach Minuten ohne Musik'],
+      ['music.channel', 'channel', 'Kanal für „Läuft gerade“ (leer = wo /play benutzt wird)', TXT],
+    ] },
+  ] },
+  { id: 'tickets', label: 'Tickets', cards: [
+    { title: 'Tickets', action: ['postTicketPanel', 'Ticket-Button posten in …', 'channel'], fields: [
+      ['tickets.enabled', 'toggle', 'Tickets an'],
+      ['tickets.supportRoles', 'roles', 'Support-Rollen'],
+      ['tickets.logChannel', 'channel', 'Kanal für Protokolle', TXT],
+      ['tickets.maxOpen', 'number', 'Offene Tickets pro Person'],
+    ] },
+  ] },
+  { id: 'extras', label: 'Extras', cards: [
+    { title: 'Auto-Antworten', fields: [['autoresponders', 'autoresponders', 'Auto-Antworten']] },
+    { title: 'Statistik-Kanäle', action: ['setupStats', 'Statistik-Kanäle anlegen'], fields: [['stats.enabled', 'toggle', 'Mitgliederzahl usw. als Kanalnamen']] },
+    { title: 'Vorschläge', fields: [['suggestions.channel', 'channel', 'Kanal für /suggest', TXT]] },
+  ] },
+];
+const LABELS = {};
+for (const s of SECTIONS) for (const c of s.cards || []) for (const f of c.fields) LABELS[f[0]] = f[2];
+const labelOf = p => LABELS[p] || p;
+
+// ---------- Auswahl-Helfer ----------
+function channelOptions(types) {
+  const cats = Object.fromEntries(S.g.channels.filter(c => c.type === CT.category).map(c => [c.id, c.name]));
+  return S.g.channels.filter(c => c.type !== CT.category && (!types || types.includes(c.type)))
+    .map(c => ({ id: c.id, label: `${c.type === CT.voice || c.type === CT.stage ? '🔊 ' : '# '}${c.name}${c.parentId && cats[c.parentId] ? '  ·  ' + cats[c.parentId] : ''}` }));
+}
+function categoryOptions() { return S.g.channels.filter(c => c.type === CT.category).map(c => ({ id: c.id, label: c.name })); }
+function roleOptions() { return S.g.roles.filter(r => !r.managed).map(r => ({ id: r.id, label: '@' + r.name })); }
+const nameOf = (list, id) => (list.find(x => x.id === id)?.label) || 'gelöscht';
+function selectEl(options, value, onchange, empty = '– keiner –') {
+  return h('select', { class: 'inp', onchange: e => onchange(e.target.value || null) },
+    h('option', { value: '' }, empty), options.map(o => h('option', { value: o.id, selected: o.id === value ? true : null }, o.label)));
+}
+
+// ---------- Feld-Editoren ----------
+function editor(f) {
+  const [path, type, label, opt, help, step] = f;
+  const val = getPath(S.g.config, path);
+  const wrap = (control, stack = false) => h('div', { class: 'field' + (stack ? ' stack' : '') }, h('label', {}, label), control, help ? h('div', { class: 'help' }, help) : null);
+  switch (type) {
+    case 'toggle': {
+      const id = 'f_' + path.replace(/\W/g, '_');
+      const box = h('span', { class: 'sw' }, h('input', { type: 'checkbox', id, checked: !!val, 'aria-label': label, onchange: e => queueSave(path, e.target.checked, 0) }), h('span'));
+      const el = wrap(box); el.querySelector('label').setAttribute('for', id); return el;
+    }
+    case 'number':
+      return wrap(h('input', { class: 'inp num', type: 'number', inputmode: 'decimal', step: step || 1, value: val ?? 0, onchange: e => { const n = Number(e.target.value); queueSave(path, step ? n : Math.round(n)); } }));
+    case 'text':
+      return wrap(h('input', { class: 'inp', type: 'text', value: val || '', oninput: e => queueSave(path, e.target.value, 800) }), true);
+    case 'textarea':
+      return wrap(h('textarea', { class: 'inp', oninput: e => queueSave(path, e.target.value, 900) }, val || ''), true);
+    case 'select':
+      return wrap(h('select', { class: 'inp', onchange: e => queueSave(path, e.target.value, 0) }, Object.entries(opt).map(([k, v]) => h('option', { value: k, selected: k === val ? true : null }, v))), true);
+    case 'channel':
+      return wrap(selectEl(channelOptions(opt), val, v => queueSave(path, v, 0)), true);
+    case 'role':
+      return wrap(selectEl(roleOptions(), val, v => queueSave(path, v, 0)), true);
+    case 'channels': case 'roles': {
+      const opts = type === 'roles' ? roleOptions() : channelOptions(opt);
+      const list = Array.isArray(val) ? val : [];
+      const chips = h('div', { class: 'chips' },
+        list.map(id => h('span', { class: 'chip' }, h('span', {}, nameOf(opts, id)), h('button', { 'aria-label': 'Entfernen', onclick: () => { queueSave(path, list.filter(x => x !== id), 0); render(); } }, '×'))),
+        selectEl(opts.filter(o => !list.includes(o.id)), null, v => { if (v) { queueSave(path, [...list, v], 0); render(); } }, '+ hinzufügen'));
+      return wrap(chips, true);
+    }
+    case 'list': {
+      const list = Array.isArray(val) ? val : [];
+      const input = h('input', { class: 'inp', placeholder: (opt || 'Eintrag') + ' + Enter', onkeydown: e => {
+        if (e.key !== 'Enter' || !e.target.value.trim()) return;
+        const add = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+        queueSave(path, [...new Set([...list, ...add])], 0); render();
+      } });
+      return wrap(h('div', { class: 'chips' }, list.map(x => h('span', { class: 'chip' }, h('span', {}, x), h('button', { 'aria-label': 'Entfernen', onclick: () => { queueSave(path, list.filter(y => y !== x), 0); render(); } }, '×'))), input), true);
+    }
+    case 'hubs': {
+      const list = (val || []).map(x => ({ ...x }));
+      const save = () => queueSave(path, list, 700);
+      return wrap(h('div', { class: 'rows' },
+        list.length ? list.map((hub, i) => h('div', { class: 'row' },
+          selectEl(channelOptions([CT.voice]), hub.id, v => { hub.id = v; save(); }, 'Sprachkanal …'),
+          selectEl(categoryOptions(), hub.category, v => { hub.category = v; save(); }, 'Kategorie wie Hub'),
+          h('input', { class: 'inp', value: hub.nameTemplate || '🔊 {name}', title: 'Name neuer Kanäle, {name} = Person', oninput: e => { hub.nameTemplate = e.target.value; save(); } }),
+          h('input', { class: 'inp num', type: 'number', min: 0, max: 99, value: hub.limit || 0, title: 'Limit (0 = keins)', onchange: e => { hub.limit = Number(e.target.value) || 0; save(); } }),
+          h('button', { class: 'x', 'aria-label': 'Hub entfernen', onclick: () => { list.splice(i, 1); queueSave(path, list, 0); render(); } }, '×'))) : h('p', { class: 'empty' }, 'Noch kein Hub. Lege einen an oder wähle einen vorhandenen Sprachkanal.'),
+        h('div', {}, h('button', { class: 'btn ghost small', onclick: () => { const free = channelOptions([CT.voice]).find(c => !list.some(x => x.id === c.id)); if (!free) return toast('Kein freier Sprachkanal – nutze „Neuen Hub anlegen“.', true); list.push({ id: free.id, category: null, nameTemplate: '🔊 {name}', limit: 0 }); queueSave(path, list, 0); render(); } }, '+ Vorhandenen Sprachkanal als Hub'))), true);
+    }
+    case 'rewards': {
+      const entries = Object.entries(val || {}).sort((a, b) => a[0] - b[0]);
+      const save = obj => { queueSave(path, obj, 600); };
+      return wrap(h('div', { class: 'rows' },
+        entries.map(([lvl, roleId]) => h('div', { class: 'row' },
+          h('input', { class: 'inp num', type: 'number', min: 1, value: lvl, 'aria-label': 'Level', onchange: e => { const o = { ...val }; delete o[lvl]; o[e.target.value] = roleId; save(o); render(); } }),
+          selectEl(roleOptions(), roleId, v => { save({ ...val, [lvl]: v }); }, 'Rolle …'),
+          h('button', { class: 'x', 'aria-label': 'Entfernen', onclick: () => { const o = { ...val }; delete o[lvl]; queueSave(path, o, 0); render(); } }, '×'))),
+        h('div', {}, h('button', { class: 'btn ghost small', onclick: () => { const r = roleOptions()[0]; if (!r) return; let l = 5; while ((val || {})[l]) l += 5; queueSave(path, { ...(val || {}), [l]: r.id }, 0); render(); } }, '+ Belohnung'))), true);
+    }
+    case 'shop': {
+      const list = (val || []).map(x => ({ ...x }));
+      const save = d => queueSave(path, list, d ?? 700);
+      return wrap(h('div', { class: 'rows' },
+        list.map((it, i) => h('div', { class: 'row' },
+          selectEl(roleOptions(), it.roleId, v => { it.roleId = v; save(0); }, 'Rolle …'),
+          h('input', { class: 'inp num', type: 'number', min: 1, value: it.price, 'aria-label': 'Preis', onchange: e => { it.price = Number(e.target.value) || 1; save(); } }),
+          h('input', { class: 'inp', value: it.description || '', placeholder: 'Beschreibung', oninput: e => { it.description = e.target.value; save(); } }),
+          h('button', { class: 'x', 'aria-label': 'Entfernen', onclick: () => { list.splice(i, 1); save(0); render(); } }, '×'))),
+        h('div', {}, h('button', { class: 'btn ghost small', onclick: () => { const r = roleOptions().find(o => !list.some(x => x.roleId === o.id)); if (!r) return; list.push({ roleId: r.id, price: 1000, description: '' }); save(0); render(); } }, '+ Rolle in den Shop'))), true);
+    }
+    case 'autoresponders': {
+      const list = (val || []).map(x => ({ ...x }));
+      const save = d => queueSave(path, list.filter(a => a.trigger && a.response), d ?? 800);
+      return wrap(h('div', { class: 'rows' },
+        list.map((a, i) => h('div', { class: 'row' },
+          h('input', { class: 'inp', value: a.trigger, placeholder: 'Auslöser, z. B. ip', oninput: e => { a.trigger = e.target.value; save(); } }),
+          h('input', { class: 'inp', value: a.response, placeholder: 'Antwort', oninput: e => { a.response = e.target.value; save(); } }),
+          h('select', { class: 'inp', onchange: e => { a.match = e.target.value; save(0); } }, Object.entries({ contains: 'enthält', exact: 'genau', startswith: 'beginnt mit' }).map(([k, v]) => h('option', { value: k, selected: k === a.match ? true : null }, v))),
+          h('button', { class: 'x', 'aria-label': 'Entfernen', onclick: () => { list.splice(i, 1); save(0); render(); } }, '×'))),
+        h('div', {}, h('button', { class: 'btn ghost small', onclick: () => { list.push({ trigger: '', response: '', match: 'contains', reply: true }); S.g.config.autoresponders = list; render(); } }, '+ Auto-Antwort'))), true);
+    }
+  }
+  return h('div');
+}
+
+function cardEl(card) {
+  const locked = card.owner && !S.g.isOwner;
+  const fields = card.fields.map(editor);
+  if (locked) fields.forEach(f => f.querySelectorAll('input,select,textarea,button').forEach(x => { x.disabled = true; }));
+  let act = null;
+  if (card.action) {
+    const [type, label, needs] = card.action;
+    if (needs === 'channel') {
+      let chosen = null;
+      act = h('div', { class: 'field stack' }, h('label', {}, label), h('div', { class: 'chips' },
+        selectEl(channelOptions(TXT), null, v => { chosen = v; }, 'Kanal wählen …'),
+        h('button', { class: 'btn small', onclick: e => (chosen ? action(type, { channelId: chosen }, e.currentTarget) : toast('Erst einen Kanal wählen.', true)) }, 'Posten')));
+    } else {
+      act = h('div', { style: 'padding-top:12px' }, h('button', { class: 'btn ghost small', onclick: e => action(type, {}, e.currentTarget) }, label));
+    }
+  }
+  return h('section', { class: 'card' }, h('h3', {}, card.title), card.note ? h('p', { class: 'note' }, card.note) : null,
+    locked ? h('p', { class: 'note' }, '🔒 Nur der Server-Inhaber kann das ändern.') : null, fields, act);
+}
+
+// ---------- Übersicht ----------
+function overview() {
+  const g = S.g, c = g.config, st = g.stats;
+  const L = c.lockdown;
+  const fmt = n => Number(n || 0).toLocaleString('de-DE');
+  const quick = [
+    ['automod.enabled', 'AutoMod'], ['automod.links.enabled', 'Linkschutz'], ['antiraid.enabled', 'Anti-Raid'], ['antinuke.enabled', 'Anti-Nuke'],
+    ['welcome.enabled', 'Willkommen'], ['levels.enabled', 'Level'], ['quests.enabled', 'Quests'], ['economy.enabled', 'Münzen'],
+    ['music.enabled', 'Musik'], ['tempvoice.enabled', 'Temp-Voice'], ['tickets.enabled', 'Tickets'], ['levels.clips.enabled', 'Clips'],
+  ];
+  let minutes = 0, reason = '';
+  return [
+    h('div', { class: 'hero' }, clockEl(), h('div', {},
+      calendarEl(),
+      h('div', { class: 'statgrid', style: 'margin-top:22px' },
+        h('div', { class: 'stat' }, h('b', {}, fmt(g.guild.memberCount)), h('span', {}, 'Mitglieder')),
+        h('div', { class: 'stat' }, h('b', {}, fmt(st.tempvoice)), h('span', {}, 'Temp-Kanäle')),
+        h('div', { class: 'stat' }, h('b', {}, fmt(st.tickets)), h('span', {}, 'Tickets offen')),
+        h('div', { class: 'stat' }, h('b', {}, fmt(st.cases)), h('span', {}, 'Mod-Fälle')),
+        h('div', { class: 'stat' }, h('b', {}, fmt(Math.round(st.phishing / 1000)) + 'k'), h('span', {}, 'Betrugs-Domains')),
+        h('div', { class: 'stat' }, h('b', {}, fmt((c.tempvoice.hubs || []).length)), h('span', {}, 'Voice-Hubs'))))),
+    h('div', { class: 'cards', style: 'margin-top:14px' },
+      h('section', { class: 'card' + (L.active ? ' alert' : '') },
+        h('h3', {}, 'Lockdown'),
+        h('p', { class: 'note' }, 'Sperrt alle öffentlichen Kanäle und pausiert Einladungen. Beim Beenden wird jede Berechtigung exakt wiederhergestellt.'),
+        h('div', { class: 'lock-panel' },
+          h('div', { class: 'lock-state' }, h('span', { class: 'dot' + (L.active ? ' live' : '') }), L.active ? `AKTIV${L.reason ? ' · ' + L.reason : ''}` : 'Nicht aktiv'),
+          L.active
+            ? h('button', { class: 'btn', onclick: e => action('lockdownEnd', {}, e.currentTarget) }, '🔓 Lockdown beenden')
+            : h('div', { class: 'chips' },
+              h('input', { class: 'inp', placeholder: 'Grund (optional)', oninput: e => { reason = e.target.value; } }),
+              h('input', { class: 'inp num', type: 'number', min: 0, max: 1440, placeholder: 'Min.', title: 'Automatisch beenden nach Minuten (0 = manuell)', oninput: e => { minutes = Number(e.target.value) || 0; } }),
+              h('button', { class: 'btn big', onclick: e => action('lockdownStart', { reason, minutes }, e.currentTarget) }, '🔒 Lockdown starten')))),
+      h('section', { class: 'card' }, h('h3', {}, 'Module'), h('div', { class: 'toggles' }, quick.map(([p, l]) =>
+        h('label', { class: 'tog' }, l, h('span', { class: 'sw' }, h('input', { type: 'checkbox', checked: !!getPath(c, p), disabled: p.startsWith('antinuke') && !g.isOwner ? true : null, onchange: e => queueSave(p, e.target.checked, 0) }), h('span')))))),
+      h('section', { class: 'card' }, h('h3', {}, 'Bestenliste'), st.top?.length
+        ? h('ol', { class: 'lb' }, st.top.map((e, i) => h('li', {}, h('b', {}, `${i + 1}.`), h('span', {}, e.name), h('em', {}, `Level ${e.level} · ${fmt(e.xp)} XP`))))
+        : h('p', { class: 'empty' }, 'Noch keine XP gesammelt.'),
+      st.nowPlaying ? h('p', { class: 'note', style: 'margin-top:14px' }, `🎶 Läuft gerade: ${st.nowPlaying.title} (+${st.nowPlaying.queue} in der Warteschlange)`) : null),
+    ),
+  ];
+}
+
+// ====================================================================
+//  Seiten
+// ====================================================================
+function render() {
+  const app = $('#app');
+  app.replaceChildren();
+  $('#gname').textContent = S.g ? S.g.guild.name : '';
+  if (S.demo) app.append(h('p', { class: 'banner' }, 'Vorschau mit Beispieldaten – Änderungen werden hier nicht gespeichert. Das echte Dashboard läuft auf der Adresse deines Bots.'));
+  if (!S.me) return app.append(loginView());
+  if (!S.g) return app.append(pickerView());
+  const nav = h('nav', { class: 'side', 'aria-label': 'Bereiche' }, SECTIONS.map((s, i) =>
+    h('button', { class: s.id === S.section ? 'on' : null, onclick: () => { S.section = s.id; try { localStorage.setItem('dash.section', s.id); } catch { /* egal */ } render(); window.scrollTo({ top: 0 }); } },
+      h('span', { class: 'n' }, String(i + 1).padStart(2, '0')), s.label)));
+  const sec = SECTIONS.find(s => s.id === S.section) || SECTIONS[0];
+  const body = h('div', {}, h('h1', { class: 'section-title' }, sec.label),
+    sec.id === 'overview' ? overview() : h('div', { class: 'cards' }, sec.cards.map(cardEl)));
+  app.append(h('div', { class: 'layout' }, nav, body));
+  nav.querySelector('.on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+}
+
+function loginView() {
+  const err = new URLSearchParams(location.search).get('fehler');
+  return h('div', {},
+    h('div', { class: 'standby' }, clockEl(), calendarEl()),
+    h('div', { class: 'login-cta' },
+      err ? h('p', { style: 'color:var(--amber)' }, 'Die Anmeldung hat nicht geklappt. Bitte nochmal versuchen.') : null,
+      h('p', {}, 'Melde dich mit Discord an, um die Server einzustellen, auf denen du „Server verwalten“ darfst.'),
+      h('a', { class: 'btn big', href: '/login' }, 'Mit Discord anmelden')));
+}
+
+function pickerView() {
+  return h('div', { class: 'picker' }, h('h1', {}, 'Server wählen'),
+    S.me.guilds.length ? h('div', { class: 'servers' }, S.me.guilds.map(g => g.botPresent
+      ? h('button', { class: 'server', onclick: () => openGuild(g.id) }, h('div', { class: 'ic' }, g.iconUrl ? h('img', { src: g.iconUrl, alt: '' }) : g.name.slice(0, 1)), h('div', { class: 'nm' }, g.name), h('div', { class: 'sub' }, 'Einstellen'))
+      : h('a', { class: 'server missing', href: g.invite, target: '_blank', rel: 'noopener' }, h('div', { class: 'ic' }, g.iconUrl ? h('img', { src: g.iconUrl, alt: '' }) : g.name.slice(0, 1)), h('div', { class: 'nm' }, g.name), h('div', { class: 'sub' }, 'Bot einladen'))))
+      : h('p', { class: 'empty' }, 'Du verwaltest keinen Server.'));
+}
+
+async function openGuild(id) {
+  $('#app').replaceChildren(h('div', { class: 'loading' }, 'Lade Server …'));
+  try {
+    S.g = await api('/guild/' + id);
+    try { localStorage.setItem('dash.guild', id); S.section = localStorage.getItem('dash.section') || 'overview'; } catch { /* egal */ }
+    render();
+  } catch (e) { toast(e.message, true); S.g = null; render(); }
+}
+
+// Menü (grauer Punkte-Knopf wie auf der StandBy-Anzeige)
+$('#menuBtn').addEventListener('click', () => {
+  const old = $('.menu'); if (old) return old.remove();
+  const m = h('div', { class: 'menu', role: 'menu' },
+    S.me ? h('div', { class: 'gname', style: 'padding:10px 14px' }, S.me.user.name) : null,
+    S.g ? h('button', { onclick: () => { S.g = null; m.remove(); try { localStorage.removeItem('dash.guild'); } catch { /* egal */ } render(); } }, 'Server wechseln') : null,
+    S.me && !S.demo ? h('a', { href: '/logout' }, 'Abmelden') : null,
+    S.demo ? h('div', { class: 'gname', style: 'padding:10px 14px' }, 'Vorschau-Modus') : h('a', { href: '/health', target: '_blank', rel: 'noopener' }, 'Bot-Status'));
+  document.body.append(m);
+  setTimeout(() => document.addEventListener('click', function close(e) { if (!m.contains(e.target) && e.target !== $('#menuBtn')) { m.remove(); document.removeEventListener('click', close); } }), 0);
+});
+
+// ====================================================================
+//  Vorschau-Daten (nur wenn kein Bot-Server antwortet)
+// ====================================================================
+function demoData() {
+  let n = 100;
+  const ch = (name, type, parentId = null) => ({ id: String(++n), name, type, parentId, position: n });
+  const info = ch('Info', CT.category), talk = ch('Chat', CT.category), vc = ch('Sprachkanäle', CT.category);
+  const channels = [info, talk, vc,
+    ch('regeln', CT.text, info.id), ch('willkommen', CT.text, info.id), ch('ankündigungen', CT.news, info.id),
+    ch('allgemein', CT.text, talk.id), ch('clips', CT.text, talk.id), ch('hall-of-fame', CT.text, talk.id), ch('musik', CT.text, talk.id), ch('support', CT.text, talk.id), ch('mod-log', CT.text, talk.id),
+    ch('➕ Kanal erstellen', CT.voice, vc.id), ch('➕ Gaming-Kanal', CT.voice, vc.id), ch('Lounge', CT.voice, vc.id)];
+  const roles = ['Admin', 'Moderator', 'DJ', 'VIP', 'Level 25', 'Level 10', 'Verifiziert', 'Mitglied'].map((name, i) => ({ id: String(500 + i), name, position: 20 - i, managed: false }));
+  const byName = x => channels.find(c => c.name === x).id;
+  return {
+    guild: { id: '1', name: 'Mein Server', icon: null, memberCount: 128, ownerId: '9' }, isOwner: true, channels, roles,
+    stats: { tempvoice: 3, tickets: 1, phishing: 39553, cases: 42, nowPlaying: { title: 'Lofi Beats – Chill Mix', queue: 4 },
+      top: [{ name: 'Bastian', level: 24, xp: 41230 }, { name: 'Lea', level: 19, xp: 25110 }, { name: 'Tom', level: 15, xp: 15880 }, { name: 'Mia', level: 11, xp: 8840 }, { name: 'Ali', level: 8, xp: 4920 }] },
+    config: {
+      modRoles: ['501'], logs: { fallback: byName('mod-log'), mod: null, messages: null, members: null, server: null, voice: null, protection: null },
+      welcome: { enabled: true, channel: byName('willkommen'), card: true, message: 'Willkommen {user} auf **{server}**! Du bist Mitglied Nummer **{count}**.', dm: false, dmMessage: '', autoRoles: ['507'], botRoles: [] },
+      goodbye: { enabled: true, channel: byName('willkommen'), message: '**{username}** hat den Server verlassen.' },
+      verify: { enabled: true, channel: byName('regeln'), role: '506', unverifiedRole: null, captcha: true, title: 'Regeln', text: '' },
+      automod: { enabled: true, exemptRoles: [], exemptChannels: [],
+        links: { enabled: true, mode: 'smart', action: 'delete', allow: ['meinserver.de'], block: [], phishingAction: 'timeout', phishingMinutes: 60 },
+        invites: { enabled: true, allowOwn: true, action: 'delete' }, spam: { enabled: true, maxMessages: 6, perSeconds: 5, duplicates: 4, timeoutMinutes: 5 },
+        mentions: { enabled: true, max: 5 }, caps: { enabled: false, percent: 70 }, badwords: { enabled: false, words: [], action: 'delete' },
+        escalation: { enabled: true, timeoutAt: 3, timeoutMinutes: 60, kickAt: 5, banAt: 7, expireDays: 30 } },
+      antiraid: { enabled: true, joins: 8, seconds: 10, action: 'lockdown', minutes: 15, pauseInvites: true, kickRaiders: false, minAccountDays: 3, accountAction: 'kick' },
+      antinuke: { enabled: true, threshold: 4, seconds: 30, punishment: 'strip', restore: true, blockBots: false, trusted: [] },
+      lockdown: { active: false, since: 0, until: 0, reason: '' },
+      tempvoice: { enabled: true, panelInChat: true, hubs: [{ id: byName('➕ Kanal erstellen'), category: vc.id, nameTemplate: '🔊 {name}', limit: 0 }, { id: byName('➕ Gaming-Kanal'), category: vc.id, nameTemplate: '🎮 {name}s Runde', limit: 5 }] },
+      tickets: { enabled: true, supportRoles: ['501'], logChannel: byName('mod-log'), maxOpen: 1 },
+      levels: { enabled: true, channel: null, message: 'GG {user}, du bist jetzt **Level {level}**! 🎉', multiplier: 1, stackRewards: true, rewards: { 10: '505', 25: '504' }, noXpChannels: [], noXpRoles: [],
+        voice: { enabled: true, perMinute: 8, minMembers: 2 },
+        clips: { enabled: true, channels: [byName('clips')], xp: 40, cooldownMinutes: 5, likeEmoji: '🔥', likeXp: 5, maxLikeXp: 100, hallOfFame: byName('hall-of-fame'), hallThreshold: 5 } },
+      quests: { enabled: true, perDay: 3, rewardMultiplier: 1, announce: true },
+      economy: { enabled: true, name: 'Münzen', emoji: '🪙', daily: 100, shop: [{ roleId: '503', price: 5000, description: 'Glänzender Name' }] },
+      music: { enabled: true, djRole: '502', defaultVolume: 80, maxQueue: 200, leaveMinutes: 3, channel: byName('musik') },
+      autoresponders: [{ trigger: 'ip', response: 'Unsere Server-IP: play.meinserver.de', match: 'contains', reply: true }],
+      stats: { enabled: false }, suggestions: { channel: null },
+    },
+  };
+}
+let DEMO = null;
+async function demoApi(path, opts) {
+  DEMO ||= demoData();
+  if (path === '/me') return { user: { id: '9', name: 'Vorschau' }, guilds: [{ id: '1', name: 'Mein Server', iconUrl: null, botPresent: true }, { id: '2', name: 'Zweiter Server', iconUrl: null, botPresent: false, invite: '#' }] };
+  if (path.startsWith('/guild/') && !opts.method) return DEMO;
+  if (path.endsWith('/config')) { const { changes } = JSON.parse(opts.body); for (const [k, v] of Object.entries(changes)) setPath(DEMO.config, k, v); return { applied: Object.keys(changes), errors: {}, config: DEMO.config }; }
+  if (path.endsWith('/action')) {
+    const { type } = JSON.parse(opts.body);
+    if (type === 'lockdownStart') DEMO.config.lockdown = { active: true, since: Date.now(), until: 0, reason: 'Vorschau' };
+    if (type === 'lockdownEnd') DEMO.config.lockdown = { active: false, since: 0, until: 0, reason: '' };
+    return { message: 'Vorschau: würde jetzt ausgeführt.', ...DEMO };
+  }
+  return {};
+}
+
+// ====================================================================
+//  Start
+// ====================================================================
+(async function boot() {
+  try {
+    S.me = await api('/me');
+    let last = null;
+    try { last = localStorage.getItem('dash.guild'); } catch { /* egal */ }
+    if (last && S.me.guilds.some(g => g.id === last && g.botPresent)) return openGuild(last);
+    if (S.me.guilds.filter(g => g.botPresent).length === 1) return openGuild(S.me.guilds.find(g => g.botPresent).id);
+    render();
+  } catch (e) {
+    if (e.status === 401) { S.me = null; return render(); }
+    S.demo = true;
+    S.me = await api('/me');
+    S.g = await api('/guild/1');
+    render();
+  }
+})();
+</script>
+</body>
+</html>

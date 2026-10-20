@@ -7,21 +7,29 @@ const store = require('../lib/store');
 
 const PAGE = 10;
 
-function leaderboardPayload(guild, page) {
-  const list = leveling.leaderboard(guild.id);
+const BOARDS = {
+  xp: { title: 'Level', fmt: e => `Level **${leveling.levelFromXp(e.xp).level}** · ${e.xp.toLocaleString('de-DE')} XP` },
+  coins: { title: 'Münzen', fmt: (e, cfg) => `**${(e.coins || 0).toLocaleString('de-DE')}** ${cfg.economy.emoji}` },
+  voiceMin: { title: 'Sprachzeit', fmt: e => `**${Math.floor((e.voiceMin || 0) / 60)} Std. ${(e.voiceMin || 0) % 60} Min.**` },
+  clips: { title: 'Clips', fmt: e => `**${e.clips || 0}** Clips` },
+};
+
+function leaderboardPayload(guild, page, by = 'xp') {
+  if (!BOARDS[by]) by = 'xp';
+  const cfg = getConfig(guild.id);
+  const list = by === 'coins' ? require('../modules/economy').richest(guild.id) : leveling.leaderboard(guild.id, by);
   const pages = Math.max(1, Math.ceil(list.length / PAGE));
   page = Math.min(Math.max(0, page), pages - 1);
   const medals = ['🥇', '🥈', '🥉'];
   const lines = list.slice(page * PAGE, page * PAGE + PAGE).map((e, idx) => {
     const pos = page * PAGE + idx;
-    const { level } = leveling.levelFromXp(e.xp);
-    return `${medals[pos] || `**${pos + 1}.**`} <@${e.userId}> · Level **${level}** · ${e.xp.toLocaleString('de-DE')} XP`;
+    return `${medals[pos] || `**${pos + 1}.**`} <@${e.userId}> · ${BOARDS[by].fmt(e, cfg)}`;
   });
   return {
-    embeds: [new EmbedBuilder().setColor(COLORS.brand).setTitle(`🏆 Bestenliste · ${guild.name}`).setDescription(lines.join('\n') || 'Noch niemand hat XP gesammelt.').setFooter({ text: `Seite ${page + 1}/${pages} · ${list.length} Mitglieder` })],
+    embeds: [new EmbedBuilder().setColor(COLORS.brand).setTitle(`🏆 Bestenliste · ${BOARDS[by].title}`).setDescription(lines.join('\n') || 'Noch keine Einträge.').setFooter({ text: `${guild.name} · Seite ${page + 1}/${pages}` })],
     components: pages > 1 ? [new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`lb:${page - 1}`).setEmoji('◀️').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
-      new ButtonBuilder().setCustomId(`lb:${page + 1}`).setEmoji('▶️').setStyle(ButtonStyle.Secondary).setDisabled(page >= pages - 1))] : [],
+      new ButtonBuilder().setCustomId(`lb:${by}:${page - 1}`).setEmoji('◀️').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+      new ButtonBuilder().setCustomId(`lb:${by}:${page + 1}`).setEmoji('▶️').setStyle(ButtonStyle.Secondary).setDisabled(page >= pages - 1))] : [],
     allowedMentions: { parse: [] },
   };
 }
@@ -34,12 +42,15 @@ module.exports = [
       const member = i.options.getMember('mitglied') || i.member;
       if (member.user.bot) return respond(i, err('Bots sammeln keine XP.'));
       await i.deferReply();
+      if (member.id === i.user.id) require('../modules/quests').progress(i.member, 'rank', 1);
       return respond(i, await leveling.rankPayload(member));
     },
   },
   {
-    data: new SlashCommandBuilder().setName('leaderboard').setDescription('Bestenliste des Servers'),
-    async execute(i) { return i.reply(leaderboardPayload(i.guild, 0)); },
+    data: new SlashCommandBuilder().setName('leaderboard').setDescription('Bestenliste des Servers')
+      .addStringOption(o => o.setName('nach').setDescription('Wonach sortieren?').addChoices(
+        { name: 'Level / XP', value: 'xp' }, { name: 'Münzen', value: 'coins' }, { name: 'Sprachzeit', value: 'voiceMin' }, { name: 'Clips', value: 'clips' })),
+    async execute(i) { return i.reply(leaderboardPayload(i.guild, 0, i.options.getString('nach') || 'xp')); },
   },
   {
     data: new SlashCommandBuilder().setName('level').setDescription('Level verwalten (Team)')

@@ -7,6 +7,7 @@ const tickets = require('../modules/tickets');
 const verify = require('../modules/verify');
 const welcome = require('../modules/welcome');
 const dashboard = require('../modules/dashboard');
+const extras = require('../modules/extras');
 
 const LOG_TYPES = [
   { key: 'mod', name: '🔨・mod-log', label: 'Moderation' },
@@ -71,6 +72,9 @@ module.exports = [
         .addChannelOption(o => o.setName('kategorie').setDescription('Vorhandene Kategorie (sonst wird eine erstellt)').addChannelTypes(ChannelType.GuildCategory))
         .addStringOption(o => o.setName('name_vorlage').setDescription('Name neuer Kanäle, z. B. „🔊 {name}“').setMaxLength(80))
         .addIntegerOption(o => o.setName('limit').setDescription('Standard-Personenlimit (0 = keins)').setMinValue(0).setMaxValue(99))
+        .addChannelOption(o => o.setName('hub').setDescription('Vorhandenen Sprachkanal als „Kanal erstellen“-Hub nutzen').addChannelTypes(ChannelType.GuildVoice))
+        .addBooleanOption(o => o.setName('hub_entfernen').setDescription('Den gewählten Hub wieder entfernen'))
+        .addBooleanOption(o => o.setName('panel_im_chat').setDescription('Bedienfeld im Chat jedes neuen Sprachkanals? (Standard: ja)'))
         .addBooleanOption(o => o.setName('nur_panel').setDescription('Nur das Bedienfeld in diesem Kanal neu posten')))
       .addSubcommand(s => s.setName('tickets').setDescription('Ticket-System einrichten')
         .addChannelOption(o => textChannel(o, 'kanal', 'Kanal für den „Ticket öffnen“-Button').setRequired(true))
@@ -82,7 +86,30 @@ module.exports = [
         .addStringOption(o => o.setName('nachricht').setDescription('Platzhalter: {user} {level}').setMaxLength(500))
         .addNumberOption(o => o.setName('multiplikator').setDescription('XP-Multiplikator (z. B. 2 für doppelte XP)').setMinValue(0.1).setMaxValue(10)))
       .addSubcommand(s => s.setName('modrole').setDescription('Team-Rolle hinzufügen/entfernen (darf Mod-Befehle, wird nicht gefiltert)')
-        .addRoleOption(o => o.setName('rolle').setDescription('Rolle').setRequired(true))),
+        .addRoleOption(o => o.setName('rolle').setDescription('Rolle').setRequired(true)))
+      .addSubcommand(s => s.setName('clips').setDescription('Clip-Kanal: XP für Clips und 🔥-Likes, Hall of Fame')
+        .addChannelOption(o => textChannel(o, 'kanal', 'Clip-Kanal hinzufügen/entfernen'))
+        .addIntegerOption(o => o.setName('xp').setDescription('XP pro Clip').setMinValue(0).setMaxValue(1000))
+        .addIntegerOption(o => o.setName('like_xp').setDescription('XP pro Like für den Ersteller').setMinValue(0).setMaxValue(100))
+        .addChannelOption(o => textChannel(o, 'hall_of_fame', 'Kanal für die besten Clips'))
+        .addIntegerOption(o => o.setName('hall_ab').setDescription('Ab so vielen Likes in die Hall of Fame').setMinValue(1).setMaxValue(100))
+        .addStringOption(o => o.setName('emoji').setDescription('Like-Emoji (Standard 🔥)').setMaxLength(60)))
+      .addSubcommand(s => s.setName('quests').setDescription('Tägliche Quests einstellen')
+        .addBooleanOption(o => o.setName('an').setDescription('an?'))
+        .addIntegerOption(o => o.setName('pro_tag').setDescription('Quests pro Tag').setMinValue(1).setMaxValue(5))
+        .addNumberOption(o => o.setName('belohnung').setDescription('Belohnungs-Multiplikator, z. B. 2').setMinValue(0.1).setMaxValue(10)))
+      .addSubcommand(s => s.setName('economy').setDescription('Münzen einstellen')
+        .addBooleanOption(o => o.setName('an').setDescription('an?'))
+        .addIntegerOption(o => o.setName('daily').setDescription('Münzen pro /daily').setMinValue(1).setMaxValue(100000))
+        .addStringOption(o => o.setName('name').setDescription('Name der Währung').setMaxLength(20))
+        .addStringOption(o => o.setName('emoji').setDescription('Emoji der Währung').setMaxLength(60)))
+      .addSubcommand(s => s.setName('music').setDescription('Musik einstellen')
+        .addBooleanOption(o => o.setName('an').setDescription('an?'))
+        .addRoleOption(o => o.setName('dj_rolle').setDescription('Nur diese Rolle darf skippen/stoppen (leer lassen = alle)'))
+        .addIntegerOption(o => o.setName('lautstaerke').setDescription('Standard-Lautstärke %').setMinValue(1).setMaxValue(200))
+        .addChannelOption(o => textChannel(o, 'kanal', 'Kanal für „Läuft gerade“ (leer = wo /play benutzt wird)')))
+      .addSubcommand(s => s.setName('stats').setDescription('Statistik-Kanäle (Mitgliederzahl usw.) anlegen'))
+      .addSubcommand(s => s.setName('suggestions').setDescription('Kanal für Vorschläge festlegen').addChannelOption(o => textChannel(o).setRequired(true))),
     async execute(i) {
       const sub = i.options.getSubcommand();
       const g = i.guild;
@@ -100,7 +127,7 @@ module.exports = [
           Object.assign(cfg.goodbye, { enabled: true, channel: wc.id });
           saveConfig(g.id);
           done.push(`👋 Willkommen & Abschied in ${wc}`);
-          const tv = await tempvoice.setup(g); done.push(`🔊 Temp-Sprachkanäle: ${tv.hub} + Steuerung in ${tv.panel}`);
+          const tv = await tempvoice.setup(g); done.push(`🔊 Temp-Sprachkanäle: ${tv.hub} (Bedienfeld im Kanal-Chat)`);
           const support = await g.channels.create({ name: '🎫・support', type: ChannelType.GuildText, permissionOverwrites: [{ id: g.roles.everyone.id, deny: [P.SendMessages] }, { id: g.client.user.id, allow: [P.SendMessages, P.EmbedLinks] }] });
           await tickets.setup(g, { panelChannel: support, supportRole: role });
           done.push(`🎫 Tickets: Button in ${support}`);
@@ -171,12 +198,23 @@ module.exports = [
           await tempvoice.sendPanel(i.channel);
           return respond(i, ok('Bedienfeld gepostet.'));
         }
+        const chatPanel = i.options.getBoolean('panel_im_chat');
+        if (chatPanel !== null) { cfg.tempvoice.panelInChat = chatPanel; saveConfig(g.id); }
+        const hubCh = i.options.getChannel('hub');
+        const tpl = i.options.getString('name_vorlage');
+        const lim = i.options.getInteger('limit');
+        if (hubCh) {
+          if (i.options.getBoolean('hub_entfernen')) {
+            tempvoice.removeHub(g.id, hubCh.id);
+            return respond(i, ok(`${hubCh} ist kein Hub mehr.`));
+          }
+          tempvoice.addHub(g.id, { id: hubCh.id, category: i.options.getChannel('kategorie')?.id || hubCh.parentId, nameTemplate: tpl || cfg.tempvoice.nameTemplate, limit: lim ?? 0 });
+          return respond(i, ok(`${hubCh} ist jetzt ein Hub: Wer ihn betritt, bekommt einen eigenen Sprachkanal${tpl ? ` namens „${tpl}“` : ''}. Hubs insgesamt: ${cfg.tempvoice.hubs.length}.`));
+        }
         await i.deferReply();
-        cfg.tempvoice.nameTemplate = i.options.getString('name_vorlage') || cfg.tempvoice.nameTemplate;
-        cfg.tempvoice.limit = i.options.getInteger('limit') ?? cfg.tempvoice.limit;
         try {
-          const r = await tempvoice.setup(g, { category: i.options.getChannel('kategorie') });
-          return respond(i, ok(`Fertig! Wer ${r.hub} betritt, bekommt einen eigenen Sprachkanal. Steuerung in ${r.panel}.`));
+          const r = await tempvoice.setup(g, { category: i.options.getChannel('kategorie'), nameTemplate: tpl, limit: lim });
+          return respond(i, ok(`Fertig! Wer ${r.hub} betritt, bekommt einen eigenen Sprachkanal – mit Bedienfeld direkt im Kanal-Chat.${r.panel ? ` Anleitung in ${r.panel}.` : ''}`));
         } catch (e) { return respond(i, err(e.message)); }
       }
       if (sub === 'tickets') {
@@ -198,6 +236,57 @@ module.exports = [
         l.multiplier = i.options.getNumber('multiplikator') ?? l.multiplier;
         saveConfig(g.id);
         return respond(i, ok(`Level **${l.enabled ? 'an' : 'aus'}** · Level-Ups in ${l.channel ? `<#${l.channel}>` : 'dem jeweiligen Kanal'} · XP ×${l.multiplier}.\nBelohnungs-Rollen: \`/level reward\``));
+      }
+      if (sub === 'clips') {
+        const c = cfg.levels.clips;
+        const ch = i.options.getChannel('kanal');
+        if (ch) { const k = c.channels.indexOf(ch.id); if (k >= 0) c.channels.splice(k, 1); else c.channels.push(ch.id); }
+        c.xp = i.options.getInteger('xp') ?? c.xp;
+        c.likeXp = i.options.getInteger('like_xp') ?? c.likeXp;
+        const hof = i.options.getChannel('hall_of_fame');
+        if (hof) c.hallOfFame = hof.id;
+        c.hallThreshold = i.options.getInteger('hall_ab') ?? c.hallThreshold;
+        c.likeEmoji = i.options.getString('emoji') || c.likeEmoji;
+        c.enabled = true;
+        saveConfig(g.id);
+        return respond(i, ok(`Clip-Kanäle: ${c.channels.map(x => `<#${x}>`).join(' ') || '–'}\nPro Clip **${c.xp} XP**, pro ${c.likeEmoji} **${c.likeXp} XP** (max. ${c.maxLikeXp} pro Clip)${c.hallOfFame ? `\nHall of Fame: <#${c.hallOfFame}> ab ${c.hallThreshold} ${c.likeEmoji}` : ''}`));
+      }
+      if (sub === 'quests') {
+        const q = cfg.quests;
+        q.enabled = i.options.getBoolean('an') ?? q.enabled;
+        q.perDay = i.options.getInteger('pro_tag') ?? q.perDay;
+        q.rewardMultiplier = i.options.getNumber('belohnung') ?? q.rewardMultiplier;
+        saveConfig(g.id);
+        return respond(i, ok(`Quests **${q.enabled ? 'an' : 'aus'}** · ${q.perDay} pro Tag · Belohnung ×${q.rewardMultiplier}`));
+      }
+      if (sub === 'economy') {
+        const e = cfg.economy;
+        e.enabled = i.options.getBoolean('an') ?? e.enabled;
+        e.daily = i.options.getInteger('daily') ?? e.daily;
+        e.name = i.options.getString('name') || e.name;
+        e.emoji = i.options.getString('emoji') || e.emoji;
+        saveConfig(g.id);
+        return respond(i, ok(`${e.name} **${e.enabled ? 'an' : 'aus'}** · /daily gibt ${e.daily} ${e.emoji}`));
+      }
+      if (sub === 'music') {
+        const m = cfg.music;
+        m.enabled = i.options.getBoolean('an') ?? m.enabled;
+        const dj = i.options.getRole('dj_rolle');
+        if (dj) m.djRole = dj.id === m.djRole ? null : dj.id;
+        m.defaultVolume = i.options.getInteger('lautstaerke') ?? m.defaultVolume;
+        const ch = i.options.getChannel('kanal');
+        if (ch) m.channel = ch.id;
+        saveConfig(g.id);
+        return respond(i, ok(`Musik **${m.enabled ? 'an' : 'aus'}** · DJ-Rolle: ${m.djRole ? `<@&${m.djRole}>` : 'keine'} · Lautstärke ${m.defaultVolume} %`));
+      }
+      if (sub === 'stats') {
+        await i.deferReply();
+        try { const cat = await extras.setupStats(g); return respond(i, ok(`Statistik-Kanäle in **${cat.name}** angelegt. Sie aktualisieren sich alle 10 Minuten.`)); } catch (e) { return respond(i, err(e.message)); }
+      }
+      if (sub === 'suggestions') {
+        cfg.suggestions.channel = i.options.getChannel('kanal').id;
+        saveConfig(g.id);
+        return respond(i, ok(`Vorschläge (\`/suggest\`) landen jetzt in <#${cfg.suggestions.channel}>.`));
       }
       if (sub === 'modrole') {
         const role = i.options.getRole('rolle');

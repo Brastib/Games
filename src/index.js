@@ -5,7 +5,6 @@
  */
 try { process.loadEnvFile(); } catch { /* keine .env-Datei – Variablen kommen vom Hoster */ }
 
-const http = require('http');
 const crypto = require('crypto');
 const { Client, Events, GatewayIntentBits: I, Partials, ActivityType } = require('discord.js');
 const store = require('./lib/store');
@@ -23,10 +22,14 @@ const giveaways = require('./modules/giveaways');
 const verify = require('./modules/verify');
 const welcome = require('./modules/welcome');
 const moderation = require('./modules/moderation');
+const quests = require('./modules/quests');
+const clips = require('./modules/clips');
+const extras = require('./modules/extras');
+const web = require('./web/server');
 
 const client = new Client({
-  intents: [I.Guilds, I.GuildMembers, I.GuildMessages, I.MessageContent, I.GuildVoiceStates, I.GuildModeration],
-  partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.User],
+  intents: [I.Guilds, I.GuildMembers, I.GuildMessages, I.MessageContent, I.GuildVoiceStates, I.GuildModeration, I.GuildMessageReactions, I.GuildExpressions],
+  partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.User, Partials.Reaction],
   allowedMentions: { parse: ['users'], repliedUser: false },
 });
 
@@ -64,6 +67,7 @@ async function tick() {
     await giveaways.processTimers(client);
     await lockdown.processTimers(client);
     await antiraid.processTimers(client);
+    await extras.processReminders(client);
   } catch (e) {
     console.error('[zeitplaner]', e);
   } finally {
@@ -81,6 +85,12 @@ client.once(Events.ClientReady, safe('ready', async c => {
   setInterval(() => lf.loadPhishingLists().catch(() => {}), 6 * 3_600_000).unref();
   setInterval(tick, 20_000).unref();
   tick();
+  setInterval(() => leveling.voiceTick(c).catch(e => console.error('[voice-xp]', e)), 60_000).unref();
+  setInterval(() => extras.updateStats(c).catch(() => {}), 10 * 60_000).unref();
+  setInterval(() => clips.cleanup(), 12 * 3_600_000).unref();
+  // Mitgliederlisten laden (für Statistik, Bestenlisten, Schutz)
+  for (const g of c.guilds.cache.values()) await g.members.fetch().catch(() => {});
+  extras.updateStats(c).catch(() => {});
   const invite = `https://discord.com/oauth2/authorize?client_id=${c.user.id}&permissions=8&scope=bot%20applications.commands`;
   console.log(`[bot] Einladungslink: ${invite}`);
 }));
@@ -88,8 +98,21 @@ client.once(Events.ClientReady, safe('ready', async c => {
 client.on(Events.InteractionCreate, onInteraction);
 
 client.on(Events.MessageCreate, safe('message', async m => {
+  if (!m.guild || m.author.bot) return;
   if (await automod.handle(m)) return;
   await leveling.onMessage(m);
+  await clips.onMessage(m);
+  await quests.progress(m.member, 'msgs', 1, m.channel);
+  if (m.mentions?.repliedUser && m.mentions.repliedUser.id !== m.author.id && !m.mentions.repliedUser.bot) await quests.progress(m.member, 'reply', 1, m.channel);
+  await extras.autoRespond(m);
+}));
+client.on(Events.MessageReactionAdd, safe('reactionAdd', async (reaction, user) => {
+  if (reaction.partial) reaction = await reaction.fetch().catch(() => null);
+  if (reaction) await clips.onReactionAdd(reaction, user);
+}));
+client.on(Events.MessageReactionRemove, safe('reactionRemove', async (reaction, user) => {
+  if (reaction.partial) reaction = await reaction.fetch().catch(() => null);
+  if (reaction) await clips.onReactionRemove(reaction, user);
 }));
 client.on(Events.MessageUpdate, safe('messageUpdate', async (oldM, newM) => {
   if (newM.partial) newM = await newM.fetch().catch(() => null);
@@ -129,28 +152,8 @@ client.on(Events.Error, e => console.error('[discord]', e.message));
 client.on(Events.Warn, w => console.warn('[discord]', w));
 process.on('unhandledRejection', e => console.error('[unbehandelt]', e));
 
-// ---------- Web-Server: hält den Bot beim Hoster wach + Statusseite ----------
-const startedAt = Date.now();
-http.createServer((req, res) => {
-  const status = {
-    status: client.isReady() ? 'online' : 'startet',
-    bot: client.user?.tag || null,
-    server: client.guilds.cache.size,
-    ping: Math.round(client.ws.ping),
-    online_seit_sekunden: Math.round((Date.now() - startedAt) / 1000),
-    speicher: store.kind,
-    betrugs_domains: lf.phishingCount(),
-  };
-  if (req.url.startsWith('/health')) {
-    res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
-    return res.end(JSON.stringify(status));
-  }
-  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-  res.end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Discord-Bot</title>
-<body style="font-family:system-ui;background:#0b0b0f;color:#eee;display:grid;place-items:center;height:100vh;margin:0">
-<div style="text-align:center"><h1 style="color:${client.isReady() ? '#2ecc71' : '#f1c40f'}">${client.isReady() ? '🟢 Bot ist online' : '🟡 Bot startet …'}</h1>
-<p>${status.bot || ''} · ${status.server} Server · ${status.ping} ms</p></div></body>`);
-}).listen(process.env.PORT || 3000, () => console.log(`[web] Statusseite auf Port ${process.env.PORT || 3000}`));
+// ---------- Web-Dashboard + Statusseite (hält den Bot beim Hoster außerdem wach) ----------
+web.start(client);
 
 // Selbst-Ping alle 10 Minuten (Render schläft sonst nach 15 Min. ohne Anfragen ein)
 const keepAliveUrl = process.env.KEEPALIVE_URL || process.env.RENDER_EXTERNAL_URL;

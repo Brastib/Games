@@ -26,7 +26,7 @@ const TOGGLES = {
   welcome: { label: 'Willkommen', emoji: '👋', get: c => c.welcome.enabled, set: (c, v) => { c.welcome.enabled = v; }, need: c => c.welcome.channel || 'Erst `/setup welcome` ausführen.' },
   goodbye: { label: 'Abschied', emoji: '🚪', get: c => c.goodbye.enabled, set: (c, v) => { c.goodbye.enabled = v; }, need: c => c.goodbye.channel || 'Erst `/setup goodbye` ausführen.' },
   levels: { label: 'Level', emoji: '⭐', get: c => c.levels.enabled, set: (c, v) => { c.levels.enabled = v; } },
-  tempvoice: { label: 'Temp-Voice', emoji: '🔊', get: c => c.tempvoice.enabled, set: (c, v) => { c.tempvoice.enabled = v; }, need: c => c.tempvoice.hub || 'Erst `/setup tempvoice` ausführen.' },
+  tempvoice: { label: 'Temp-Voice', emoji: '🔊', get: c => c.tempvoice.enabled, set: (c, v) => { c.tempvoice.enabled = v; }, need: c => c.tempvoice.hubs.length > 0 || 'Erst `/setup tempvoice` ausführen.' },
   tickets: { label: 'Tickets', emoji: '🎫', get: c => c.tickets.enabled, set: (c, v) => { c.tickets.enabled = v; }, need: c => c.tickets.category || 'Erst `/setup tickets` ausführen.' },
   captcha: { label: 'Captcha', emoji: '🧮', get: c => c.verify.captcha, set: (c, v) => { c.verify.captcha = v; }, need: c => c.verify.enabled || 'Erst `/setup rules` ausführen.' },
 };
@@ -56,7 +56,7 @@ function view(guild) {
         `**Regeln/Verifizierung:** ${on(c.verify.enabled)} ${c.verify.enabled ? `${ch(c.verify.channel)} → <@&${c.verify.role}>${c.verify.captcha ? ' + Captcha' : ''}` : ''}`,
       ].join('\n') },
       { name: '🧰 Funktionen', value: [
-        `**Temp-Sprachkanäle:** ${on(c.tempvoice.enabled)} ${c.tempvoice.hub ? `Hub ${ch(c.tempvoice.hub)}` : ''} · aktiv: ${store.values('tempvoice').filter(r => r.guildId === guild.id).length}`,
+        `**Temp-Sprachkanäle:** ${on(c.tempvoice.enabled)} ${c.tempvoice.hubs.map(h => ch(h.id)).join(' ')} · aktiv: ${store.values('tempvoice').filter(r => r.guildId === guild.id).length}`,
         `**Tickets:** ${on(c.tickets.enabled)} · offen: ${store.values('tickets').filter(t => t.guildId === guild.id).length}`,
         `**Level:** ${on(c.levels.enabled)} · Belohnungen: ${Object.keys(c.levels.rewards).length}`,
         `**Mod-Rollen:** ${c.modRoles.map(r => `<@&${r}>`).join(' ') || '–'}`,

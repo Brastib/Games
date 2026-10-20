@@ -15,7 +15,7 @@ const rolepanels = require('../modules/rolepanels');
 const giveaways = require('../modules/giveaways');
 
 module.exports = [
-  // ---------- Temporäre Sprachkanäle per Befehl ----------
+  // ---------- Temporäre Sprachkanäle per Befehl (gleiche Aktionen wie das Bedienfeld) ----------
   {
     data: new SlashCommandBuilder().setName('voice').setDescription('Deinen temporären Sprachkanal steuern')
       .addSubcommand(s => s.setName('name').setDescription('Umbenennen').addStringOption(o => o.setName('name').setDescription('Neuer Name').setRequired(true).setMaxLength(100)))
@@ -26,41 +26,44 @@ module.exports = [
       .addSubcommand(s => s.setName('unhide').setDescription('Sichtbar machen'))
       .addSubcommand(s => s.setName('permit').setDescription('Jemanden reinlassen').addUserOption(o => o.setName('person').setDescription('Wen?').setRequired(true)))
       .addSubcommand(s => s.setName('kick').setDescription('Jemanden rauswerfen').addUserOption(o => o.setName('person').setDescription('Wen?').setRequired(true)))
+      .addSubcommand(s => s.setName('ban').setDescription('Jemanden aus deinen Kanälen bannen').addUserOption(o => o.setName('person').setDescription('Wen?').setRequired(true)))
+      .addSubcommand(s => s.setName('unban').setDescription('Bann aufheben').addUserOption(o => o.setName('person').setDescription('Wen?').setRequired(true)))
       .addSubcommand(s => s.setName('claim').setDescription('Kanal übernehmen, wenn der Besitzer weg ist'))
-      .addSubcommand(s => s.setName('transfer').setDescription('Kanal übergeben').addUserOption(o => o.setName('person').setDescription('An wen?').setRequired(true))),
+      .addSubcommand(s => s.setName('transfer').setDescription('Kanal übergeben').addUserOption(o => o.setName('person').setDescription('An wen?').setRequired(true)))
+      .addSubcommand(s => s.setName('panel').setDescription('Bedienfeld hier im Chat anzeigen')),
     async execute(i) {
       const sub = i.options.getSubcommand();
       if (sub === 'claim') return tempvoice.handleButton(i, 'claim');
-      const o = tempvoice.ownedChannel(i.member);
+      const o = tempvoice.resolve(i);
       if (o.error) return respond(i, err(o.error));
       const target = i.options.getUser('person');
+      if (target && (target.id === i.user.id || target.bot)) return respond(i, err('Wähle eine andere Person.'));
+      const { ch, r } = o;
+      const A = tempvoice.actions;
       try {
         switch (sub) {
-          case 'name':
+          case 'name': {
             await i.deferReply({ flags: 64 });
-            await Promise.race([o.ch.setName(i.options.getString('name')), new Promise(r => setTimeout(r, 6000))]);
-            return respond(i, ok('Name geändert (Discord erlaubt 2 Änderungen pro 10 Minuten).'));
-          case 'limit': await o.ch.setUserLimit(i.options.getInteger('anzahl')); return respond(i, ok('Limit gesetzt.'));
-          case 'lock': await tempvoice.setFlagForAll(o.ch, 'Connect', false); return respond(i, ok('Gesperrt.'));
-          case 'unlock': await tempvoice.setFlagForAll(o.ch, 'Connect', null); return respond(i, ok('Geöffnet.'));
-          case 'hide': await tempvoice.setFlagForAll(o.ch, 'ViewChannel', false); return respond(i, ok('Versteckt.'));
-          case 'unhide': await tempvoice.setFlagForAll(o.ch, 'ViewChannel', null); return respond(i, ok('Wieder sichtbar.'));
-          case 'permit': await o.ch.permissionOverwrites.edit(target.id, { ViewChannel: true, Connect: true }, MEMBER); return respond(i, ok(`${target} darf rein.`));
-          case 'kick': {
-            if (target.id === i.user.id) return respond(i, err('Du kannst dich nicht selbst rauswerfen.'));
-            await o.ch.permissionOverwrites.edit(target.id, { Connect: false }, MEMBER);
-            await o.ch.members.get(target.id)?.voice.disconnect().catch(() => {});
-            return respond(i, ok(`${target} wurde rausgeworfen.`));
+            const res = await A.rename(ch, r, i.options.getString('name'));
+            return respond(i, res === 'ok' ? ok('Name geändert.') : res === 'wait' ? ok('Discord erlaubt 2 Umbenennungen pro 10 Minuten – der Name wird gleich übernommen.') : err(res));
           }
-          case 'transfer':
-            if (target.bot || target.id === i.user.id) return respond(i, err('Wähle eine andere Person.'));
-            await tempvoice.setOwner(o.ch, o.r.ownerId, target.id);
-            return respond(i, ok(`${target} ist jetzt Besitzer.`));
+          case 'limit': await A.limit(ch, r, i.options.getInteger('anzahl')); break;
+          case 'lock': await A.lock(ch, r, true); break;
+          case 'unlock': await A.lock(ch, r, false); break;
+          case 'hide': await A.hide(ch, r, true); break;
+          case 'unhide': await A.hide(ch, r, false); break;
+          case 'permit': await A.permit(ch, r, [target.id]); break;
+          case 'kick': await A.kick(ch, r, [target.id]); break;
+          case 'ban': await A.ban(ch, r, [target.id]); break;
+          case 'unban': await A.unban(ch, r, [target.id]); break;
+          case 'transfer': await A.transfer(ch, r, target.id); break;
+          case 'panel': return tempvoice.handleButton(i, 'info');
         }
+        await tempvoice.refreshPanel(ch);
+        return respond(i, ok('Erledigt.'));
       } catch (e) { return respond(i, err(e.message)); }
     },
   },
-
   // ---------- Temporäre Textkanäle ----------
   {
     data: new SlashCommandBuilder().setName('tempchannel').setDescription('Temporäre Textkanäle, die sich selbst löschen')

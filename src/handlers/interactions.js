@@ -12,8 +12,10 @@ const verify = require('../modules/verify');
 const rolepanels = require('../modules/rolepanels');
 const giveaways = require('../modules/giveaways');
 const dashboard = require('../modules/dashboard');
+const economy = require('../modules/economy');
+const extras = require('../modules/extras');
 
-const FILES = ['moderation', 'protection', 'setup', 'features', 'levels', 'info'];
+const FILES = ['moderation', 'protection', 'setup', 'features', 'levels', 'community', 'music', 'extras', 'info'];
 const commands = new Collection();
 for (const f of FILES) {
   for (const cmd of require(`../commands/${f}`)) {
@@ -68,17 +70,21 @@ async function onInteraction(i) {
         case 'rp': return await rolepanels.onButton(i, action);
         case 'gw': return await giveaways.onJoin(i);
         case 'dash': return await dashboard.handleButton(i, [action, value]);
-        case 'lb': return await i.update(leaderboardPayload(i.guild, parseInt(action, 10) || 0));
+        case 'mu': return await require('../commands/music').handleButton(i, action);
+        case 'sg': return await extras.onSuggestionButton(i, action);
+        case 'lb': return await i.update(leaderboardPayload(i.guild, parseInt(value, 10) || 0, action));
       }
       return;
     }
     if (i.isStringSelectMenu()) {
       if (ns === 'rps') return await rolepanels.onSelect(i);
+      if (ns === 'tvu') return await tempvoice.handleSelect(i, action, value);
       if (ns === 'help') return await i.update(helpPayload(i.values[0]));
+      if (ns === 'shop') return await economy.buy(i, i.values[0]);
       return;
     }
     if (i.isUserSelectMenu()) {
-      if (ns === 'tvs') return await tempvoice.handleSelect(i, action);
+      if (ns === 'tvs') return await tempvoice.handleSelect(i, action, value);
       return;
     }
     if (i.isModalSubmit()) {

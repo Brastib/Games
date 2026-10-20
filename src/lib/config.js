@@ -55,13 +55,25 @@ function defaults() {
     },
     lockdown: { active: false, since: 0, until: 0, reason: '', by: null, backup: [], invitesPaused: false },
     lockedChannels: {},
-    tempvoice: { enabled: false, hub: null, category: null, panelChannel: null, nameTemplate: '🔊 {name}', limit: 0 },
+    // hubs: [{ id, category, nameTemplate, limit }] – "Kanal erstellen"-Sprachkanäle (im Dashboard einstellbar)
+    tempvoice: { enabled: false, hubs: [], hub: null, category: null, panelChannel: null, nameTemplate: '🔊 {name}', limit: 0, panelInChat: true },
     temptext: { category: null },
     tickets: { enabled: false, category: null, supportRoles: [], logChannel: null, counter: 0, maxOpen: 1 },
     levels: {
       enabled: true, channel: null, message: 'GG {user}, du bist jetzt **Level {level}**! 🎉',
       rewards: {}, stackRewards: true, noXpChannels: [], noXpRoles: [], multiplier: 1,
+      voice: { enabled: true, perMinute: 8, minMembers: 2 },
+      clips: {
+        enabled: true, channels: [], xp: 40, cooldownMinutes: 5,
+        likeEmoji: '🔥', likeXp: 5, maxLikeXp: 100, hallOfFame: null, hallThreshold: 5,
+      },
     },
+    quests: { enabled: true, perDay: 3, rewardMultiplier: 1, announce: true },
+    economy: { enabled: true, name: 'Münzen', emoji: '🪙', daily: 100, shop: [] },
+    music: { enabled: true, djRole: null, defaultVolume: 80, maxQueue: 200, leaveMinutes: 3, channel: null },
+    autoresponders: [],
+    stats: { enabled: false, category: null, members: null, humans: null, boosts: null },
+    suggestions: { channel: null, counter: 0 },
   };
 }
 
@@ -85,6 +97,11 @@ function getConfig(guildId) {
   let cfg = cache.get(guildId);
   if (!cfg) {
     cfg = mergeDefaults(defaults(), store.get('guilds', guildId));
+    // Alte Einstellung (ein Hub) in die neue Liste übernehmen
+    const tv = cfg.tempvoice;
+    if (tv.hub && !tv.hubs.some(h => h.id === tv.hub)) {
+      tv.hubs.push({ id: tv.hub, category: tv.category, nameTemplate: tv.nameTemplate, limit: tv.limit });
+    }
     cache.set(guildId, cfg);
   }
   return cfg;

@@ -1,0 +1,272 @@
+'use strict';
+/**
+ * Web-Dashboard + Statusseite.
+ * Login mit Discord (OAuth2). Nur wer auf einem Server "Server verwalten" darf, kann ihn hier einstellen.
+ * Nötig: DISCORD_CLIENT_SECRET und DASHBOARD_URL (z. B. https://dein-bot.onrender.com).
+ * Im Developer Portal unter OAuth2 → Redirects muss  <DASHBOARD_URL>/callback  eingetragen sein.
+ */
+const path = require('path');
+const crypto = require('crypto');
+const express = require('express');
+const { PermissionFlagsBits: P, ChannelType } = require('discord.js');
+const store = require('../lib/store');
+const { getConfig, saveConfig } = require('../lib/config');
+const { applyChanges } = require('./schema');
+const lf = require('../lib/linkFilter');
+
+const API = 'https://discord.com/api/v10';
+const SESSION_DAYS = 7;
+
+function baseUrl() {
+  const port = process.env.PORT || 3000;
+  return (process.env.DASHBOARD_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${port}`).replace(/\/$/, '');
+}
+const oauthReady = () => !!process.env.DISCORD_CLIENT_SECRET;
+
+function cookies(req) {
+  const out = {};
+  for (const part of (req.headers.cookie || '').split(';')) {
+    const [k, ...v] = part.trim().split('=');
+    if (k) out[k] = decodeURIComponent(v.join('='));
+  }
+  return out;
+}
+function setCookie(res, name, value, maxAgeSec) {
+  const secure = baseUrl().startsWith('https://') ? '; Secure' : '';
+  res.append('Set-Cookie', `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSec}${secure}`);
+}
+function session(req) {
+  const sid = cookies(req).sid;
+  if (!sid || !/^[a-f0-9]{64}$/.test(sid)) return null;
+  const s = store.get('sessions', sid);
+  if (!s || s.exp < Date.now()) { if (s) store.delete('sessions', sid); return null; }
+  return { sid, ...s };
+}
+
+function start(client) {
+  const app = express();
+  app.disable('x-powered-by');
+  app.use(express.json({ limit: '300kb' }));
+  app.use((req, res, next) => {
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('Referrer-Policy', 'same-origin');
+    res.set('X-Frame-Options', 'DENY');
+    next();
+  });
+
+  // ---------- Status ----------
+  const startedAt = Date.now();
+  const status = () => ({
+    status: client.isReady() ? 'online' : 'startet', bot: client.user?.tag || null, server: client.guilds.cache.size,
+    ping: Math.round(client.ws.ping), online_seit_sekunden: Math.round((Date.now() - startedAt) / 1000),
+    speicher: store.kind, betrugs_domains: lf.phishingCount(), dashboard: oauthReady(),
+  });
+  app.get('/health', (req, res) => res.json(status()));
+
+  // ---------- Login ----------
+  app.get('/login', (req, res) => {
+    if (!oauthReady()) return res.status(503).send('Dashboard ist noch nicht eingerichtet: DISCORD_CLIENT_SECRET fehlt (siehe README).');
+    const state = crypto.randomBytes(16).toString('hex');
+    setCookie(res, 'oauth_state', state, 600);
+    const params = new URLSearchParams({
+      client_id: client.application?.id || client.user?.id || '', response_type: 'code', scope: 'identify guilds',
+      redirect_uri: `${baseUrl()}/callback`, state, prompt: 'none',
+    });
+    res.redirect(`https://discord.com/oauth2/authorize?${params}`);
+  });
+
+  app.get('/callback', async (req, res) => {
+    const { code, state } = req.query;
+    if (!code || !state || state !== cookies(req).oauth_state) return res.redirect('/?fehler=login');
+    try {
+      const tokenRes = await fetch(`${API}/oauth2/token`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: client.application.id, client_secret: process.env.DISCORD_CLIENT_SECRET,
+          grant_type: 'authorization_code', code: String(code), redirect_uri: `${baseUrl()}/callback`,
+        }),
+      });
+      const token = await tokenRes.json();
+      if (!token.access_token) throw new Error(token.error_description || 'Kein Token');
+      const auth = { authorization: `Bearer ${token.access_token}` };
+      const [user, guilds] = await Promise.all([
+        fetch(`${API}/users/@me`, { headers: auth }).then(r => r.json()),
+        fetch(`${API}/users/@me/guilds`, { headers: auth }).then(r => r.json()),
+      ]);
+      const manageable = (Array.isArray(guilds) ? guilds : []).filter(g => g.owner || (BigInt(g.permissions) & (P.ManageGuild | P.Administrator)))
+        .map(g => ({ id: g.id, name: g.name, icon: g.icon }));
+      const sid = crypto.randomBytes(32).toString('hex');
+      store.set('sessions', sid, {
+        userId: user.id, username: user.global_name || user.username, avatar: user.avatar, guilds: manageable,
+        exp: Date.now() + SESSION_DAYS * 86_400_000,
+      });
+      setCookie(res, 'sid', sid, SESSION_DAYS * 86400);
+      setCookie(res, 'oauth_state', '', 0);
+      res.redirect('/');
+    } catch (e) {
+      console.error('[dashboard] Login fehlgeschlagen:', e.message);
+      res.redirect('/?fehler=login');
+    }
+  });
+
+  app.get('/logout', (req, res) => {
+    const s = session(req);
+    if (s) store.delete('sessions', s.sid);
+    setCookie(res, 'sid', '', 0);
+    res.redirect('/');
+  });
+
+  // ---------- API ----------
+  const api = express.Router();
+  api.use((req, res, next) => {
+    req.session = session(req);
+    if (!req.session) return res.status(401).json({ error: 'Nicht angemeldet' });
+    if (req.method !== 'GET' && req.get('x-requested-with') !== 'dashboard') return res.status(403).json({ error: 'Ungültige Anfrage' });
+    next();
+  });
+
+  async function access(req, res) {
+    const guild = client.guilds.cache.get(req.params.id);
+    if (!guild) { res.status(404).json({ error: 'Der Bot ist nicht auf diesem Server.' }); return null; }
+    const member = await guild.members.fetch(req.session.userId).catch(() => null);
+    const isOwner = guild.ownerId === req.session.userId;
+    if (!member || !(isOwner || member.permissions.has(P.ManageGuild))) { res.status(403).json({ error: 'Du darfst diesen Server nicht verwalten.' }); return null; }
+    return { guild, member, isOwner };
+  }
+
+  function publicConfig(cfg) {
+    const c = JSON.parse(JSON.stringify(cfg));
+    c.lockdown = { active: cfg.lockdown.active, since: cfg.lockdown.since, until: cfg.lockdown.until, reason: cfg.lockdown.reason };
+    delete c.lockedChannels;
+    return c;
+  }
+
+  function guildData(guild, isOwner) {
+    const cfg = getConfig(guild.id);
+    const channels = guild.channels.cache.filter(c => !c.isThread())
+      .map(c => ({ id: c.id, name: c.name, type: c.type, parentId: c.parentId, position: c.rawPosition }))
+      .sort((a, b) => a.position - b.position);
+    const roles = guild.roles.cache.filter(r => r.id !== guild.id)
+      .map(r => ({ id: r.id, name: r.name, color: r.colors?.primaryColor ?? r.color, position: r.position, managed: r.managed, editable: r.editable }))
+      .sort((a, b) => b.position - a.position);
+    const leveling = require('../modules/leveling');
+    const top = leveling.leaderboard(guild.id).slice(0, 5).map(e => ({ ...e, name: guild.members.cache.get(e.userId)?.displayName || e.userId, level: leveling.levelFromXp(e.xp).level }));
+    const music = require('../modules/music/player').get(guild);
+    return {
+      guild: { id: guild.id, name: guild.name, icon: guild.iconURL({ size: 128 }), memberCount: guild.memberCount, ownerId: guild.ownerId },
+      isOwner, config: publicConfig(cfg), channels, roles,
+      stats: {
+        tempvoice: store.values('tempvoice').filter(r => r.guildId === guild.id).length,
+        tickets: store.values('tickets').filter(t => t.guildId === guild.id).length,
+        phishing: lf.phishingCount(), cases: store.entries('cases').filter(([k]) => k.startsWith(guild.id + ':')).length,
+        nowPlaying: music?.current ? { title: music.current.title, queue: music.queue.length } : null,
+        top,
+      },
+    };
+  }
+
+  api.get('/me', (req, res) => {
+    const s = req.session;
+    const appId = client.application?.id || client.user?.id;
+    res.json({
+      user: { id: s.userId, name: s.username, avatar: s.avatar ? `https://cdn.discordapp.com/avatars/${s.userId}/${s.avatar}.png?size=64` : null },
+      guilds: s.guilds.map(g => ({
+        ...g, iconUrl: g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=96` : null,
+        botPresent: client.guilds.cache.has(g.id),
+        invite: `https://discord.com/oauth2/authorize?client_id=${appId}&permissions=8&scope=bot%20applications.commands&guild_id=${g.id}&disable_guild_select=true`,
+      })),
+    });
+  });
+
+  api.get('/guild/:id', async (req, res) => {
+    const a = await access(req, res); if (!a) return;
+    res.json(guildData(a.guild, a.isOwner));
+  });
+
+  api.patch('/guild/:id/config', async (req, res) => {
+    const a = await access(req, res); if (!a) return;
+    const cfg = getConfig(a.guild.id);
+    const { applied, errors } = applyChanges(cfg, req.body?.changes, a.guild, { isOwner: a.isOwner });
+    if (applied.length) saveConfig(a.guild.id);
+    res.status(Object.keys(errors).length && !applied.length ? 400 : 200).json({ applied, errors, config: publicConfig(cfg) });
+  });
+
+  api.post('/guild/:id/action', async (req, res) => {
+    const a = await access(req, res); if (!a) return;
+    const { type, channelId, reason, minutes } = req.body || {};
+    const g = a.guild;
+    const user = await client.users.fetch(req.session.userId);
+    try {
+      let message = 'Erledigt.';
+      if (type === 'lockdownStart') {
+        const r = await require('../modules/lockdown').start(g, { reason: String(reason || 'Über das Web-Dashboard').slice(0, 300), by: user, minutes: Math.min(1440, Math.max(0, Number(minutes) || 0)) });
+        message = r.already ? 'Lockdown läuft bereits.' : `Lockdown aktiv: ${r.locked} Kanäle gesperrt.`;
+      } else if (type === 'lockdownEnd') {
+        const r = await require('../modules/lockdown').end(g, { by: user });
+        message = r.notActive ? 'Es lief kein Lockdown.' : `Lockdown beendet, ${r.restored} Rechte wiederhergestellt.`;
+      } else if (type === 'createHub') {
+        const r = await require('../modules/tempvoice').setup(g, { globalPanel: false });
+        message = `Neuer Hub „${r.hub.name}“ erstellt.`;
+      } else if (type === 'createLogs') {
+        await createLogs(g);
+        message = 'Log-Kanäle erstellt.';
+      } else if (type === 'postRules') {
+        const cfg = getConfig(g.id);
+        const ch = g.channels.cache.get(cfg.verify.channel);
+        if (!ch || !cfg.verify.role) throw new Error('Erst Regel-Kanal und Rolle auswählen.');
+        const verify = require('../modules/verify');
+        const old = cfg.verify.messageId && await ch.messages.fetch(cfg.verify.messageId).catch(() => null);
+        if (old) await old.edit(verify.rulesMessage(cfg));
+        else { const m = await ch.send(verify.rulesMessage(cfg)); cfg.verify.messageId = m.id; }
+        cfg.verify.enabled = true;
+        saveConfig(g.id);
+        message = old ? 'Regeln aktualisiert.' : 'Regeln gepostet.';
+      } else if (type === 'postTicketPanel') {
+        const ch = g.channels.cache.get(String(channelId));
+        if (!ch?.isTextBased()) throw new Error('Kanal auswählen.');
+        const tickets = require('../modules/tickets');
+        const cfg = getConfig(g.id);
+        if (!cfg.tickets.category || !g.channels.cache.has(cfg.tickets.category)) await tickets.setup(g, { panelChannel: ch });
+        else await ch.send(tickets.panelMessage());
+        cfg.tickets.enabled = true; saveConfig(g.id);
+        message = `Ticket-Button in #${ch.name} gepostet.`;
+      } else if (type === 'setupStats') {
+        await require('../modules/extras').setupStats(g);
+        message = 'Statistik-Kanäle erstellt.';
+      } else {
+        return res.status(400).json({ error: 'Unbekannte Aktion' });
+      }
+      res.json({ message, ...guildData(g, a.isOwner) });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  app.use('/api', api);
+
+  // ---------- Oberfläche ----------
+  app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+  app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h' }));
+
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => console.log(`[web] Dashboard & Statusseite auf Port ${port} (${baseUrl()})${oauthReady() ? '' : ' – Login noch nicht eingerichtet (DISCORD_CLIENT_SECRET fehlt)'}`));
+  return app;
+}
+
+async function createLogs(guild) {
+  const cfg = getConfig(guild.id);
+  const overwrites = [
+    { id: guild.roles.everyone.id, deny: [P.ViewChannel] },
+    { id: guild.client.user.id, allow: [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.AttachFiles] },
+  ];
+  const cat = await guild.channels.create({ name: '📁 Server-Logs', type: ChannelType.GuildCategory, permissionOverwrites: overwrites });
+  for (const [key, name] of [['mod', '🔨・mod-log'], ['protection', '🛡️・schutz-log'], ['messages', '💬・nachrichten-log'], ['members', '👥・mitglieder-log'], ['server', '⚙️・server-log'], ['voice', '🔊・voice-log']]) {
+    const ch = await guild.channels.create({ name, type: ChannelType.GuildText, parent: cat.id, permissionOverwrites: overwrites });
+    cfg.logs[key] = ch.id;
+  }
+  cfg.logs.fallback = cfg.logs.mod;
+  saveConfig(guild.id);
+}
+
+module.exports = { start };

@@ -19,3 +19,5 @@ services:
         sync: false
       - key: MONGODB_URI
         sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false

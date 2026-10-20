@@ -29,11 +29,11 @@ function getData(guildId, userId) {
   return store.get('levels', key(guildId, userId)) || { xp: 0, msgs: 0, last: 0 };
 }
 
-function leaderboard(guildId) {
+function leaderboard(guildId, by = 'xp') {
   return store.entries('levels')
     .filter(([k]) => k.startsWith(guildId + ':'))
-    .map(([k, v]) => ({ userId: k.split(':')[1], xp: v.xp, msgs: v.msgs }))
-    .sort((a, b) => b.xp - a.xp);
+    .map(([k, v]) => ({ userId: k.split(':')[1], xp: v.xp || 0, msgs: v.msgs || 0, voiceMin: v.voiceMin || 0, clips: v.clips || 0 }))
+    .sort((a, b) => (b[by] || 0) - (a[by] || 0));
 }
 
 function rankOf(guildId, userId) {
@@ -57,6 +57,33 @@ async function applyRewards(member, level) {
   return added;
 }
 
+/**
+ * XP gutschreiben (Nachrichten, Sprachzeit, Clips, Quests …) und Level-Aufstieg verkünden.
+ * @param {import('discord.js').GuildMember} member
+ * @param {number} amount
+ * @param {{ channel?: any, stat?: string, statAmount?: number, ignoreMultiplier?: boolean }} opts
+ */
+async function addXp(member, amount, opts = {}) {
+  if (!member?.guild || member.user.bot) return null;
+  const cfg = getConfig(member.guild.id).levels;
+  if (!cfg.enabled) return null;
+  const k = key(member.guild.id, member.id);
+  const d = getData(member.guild.id, member.id);
+  if (opts.stat) d[opts.stat] = (d[opts.stat] || 0) + (opts.statAmount ?? 1);
+  const before = levelFromXp(d.xp).level;
+  d.xp = Math.max(0, d.xp + Math.round(amount * (opts.ignoreMultiplier ? 1 : (cfg.multiplier || 1))));
+  store.set('levels', k, d);
+  const after = levelFromXp(d.xp).level;
+  if (after > before) {
+    const roles = await applyRewards(member, after);
+    const text = fillTemplate(cfg.message, { member, extra: { level: String(after) } }) +
+      (roles.length ? `\nNeue Rolle: ${roles.map(r => `<@&${r.id}>`).join(', ')}` : '');
+    const target = member.guild.channels.cache.get(cfg.channel) || opts.channel;
+    if (target?.isTextBased?.()) await target.send({ content: text, allowedMentions: { users: [member.id] } }).catch(() => {});
+  }
+  return { level: after, xp: d.xp, levelUp: after > before };
+}
+
 async function onMessage(message) {
   if (!message.guild || message.author.bot || !message.member) return;
   const cfg = getConfig(message.guild.id).levels;
@@ -65,19 +92,31 @@ async function onMessage(message) {
   if (message.member.roles.cache.some(r => cfg.noXpRoles.includes(r.id))) return;
   const d = getData(message.guild.id, message.author.id);
   const now = Date.now();
-  d.msgs = (d.msgs || 0) + 1;
-  if (now - (d.last || 0) < 60_000) { store.set('levels', key(message.guild.id, message.author.id), d); return; }
-  const before = levelFromXp(d.xp).level;
-  d.xp += Math.round(randomInt(15, 25) * (cfg.multiplier || 1));
+  if (now - (d.last || 0) < 60_000) {
+    d.msgs = (d.msgs || 0) + 1;
+    store.set('levels', key(message.guild.id, message.author.id), d);
+    return;
+  }
   d.last = now;
   store.set('levels', key(message.guild.id, message.author.id), d);
-  const after = levelFromXp(d.xp).level;
-  if (after > before) {
-    const roles = await applyRewards(message.member, after);
-    const text = fillTemplate(cfg.message, { member: message.member, extra: { level: String(after) } }) +
-      (roles.length ? `\nNeue Rolle: ${roles.map(r => `<@&${r.id}>`).join(', ')}` : '');
-    const target = message.guild.channels.cache.get(cfg.channel) || message.channel;
-    await target.send({ content: text, allowedMentions: { users: [message.author.id] } }).catch(() => {});
+  await addXp(message.member, randomInt(15, 25), { channel: message.channel, stat: 'msgs' });
+}
+
+/** Jede Minute: XP für Zeit im Sprachkanal (nicht allein, nicht taub, nicht im AFK-Kanal). */
+async function voiceTick(client) {
+  for (const guild of client.guilds.cache.values()) {
+    const cfg = getConfig(guild.id);
+    const v = cfg.levels.voice;
+    for (const ch of guild.channels.cache.values()) {
+      if (!ch.isVoiceBased() || ch.id === guild.afkChannelId) continue;
+      const humans = ch.members.filter(m => !m.user.bot);
+      if (humans.size < (v?.minMembers || 2)) continue;
+      for (const m of humans.values()) {
+        if (m.voice.selfDeaf || m.voice.serverDeaf) continue;
+        if (cfg.levels.enabled && v?.enabled) await addXp(m, v.perMinute || 8, { channel: ch, stat: 'voiceMin' });
+        require('./quests').progress(m, 'voice', 1, ch);
+      }
+    }
   }
 }
 
@@ -102,4 +141,4 @@ async function rankPayload(member) {
   };
 }
 
-module.exports = { needFor, levelFromXp, xpForLevel, getData, leaderboard, rankOf, onMessage, setXp, rankPayload, applyRewards };
+module.exports = { needFor, levelFromXp, xpForLevel, getData, leaderboard, rankOf, onMessage, addXp, voiceTick, setXp, rankPayload, applyRewards };

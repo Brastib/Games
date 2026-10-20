@@ -24,7 +24,8 @@ async function test(name, fn) {
   console.log('\n📦 Module');
   const { commands } = require('../src/handlers/interactions');
   await test('Alle Module laden ohne Fehler', () => {
-    for (const f of fs.readdirSync(path.join(__dirname, '../src/modules'))) require(`../src/modules/${f}`);
+    const walkDir = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => (e.isDirectory() ? walkDir(path.join(dir, e.name)) : e.name.endsWith('.js') ? [path.join(dir, e.name)] : []));
+    for (const f of walkDir(path.join(__dirname, '../src'))) if (!f.endsWith('index.js')) require(f);
   });
 
   console.log('\n⌨️  Slash-Befehle');
@@ -175,6 +176,32 @@ async function test(name, fn) {
     assert.strictEqual(dump(g), before, 'Berechtigungen nach dem Ende identisch');
   });
 
+  console.log('\n🔊 Temp-Sprachkanäle (nachgebauter Kanal)');
+  const tempvoice = require('../src/modules/tempvoice');
+  await test('Sperren, Bannen, Entbannen, Übertragen + gemerkte Bannliste', async () => {
+    const g = fakeGuild();
+    g.id = 'g-tv';
+    const ch = { id: 'vc1', name: 'Kanal', guild: g, client: g.client, permissionOverwrites: fakeOverwrites([{ id: 'guild', type: 0, allow: 0n, deny: 0n }, { id: 'role-member', type: 0, allow: F.Connect, deny: 0n }]), members: new Collection(), setUserLimit: async () => {} };
+    ch.permissionOverwrites.delete = async id => { ch.permissionOverwrites.cache.delete(id); };
+    store.set('tempvoice', 'vc1', { guildId: 'g-tv', ownerId: 'owner1', createdAt: Date.now(), locked: false, hidden: false, banned: [] });
+    const r = tempvoice.rec('vc1');
+    const ow = () => ch.permissionOverwrites.cache;
+    await tempvoice.actions.lock(ch, r, true);
+    assert(ow().get('guild').deny.has(F.Connect) && ow().get('role-member').deny.has(F.Connect), 'gesperrt');
+    await tempvoice.actions.permit(ch, r, ['friend']);
+    assert(ow().get('friend').allow.has(F.Connect), 'Freund darf rein');
+    await tempvoice.actions.ban(ch, r, ['troll']);
+    assert(ow().get('troll').deny.has(F.Connect) && ow().get('troll').deny.has(F.ViewChannel), 'gebannt');
+    assert.deepStrictEqual(tempvoice.getPrefs('g-tv', 'owner1').banned, ['troll'], 'Bannliste gemerkt');
+    await tempvoice.actions.unban(ch, r, ['troll']);
+    assert(!ow().has('troll') && tempvoice.getPrefs('g-tv', 'owner1').banned.length === 0, 'entbannt');
+    await tempvoice.actions.lock(ch, r, false);
+    assert(!ow().get('guild').deny.has(F.Connect), 'wieder offen');
+    await tempvoice.actions.transfer(ch, r, 'friend');
+    assert.strictEqual(tempvoice.rec('vc1').ownerId, 'friend');
+    assert(ow().get('friend').allow.has(F.ManageChannels), 'neuer Besitzer hat Rechte');
+  });
+
   console.log('\n🤖 AutoMod (nachgebaute Nachrichten)');
   const automod = require('../src/modules/automod');
   function fakeMessage(content, { staff = false } = {}) {
@@ -202,6 +229,143 @@ async function test(name, fn) {
     let last;
     for (let k = 0; k < 7; k++) { last = fakeMessage(`nachricht ${k}`); last.msg.author.id = 'spammer'; last.msg.member.id = 'spammer'; await automod.handle(last.msg); }
     assert(last.state.deleted && last.state.timeout);
+  });
+
+  // ---------- Fake-Mitglied für Quests/Level/Münzen ----------
+  function fakeMember(id, guildId = 'g-q') {
+    const sent = [];
+    const guild = { id: guildId, roles: { cache: new Collection() }, channels: { cache: new Collection() } };
+    const channel = { isTextBased: () => true, send: async m => { sent.push(m); return { delete: async () => {} }; } };
+    return { id, guild, user: { id, bot: false, displayAvatarURL: () => '' }, roles: { cache: new Collection(), add: async () => {} }, displayName: id, sent, channel };
+  }
+
+  console.log('\n🗓️  Quests, Level & Münzen');
+  const quests = require('../src/modules/quests');
+  const economy = require('../src/modules/economy');
+  await test('Tages-Quests sind pro Person und Tag fest und passen zur Einstellung', () => {
+    const a = quests.todays('g-q', 'u1'), b = quests.todays('g-q', 'u1');
+    assert.deepStrictEqual(a, b);
+    assert.strictEqual(a.length, 3);
+    assert(a.every(q => q.target > 0 && q.xp > 0 && q.coins > 0));
+    assert(!a.some(q => q.id === 'clip'), 'Clip-Quest nur mit Clip-Kanal');
+  });
+  await test('Quest erledigen gibt XP + Münzen, alle erledigen gibt Bonus + Serie', async () => {
+    const m = fakeMember('u2');
+    const list = quests.todays('g-q', 'u2');
+    const xp0 = lv.getData('g-q', 'u2').xp;
+    for (const q of list) await quests.progress(m, q.id, q.target, m.channel);
+    const st = quests.state('g-q', 'u2');
+    assert.strictEqual(st.done.length, list.length);
+    assert.strictEqual(st.streak, 1);
+    assert(lv.getData('g-q', 'u2').xp > xp0 + list.reduce((s, q) => s + q.xp, 0), 'Bonus-XP fehlt');
+    assert(economy.balance('g-q', 'u2') >= list.reduce((s, q) => s + q.coins, 0) + 100);
+    assert(m.sent.length >= list.length, 'Meldung im Chat');
+  });
+  await test('Tagesbelohnung nur einmal, Überweisen prüft Kontostand', () => {
+    const m = fakeMember('u3');
+    const r1 = economy.daily(m), r2 = economy.daily(m);
+    assert(r1.ok && r1.amount === 100 && !r2.ok);
+    assert(!economy.transfer('g-q', 'u3', 'u4', 1000));
+    assert(economy.transfer('g-q', 'u3', 'u4', 40));
+    assert.strictEqual(economy.balance('g-q', 'u4'), 40);
+  });
+  await test('Level-Up wird gemeldet', async () => {
+    const m = fakeMember('u5');
+    const r = await lv.addXp(m, 150, { channel: m.channel });
+    assert(r.levelUp && r.level === 1 && m.sent.length === 1);
+  });
+
+  console.log('\n🎬 Clips');
+  const clips = require('../src/modules/clips');
+  await test('Clips erkennen (Video-Datei, Medal, Twitch-Clip) – normale Links nicht', () => {
+    const msg = (content, att = []) => ({ content, attachments: new Collection(att.map((a, k) => [String(k), a])) });
+    assert(clips.isClip(msg('', [{ name: 'clutch.mp4', contentType: 'video/mp4' }])));
+    assert(clips.isClip(msg('https://medal.tv/games/valorant/clips/abc')));
+    assert(clips.isClip(msg('https://clips.twitch.tv/Name')));
+    assert(!clips.isClip(msg('https://example.org/text')));
+    assert(!clips.isClip(msg('', [{ name: 'bild.png', contentType: 'image/png' }])));
+  });
+
+  console.log('\n🛠️  Dashboard-Eingaben');
+  const { applyChanges } = require('../src/web/schema');
+  const fg = {
+    id: 'g-s',
+    channels: { cache: new Collection([['111', { id: '111', type: ChannelType.GuildText }], ['222', { id: '222', type: ChannelType.GuildVoice }], ['333', { id: '333', type: ChannelType.GuildCategory }]]) },
+    roles: { cache: new Collection([['g-s', { id: 'g-s' }], ['900', { id: '900' }]]) },
+  };
+  await test('Gültige Werte werden übernommen', () => {
+    const c = getConfig('g-s');
+    const r = applyChanges(c, { 'welcome.channel': '111', 'automod.spam.maxMessages': 8, 'tempvoice.hubs': [{ id: '222', category: '333', nameTemplate: '🎮 {name}', limit: 4 }], 'levels.rewards': { 10: '900' }, 'automod.links.allow': ['https://www.MeineSeite.de/x'] }, fg, { isOwner: false });
+    assert.deepStrictEqual(r.errors, {});
+    assert.strictEqual(c.welcome.channel, '111');
+    assert.strictEqual(c.tempvoice.hubs[0].limit, 4);
+    assert.deepStrictEqual(c.automod.links.allow, ['meineseite.de']);
+  });
+  await test('Ungültige Werte, falsche Kanaltypen und Fremd-Schlüssel werden abgelehnt', () => {
+    const c = getConfig('g-s');
+    const r = applyChanges(c, { 'welcome.channel': '222', 'automod.spam.maxMessages': 999, 'tempvoice.hubs': [{ id: '111' }], 'lockdown.active': true, 'antinuke.enabled': false, 'automod.links.allow': ['kein domain'] }, fg, { isOwner: false });
+    for (const k of ['welcome.channel', 'automod.spam.maxMessages', 'tempvoice.hubs', 'lockdown.active', 'antinuke.enabled', 'automod.links.allow']) assert(r.errors[k], `${k} hätte abgelehnt werden müssen`);
+    assert.strictEqual(c.antinuke.enabled, true);
+    assert.strictEqual(c.lockdown.active, false);
+  });
+
+  console.log('\n🌐 Web-Server (Dashboard-API)');
+  await test('Statusseite, Login-Schutz, Einstellungen speichern', async () => {
+    process.env.PORT = '3987';
+    process.env.DISCORD_CLIENT_SECRET = 'test';
+    const guild = {
+      ...fg, name: 'Testserver', ownerId: 'owner', memberCount: 3, iconURL: () => null,
+      members: { cache: new Collection(), fetch: async () => ({ permissions: { has: () => true } }) },
+    };
+    for (const c of guild.channels.cache.values()) Object.assign(c, { name: 'k' + c.id, parentId: null, rawPosition: 0, isThread: () => false });
+    for (const r of guild.roles.cache.values()) Object.assign(r, { name: 'r', position: 1, managed: false, editable: true, color: 0 });
+    const client = { isReady: () => true, user: { id: 'bot', tag: 'Bot#1' }, application: { id: 'bot' }, ws: { ping: 42 }, guilds: { cache: new Collection([['g-s', guild]]) }, users: { fetch: async () => ({ id: 'u', tag: 'u' }) } };
+    require('../src/web/server').start(client);
+    await new Promise(r => setTimeout(r, 300));
+    const base = 'http://127.0.0.1:3987';
+    const health = await (await fetch(base + '/health')).json();
+    assert.strictEqual(health.status, 'online');
+    const page = await (await fetch(base + '/')).text();
+    assert(page.includes('Mit Discord anmelden'));
+    assert.strictEqual((await fetch(base + '/api/me')).status, 401);
+    const sid = 'a'.repeat(64);
+    store.set('sessions', sid, { userId: 'u', username: 'Test', guilds: [{ id: 'g-s', name: 'Testserver' }], exp: Date.now() + 60_000 });
+    const H = { cookie: `sid=${sid}`, 'content-type': 'application/json' };
+    const me = await (await fetch(base + '/api/me', { headers: H })).json();
+    assert.strictEqual(me.guilds[0].botPresent, true);
+    const gd = await (await fetch(base + '/api/guild/g-s', { headers: H })).json();
+    assert.strictEqual(gd.guild.name, 'Testserver');
+    assert(!('backup' in gd.config.lockdown), 'interne Daten nicht ausgeben');
+    const noCsrf = await fetch(base + '/api/guild/g-s/config', { method: 'PATCH', headers: H, body: JSON.stringify({ changes: { 'levels.enabled': false } }) });
+    assert.strictEqual(noCsrf.status, 403);
+    const okRes = await (await fetch(base + '/api/guild/g-s/config', { method: 'PATCH', headers: { ...H, 'x-requested-with': 'dashboard' }, body: JSON.stringify({ changes: { 'levels.enabled': false } }) })).json();
+    assert.deepStrictEqual(okRes.applied, ['levels.enabled']);
+    assert.strictEqual(getConfig('g-s').levels.enabled, false);
+  });
+
+  console.log('\n🎵 Musik');
+  await test('ffmpeg → Opus → Discord-Audio-Ressource funktioniert', async () => {
+    const { spawn } = require('child_process');
+    const { createAudioResource, StreamType } = require('@discordjs/voice');
+    const ff = spawn(require('ffmpeg-static'), ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2', '-af', 'volume=0.8,bass=g=12', '-c:a', 'libopus', '-b:a', '128k', '-ar', '48000', '-ac', '2', '-f', 'ogg', 'pipe:1']);
+    const res = createAudioResource(ff.stdout, { inputType: StreamType.OggOpus });
+    let packets = 0;
+    await new Promise((resolve, reject) => {
+      res.playStream.on('data', () => { packets++; });
+      res.playStream.on('end', resolve);
+      res.playStream.on('error', reject);
+      setTimeout(resolve, 8000);
+    });
+    assert(packets >= 90, `nur ${packets} Opus-Pakete (erwartet ~100 für 2 Sek.)`);
+  });
+  await test('Alle Audio-Filter sind gültige ffmpeg-Filter', async () => {
+    const { spawnSync } = require('child_process');
+    const { FILTERS } = require('../src/modules/music/player');
+    for (const [name, f] of Object.entries(FILTERS)) {
+      if (!f.af) continue;
+      const r = spawnSync(require('ffmpeg-static'), ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=d=0.3', '-af', `${f.af},volume=1`, '-f', 'null', '-']);
+      assert.strictEqual(r.status, 0, `Filter ${name}: ${r.stderr}`);
+    }
   });
 
   console.log('\n🖼️  Bildkarten');
