@@ -159,6 +159,7 @@ const SCHEMA = {
   'posts.leaderboard.enabled': v.bool(), 'posts.leaderboard.channel': v.channel(TEXT), 'posts.leaderboard.weekday': v.int(0, 6),
   'posts.leaderboard.time': v.time(), 'posts.leaderboard.text': v.str(300, 1), 'posts.leaderboard.everyDays': v.int(1, 30),
 
+  quiet: v.bool(),
   autoresponders: v.autoresponders(),
   'stats.enabled': v.bool(),
   'suggestions.channel': v.channel(TEXT),

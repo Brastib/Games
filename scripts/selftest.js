@@ -710,6 +710,19 @@ async function test(name, fn) {
     assert(await migrate.isBotOwner({ id: 't1' }, team), 'Team-Mitglied');
   });
 
+  await test('Ruhemodus: zählt XP still, postet keine Level-Ups', async () => {
+    const posted = [];
+    const ch = { isTextBased: () => true, send: async m => { posted.push(m); } };
+    const av = () => 'https://cdn.discordapp.com/embed/avatars/0.png';
+    const member = { id: 'q1', user: { id: 'q1', bot: false, username: 'q', displayAvatarURL: av }, displayName: 'q', displayAvatarURL: av, guild: { id: 'g-quiet', channels: { cache: new Collection() } }, roles: { cache: new Collection() } };
+    getConfig('g-quiet').quiet = true;
+    const r = await lv.addXp(member, 500, { channel: ch });
+    assert(r.levelUp && posted.length === 0, 'kein Post im Ruhemodus');
+    getConfig('g-quiet').quiet = false;
+    await lv.addXp(member, 1000, { channel: ch });
+    assert.strictEqual(posted.length, 1, 'danach wieder Level-Up-Meldung');
+  });
+
   console.log('\n🎨 Rot-Schwarz-Theme');
   await test('Keine blauen/grünen Buttons und Embed-Farben (außer frei wählbaren Rollen-Buttons)', () => {
     const { COLORS } = require('../src/lib/embeds');

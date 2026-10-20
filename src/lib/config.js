@@ -20,6 +20,9 @@ const DEFAULT_ALLOW = [
 
 function defaults() {
   return {
+    // Ruhemodus: auf neuen Servern zählt der Bot still mit (XP, Quests), postet aber keine Level-Up-/Quest-Meldungen,
+    // bis /nb gelaufen ist oder er im Dashboard ausgeschaltet wird – damit neben dem alten Bot nichts doppelt kommt.
+    quiet: false,
     modRoles: [],
     logs: { fallback: null, mod: null, messages: null, members: null, server: null, voice: null, protection: null },
     welcome: {

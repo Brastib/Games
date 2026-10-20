@@ -32,6 +32,7 @@ const alert = require('./modules/alert');
 const backups = require('./modules/backups');
 const platforms = require('./lib/platforms');
 const web = require('./web/server');
+const { getConfig, saveConfig } = require('./lib/config');
 
 const client = new Client({
   intents: [I.Guilds, I.GuildMembers, I.GuildMessages, I.MessageContent, I.GuildVoiceStates, I.GuildModeration, I.GuildMessageReactions, I.GuildExpressions, I.GuildPresences],
@@ -202,7 +203,11 @@ client.on(Events.GuildAuditLogEntryCreate, safe('audit', async (entry, guild) =>
   await antinuke.onAuditEntry(entry, guild);
   await logs.auditEntry(entry, guild);
 }));
-client.on(Events.GuildCreate, g => console.log(`[bot] Neuer Server: ${g.name} (${g.memberCount} Mitglieder)`));
+client.on(Events.GuildCreate, safe('guildCreate', async g => {
+  const fresh = !store.has('guilds', g.id);
+  if (fresh) { getConfig(g.id).quiet = true; saveConfig(g.id); }
+  console.log(`[bot] Neuer Server: ${g.name} (${g.memberCount} Mitglieder)${fresh ? ' – Ruhemodus an (keine Level-Up-/Quest-Meldungen bis /nb)' : ''}`);
+}));
 client.on('raw', platforms.onRaw);
 client.on(Events.ShardDisconnect, () => alert.onDisconnect());
 client.on(Events.ShardReconnecting, () => alert.onDisconnect());

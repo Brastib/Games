@@ -272,6 +272,7 @@ function buildPlan(guild, d, x) {
   if (lvCh || xpBits.length) {
     add('⭐ Level', [lvCh ? `Level-Up in ${lvCh}` : null, ...xpBits, 'Formel 100 × Level²'].filter(Boolean).join(' · '), () => {
       const l = cfgOf().levels;
+      l.enabled = true;
       l.formula = 'etc';
       if (lvCh) l.channel = lvCh.id;
       if (num(c.xp_min_msg) != null) l.msgXp = { min: num(c.xp_min_msg), max: num(c.xp_max_msg, num(c.xp_min_msg)) };
@@ -309,7 +310,7 @@ function buildPlan(guild, d, x) {
 
   // 🗓️ Quests
   const qCh = chan(c.quest_channel_id) || chan(d.channels.quest);
-  if (qCh) add('🗓️ Quests', `/quests nur in ${qCh}`, () => { cfgOf().quests.channel = qCh.id; });
+  if (qCh) add('🗓️ Quests', `/quests nur in ${qCh}`, () => Object.assign(cfgOf().quests, { enabled: true, channel: qCh.id }) && null);
 
   // 🧮 Zählspiel
   const cCh = chan(c.counting_channel_id) || d.counting?.channel || null;
@@ -443,6 +444,12 @@ async function apply(guild, plan, { clean = false, by = null } = {}) {
       failed.push(`${it.area} – ${e.message}`);
     }
     saveConfig(guild.id);
+  }
+  // Ab jetzt ist der neue Bot zuständig: Meldungen wieder an
+  if (getConfig(guild.id).quiet) {
+    getConfig(guild.id).quiet = false;
+    saveConfig(guild.id);
+    done.push('🔔 Ruhemodus beendet – Level-Ups und Quest-Meldungen sind jetzt an');
   }
   let removed = 0;
   if (clean) {

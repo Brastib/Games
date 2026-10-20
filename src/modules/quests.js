@@ -102,7 +102,7 @@ async function progress(member, type, amount = 1, channel = null) {
     lines.push(`🏆 **Alle Tages-Quests erledigt!** Bonus **+${bonusXp} XP** · **+${bonusCoins} ${cfg.economy.emoji}** · Serie: **${s.streak} 🔥**`);
   }
   store.set('quests', k, s);
-  if (cfg.quests.announce && channel?.isTextBased?.()) {
+  if (cfg.quests.announce && !cfg.quiet && channel?.isTextBased?.()) {
     const m = await channel.send({ content: `<@${member.id}>`, embeds: [new EmbedBuilder().setColor(COLORS.ok).setDescription(lines.join('\n'))], allowedMentions: { users: [member.id] } }).catch(() => null);
     if (m) setTimeout(() => m.delete().catch(() => {}), 30_000);
   }

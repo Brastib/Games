@@ -692,6 +692,7 @@ const SECTIONS = [
       ['alert.mentions', 'list', 'Diese Personen anpingen (Nutzer-IDs)', '123456789012345678'],
       ['alert.message', 'textarea', 'Alarm-Nachricht'],
     ] },
+    { title: '🔕 Ruhemodus', note: 'Auf neuen Servern zählt der Bot still mit (XP, Quests), postet aber keine Level-Up- und Quest-Meldungen – damit neben dem alten Bot nichts doppelt kommt. /nb schaltet ihn automatisch aus.', fields: [['quiet', 'toggle', 'Ruhemodus an']] },
     { title: '🔄 Übernahme vom alten Bot', custom: 'migration', note: 'In Discord /nb eingeben (nur der Besitzer des Bots sieht den Befehl). Der Bot liest, was der alte Bot gepostet und eingestellt hat, zeigt einen Plan und übernimmt erst nach deinem Klick. Mit dashboard: und passwort: kommen auch alle XP mit.', fields: [] },
     { title: '💾 Backups', custom: 'backups', note: 'Täglich automatisch. Vor jeder Wiederherstellung wird der aktuelle Stand zusätzlich gesichert.', fields: [
       ['backups.enabled', 'toggle', 'Tägliche Backups'],
@@ -1113,6 +1114,7 @@ function render() {
   if (!S.me) return app.append(loginView());
   if (!S.g) return app.append(pickerView());
   for (const w of S.g.warnings || []) app.append(h('p', { class: 'banner alert' }, `⚠️ ${w}`));
+  if (S.g.config.quiet) app.append(h('p', { class: 'banner' }, '🔕 Ruhemodus: Der Bot zählt still mit, postet aber keine Level-Ups und Quest-Meldungen. Aus mit /nb oder unter System.'));
   const nav = h('nav', { class: 'side', 'aria-label': 'Bereiche' }, SECTIONS.map((s, i) =>
     h('button', { class: s.id === S.section ? 'on' : null, onclick: () => { S.section = s.id; try { localStorage.setItem('dash.section', s.id); } catch { /* egal */ } render(); window.scrollTo({ top: 0 }); } },
       h('span', { class: 'n' }, String(i + 1).padStart(2, '0')), s.label)));
