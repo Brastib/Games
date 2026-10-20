@@ -213,6 +213,7 @@ function start(client) {
       guild: { id: guild.id, name: guild.name, icon: guild.iconURL({ size: 128 }), memberCount: guild.memberCount, ownerId: guild.ownerId },
       isOwner, config: publicConfig(cfg), channels, roles,
       migration: store.get('migrations', guild.id) || null,
+      events: require('../modules/events').list(guild.id).filter(e => !e.ended).map(e => ({ id: e.id, name: e.name, at: e.at, going: e.going.length, channelId: e.channelId })),
       warnings: (client.limitedIntents || []).map(x => `${x.name} ist im Developer Portal aus – ohne funktioniert nicht: ${x.loses}.`),
       stats: {
         tempvoice: store.values('tempvoice').filter(r => r.guildId === guild.id).length,
@@ -314,6 +315,14 @@ function start(client) {
         if (!a.isOwner) throw new Error('Nur der Server-Inhaber kann ein Backup zurückspielen.');
         const r = require('../modules/backups').restore(g.id, req.body.backupId);
         message = `Wiederhergestellt (${r.restored} Einträge). Der vorherige Stand wurde vorher gesichert.`;
+      } else if (type === 'archiveSetup') {
+        const r = await require('../modules/tickets').setupArchive(g);
+        message = `Archiv bereit: ${r.category.name} · #${r.channel.name}.`;
+      } else if (type === 'archivePurge') {
+        message = `${await require('../modules/tickets').purgeArchive(g)} archivierte Tickets gelöscht.`;
+      } else if (type === 'eventEnd') {
+        await require('../modules/events').end(g, Number(req.body.eventId));
+        message = 'Event beendet.';
       } else if (type === 'setupStats') {
         await require('../modules/extras').setupStats(g);
         message = 'Statistik-Kanäle erstellt.';

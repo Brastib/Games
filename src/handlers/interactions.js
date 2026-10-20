@@ -15,7 +15,7 @@ const dashboard = require('../modules/dashboard');
 const economy = require('../modules/economy');
 const extras = require('../modules/extras');
 
-const FILES = ['moderation', 'protection', 'setup', 'features', 'levels', 'community', 'music', 'extras', 'info'];
+const FILES = ['moderation', 'protection', 'setup', 'features', 'levels', 'community', 'music', 'extras', 'fun', 'info'];
 const commands = new Collection();
 for (const f of FILES) {
   for (const cmd of require(`../commands/${f}`)) {
@@ -73,6 +73,7 @@ async function onInteraction(i) {
         case 'dash': return await dashboard.handleButton(i, [action, value]);
         case 'mu': return await require('../commands/music').handleButton(i, action);
         case 'sg': return await extras.onSuggestionButton(i, action);
+        case 'ev': return await require('../modules/events').onButton(i, action, Number(value));
         case 'nb': return await require('../modules/migrate').handleButton(i, action, value);
         case 'lb': return await i.update({ content: '', files: [], attachments: [], ...leaderboardPayload(i.guild, parseInt(value, 10) || 0, action) });
       }

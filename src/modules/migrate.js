@@ -362,7 +362,12 @@ function buildPlan(guild, d, x) {
       else await tPanel.send(tickets.panelMessage());
     });
   }
-  if (c.support_archive_category_id || d.channels.archivePanel) skipped.push(['🗄️ Ticket-Archiv', 'kommt mit der Ticket-Archiv-Funktion (Trello-Karte)']);
+  const arch = chan(c.support_archive_category_id);
+  if (arch) add('🗄️ Ticket-Archiv', `Kategorie ${arch.name} · neuer Kanal #archiv-verwaltung mit „Archiv leeren“`, async () => {
+    cfgOf().tickets.archiveCategory = arch.id;
+    cfgOf().tickets.archiveChannel = null;
+    await require('./tickets').setupArchive(guild);
+  });
 
   // 🎭 Rollen-Buttons (aus den Nachrichten)
   for (const rp of d.rolePanels) {
@@ -404,7 +409,11 @@ function buildPlan(guild, d, x) {
   if (c.backup_retention_count) add('💾 Backups', `täglich, ${c.backup_retention_count} behalten`, () => Object.assign(cfgOf().backups, { enabled: c.backup_enabled !== undefined ? on(c.backup_enabled) : true, keep: Math.min(30, Math.max(1, num(c.backup_retention_count, 7))) }));
   if (c.enable_automod !== undefined) add('🤖 AutoMod', on(c.enable_automod) ? 'an' : 'aus', () => { cfgOf().automod.enabled = on(c.enable_automod); });
   if (c.enable_antispam === '0' || c.enable_antiraid === '0') skipped.push(['🛡️ Spam-/Raid-Schutz', 'war im alten Bot aus – bleibt im neuen an (empfohlen), im Dashboard abschaltbar']);
-  if (on(c.enable_fun) || c.bot_prefix) skipped.push(['🎉 Fun- & Prefix-Befehle', 'kommen noch (Trello-Karte)']);
+  if (c.enable_fun !== undefined) add('🎲 Fun-Befehle', `${on(c.enable_fun) ? 'an' : 'aus'} (/8ball, /ssp, /münze, /würfel)`, () => { cfgOf().fun.enabled = on(c.enable_fun); });
+  if (c.enable_channel_manager !== undefined || c.bot_prefix) {
+    const ch = String(c.bot_prefix || '!').trim().slice(0, 3) || '!';
+    add('❗ Prefix-Befehle', `${on(c.enable_channel_manager ?? '1') ? 'an' : 'aus'} · ${ch}createvoice / ${ch}createtext`, () => Object.assign(cfgOf().prefix, { enabled: on(c.enable_channel_manager ?? '1'), char: ch }) && null);
+  }
   if (c.temp_voice_roles_whitelist || c.voice_blacklist_roles) skipped.push(['🔊 Temp-Voice-Rollenlisten', 'gibt es im neuen Bot noch nicht']);
 
   // 🧽 alte Panels (nur bei „aufräumen“)

@@ -35,6 +35,9 @@ Vorbilder waren Carl-bot und MEE6, aber alles ist kostenlos und gehört dir.
 | 🎮 **Gratis-Spiele** | Kostenlose Spiele von Epic Games und Steam automatisch ankündigen, abgelaufene Angebote werden wieder gelöscht. |
 | 🚨 **Notfall-Alarm** | Meldung per Discord-Webhook bei Absturz oder Verbindungsverlust, „wieder online“ danach. |
 | 💾 **Backups** | Täglich automatisch pro Server, „Jetzt sichern“, herunterladen, zurückspielen (vorher wird der aktuelle Stand gesichert). |
+| 📅 **Events** | `/event erstellen` (z. B. „morgen 20:00“) mit Knöpfen „Bin dabei“/„Absagen“, Teilnehmerliste, Erinnerung 15 Min. vorher. |
+| 🎲 **Spaß & Prefix** | `/8ball`, `/ssp`, `/münze`, `/würfel`; wie beim alten Bot `!createvoice` und `!createtext`. |
+| 🗄️ **Ticket-Archiv** | Geschlossene Tickets wandern ins Archiv (nur Team liest mit), `#archiv-verwaltung` mit „Archiv leeren“. |
 | 🎉 **Extras** | Gewinnspiele, Umfragen, Vorschläge mit Abstimmung (`/suggest`), Erinnerungen (`/remind`), Auto-Antworten, Statistik-Kanäle (Mitgliederzahl), Embed-Baukasten, Rollen per Button. |
 
 ---
@@ -142,13 +145,13 @@ sudo npm i -g pm2 && pm2 start src/index.js --name discord-bot && pm2 save && pm
 
 ```bash
 npm install
-npm run check   # 58 Selbsttests ohne Discord: Befehle, Linkschutz, Lockdown, Temp-Voice, AutoMod, Level-Formeln, XP-Import,
+npm run check   # 63 Selbsttests ohne Discord: Befehle, Linkschutz, Lockdown, Temp-Voice, AutoMod, Level-Formeln, XP-Import,
                 # Quests, Münzen, Clips, Dashboard-API, Passwort-Login + Sperre, Eingabeprüfung, Audio-Kette (ffmpeg → Opus),
                 # Bildkarten, Wochen-Posts (Zeitplan inkl. Sommer-/Winterzeit), Rot-Schwarz-Farben
 npm start
 ```
 
-**Aufbau:** `src/index.js` (Start, Ereignisse, Zeitplaner) · `src/commands/` (64 Slash-Befehle) · `src/modules/` (Funktionen, `music/` für den Player) · `src/web/` (Dashboard: `server.js`, `schema.js` = erlaubte Einstellungen, `public/index.html` = Oberfläche) · `src/lib/` (Speicher, Linkfilter, Bildkarten) · `scripts/selftest.js`
+**Aufbau:** `src/index.js` (Start, Ereignisse, Zeitplaner) · `src/commands/` (69 Slash-Befehle) · `src/modules/` (Funktionen, `music/` für den Player) · `src/web/` (Dashboard: `server.js`, `schema.js` = erlaubte Einstellungen, `public/index.html` = Oberfläche) · `src/lib/` (Speicher, Linkfilter, Bildkarten) · `scripts/selftest.js`
 
 Musik: yt-dlp wird beim ersten `/play` automatisch nach `./bin` geladen und wöchentlich erneuert; ffmpeg kommt aus `ffmpeg-static`.
 

@@ -39,7 +39,7 @@ async function test(name, fn) {
   await test('Namen/Beschreibungen/Auswahlen innerhalb der Discord-Grenzen', () => {
     for (const c of body) {
       walk(c, (o) => {
-        assert(/^[-_a-z0-9]{1,32}$/.test(o.name), `Ungültiger Name: ${o.name}`);
+        assert(/^[-_\p{Ll}\p{Lo}\p{N}]{1,32}$/u.test(o.name) && o.name === o.name.toLowerCase(), `Ungültiger Name: ${o.name}`); // Discord-Regel: Kleinbuchstaben inkl. Umlaute
         assert(o.description && o.description.length <= 100, `Beschreibung zu lang/leer: ${c.name}/${o.name} (${o.description?.length})`);
         assert((o.options || []).length <= 25, `Zu viele Optionen in ${o.name}`);
         for (const ch of o.choices || []) assert(ch.name.length <= 100, `Auswahl zu lang: ${ch.name}`);
@@ -721,6 +721,53 @@ async function test(name, fn) {
     getConfig('g-quiet').quiet = false;
     await lv.addXp(member, 1000, { channel: ch });
     assert.strictEqual(posted.length, 1, 'danach wieder Level-Up-Meldung');
+  });
+
+  console.log('\n🎲 Events, Fun, Prefix, Ticket-Archiv');
+  await test('Events verstehen deutsche Zeitangaben (Sommer- und Winterzeit)', () => {
+    const ev = require('../src/modules/events');
+    const now = Date.UTC(2026, 9, 20, 13, 0); // 15:00 in Berlin
+    assert.strictEqual(ev.parseWhen('heute 20:00', now), Date.UTC(2026, 9, 20, 18, 0));
+    assert.strictEqual(ev.parseWhen('morgen 18:30', now), Date.UTC(2026, 9, 21, 16, 30));
+    assert.strictEqual(ev.parseWhen('24.10. 20 Uhr', now), Date.UTC(2026, 9, 24, 18, 0));
+    assert.strictEqual(ev.parseWhen('05.12.2026 20:00', now), Date.UTC(2026, 11, 5, 19, 0), 'Winterzeit');
+    assert.strictEqual(ev.parseWhen('irgendwann', now), null);
+  });
+  await test('Event-Zusagen: dabei ↔ abgesagt, Erinnerung genau einmal', async () => {
+    const ev = require('../src/modules/events');
+    const sent = [];
+    const ch = { id: 'evc', send: async m => { sent.push(m.content); return { id: 'm1' }; }, messages: { edit: async () => {} } };
+    const g = { id: 'g-ev', channels: { cache: new Collection([['evc', ch]]) } };
+    const e = await ev.create({ ...ch, guild: g }, { id: 'host' }, { name: 'Spieleabend', at: Date.now() + 10 * 60_000 });
+    let upd;
+    const click = (user, action) => ev.onButton({ guild: g, user: { id: user }, update: async p => { upd = p; }, reply: async () => {} }, action, e.id);
+    await click('a', 'yes'); await click('b', 'yes'); await click('a', 'no');
+    const saved = store.get('events', `g-ev:${e.id}`);
+    assert.deepStrictEqual([saved.going, saved.notGoing], [['host', 'b'], ['a']]);
+    assert.match(upd.embeds[0].data.fields[1].name, /Dabei \(2\)/);
+    const client = { guilds: { cache: new Collection([['g-ev', g]]) } };
+    await ev.processTimers(client); await ev.processTimers(client);
+    assert.strictEqual(sent.filter(t => /startet/.test(t || '')).length, 1, 'eine Erinnerung');
+  });
+  await test('Prefix-Befehle: nur mit Zeichen, Hinweis ohne Sprachkanal', async () => {
+    const pre = require('../src/modules/prefix');
+    const replies = [];
+    const m = content => ({ content, guild: { id: 'g-pre' }, member: { voice: { channel: null } }, reply: async r => { replies.push(r.content); } });
+    assert.strictEqual(await pre.onMessage(m('hallo !createvoice')), false);
+    assert.strictEqual(await pre.onMessage(m('!unbekannt')), false);
+    assert.strictEqual(await pre.onMessage(m('!createvoice Zocken')), true);
+    assert.match(replies[0], /Geh zuerst in einen Sprachkanal/);
+    getConfig('g-pre').prefix.enabled = false;
+    assert.strictEqual(await pre.onMessage(m('!createvoice')), false);
+  });
+  await test('Ticket-Archiv leeren löscht nur archivierte Tickets', async () => {
+    const tk = require('../src/modules/tickets');
+    const deleted = [];
+    const mk = (id, parentId) => [id, { id, parentId, type: ChannelType.GuildText, delete: async () => { deleted.push(id); } }];
+    const g = { id: 'g-arch', channels: { cache: new Collection([mk('a1', 'cat'), mk('a2', 'cat'), mk('mgmt', 'cat'), mk('other', 'x')]) } };
+    Object.assign(getConfig('g-arch').tickets, { archiveCategory: 'cat', archiveChannel: 'mgmt' });
+    assert.strictEqual(await tk.purgeArchive(g), 2);
+    assert.deepStrictEqual(deleted, ['a1', 'a2']);
   });
 
   console.log('\n🎨 Rot-Schwarz-Theme');

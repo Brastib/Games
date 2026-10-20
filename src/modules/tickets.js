@@ -158,7 +158,53 @@ async function close(interaction, reason = 'Kein Grund angegeben') {
   const user = await interaction.client.users.fetch(t.userId).catch(() => null);
   user?.send({ content: `Dein Ticket #${t.number} auf **${interaction.guild.name}** wurde geschlossen. Hier ist das Protokoll:`, files: [new AttachmentBuilder(Buffer.from(text, 'utf8'), { name: `ticket-${t.number}.txt` })] }).catch(() => {});
   store.delete('tickets', channel.id);
+  const archive = interaction.guild.channels.cache.get(cfg.tickets.archiveCategory);
+  if (archive?.type === ChannelType.GuildCategory) {
+    // Ins Archiv: nur noch lesbar für das Team, die Person sieht ihr Ticket nicht mehr
+    setTimeout(() => toArchive(channel, archive, t).catch(e => console.error('[ticket-archiv]', e.message)), 3000);
+    return;
+  }
   setTimeout(() => channel.delete(`Ticket geschlossen von ${interaction.user.tag}`).catch(() => {}), 5000);
+}
+
+async function toArchive(channel, archive, t) {
+  await channel.setParent(archive.id, { lockPermissions: true });
+  await channel.setName(`archiv-${String(t.number).padStart(4, '0')}`).catch(() => {});
+  await channel.send({ embeds: [new EmbedBuilder().setColor(COLORS.mod).setDescription(`🗄️ Archiviert <t:${Math.floor(Date.now() / 1000)}:R>. Löschen: Knopf in <#${getConfig(channel.guild.id).tickets.archiveChannel}>.`)] }).catch(() => {});
+}
+
+/** Archiv-Kategorie (nur Team) + #archiv-verwaltung mit „Archiv leeren“-Knopf anlegen */
+async function setupArchive(guild) {
+  const cfg = getConfig(guild.id);
+  const team = [...new Set([...cfg.tickets.supportRoles, ...cfg.modRoles])].filter(r => guild.roles.cache.has(r));
+  const overwrites = [
+    { id: guild.roles.everyone.id, deny: [P.ViewChannel] },
+    { id: guild.client.user.id, allow: [P.ViewChannel, P.SendMessages, P.ManageChannels, P.ReadMessageHistory] },
+    ...team.map(id => ({ id, allow: [P.ViewChannel, P.ReadMessageHistory], deny: [P.SendMessages] })),
+  ];
+  let cat = guild.channels.cache.get(cfg.tickets.archiveCategory);
+  if (!cat) cat = await guild.channels.create({ name: '🗄️ Ticket-Archiv', type: ChannelType.GuildCategory, permissionOverwrites: overwrites });
+  let mgmt = guild.channels.cache.get(cfg.tickets.archiveChannel);
+  if (!mgmt) {
+    mgmt = await guild.channels.create({ name: 'archiv-verwaltung', type: ChannelType.GuildText, parent: cat.id, permissionOverwrites: overwrites });
+    await mgmt.send({
+      embeds: [new EmbedBuilder().setColor(COLORS.brand).setTitle('🗄️ Ticket-Archiv').setDescription('Geschlossene Tickets landen hier und bleiben nachlesbar.\nMit dem Knopf werden **alle** archivierten Tickets auf einmal gelöscht.')],
+      components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('tk:purge').setLabel('Archiv leeren').setEmoji('🗑️').setStyle(ButtonStyle.Danger))],
+    });
+  }
+  cfg.tickets.archiveCategory = cat.id;
+  cfg.tickets.archiveChannel = mgmt.id;
+  saveConfig(guild.id);
+  return { category: cat, channel: mgmt };
+}
+
+/** Alle archivierten Tickets löschen (die Verwaltung bleibt) */
+async function purgeArchive(guild) {
+  const cfg = getConfig(guild.id).tickets;
+  const old = guild.channels.cache.filter(c => c.parentId === cfg.archiveCategory && c.id !== cfg.archiveChannel && c.type === ChannelType.GuildText);
+  let n = 0;
+  for (const c of old.values()) if (await c.delete('Ticket-Archiv geleert').then(() => true).catch(() => false)) n++;
+  return n;
 }
 
 async function handleButton(interaction, action) {
@@ -167,6 +213,11 @@ async function handleButton(interaction, action) {
   if (action === 'close') return onCloseButton(interaction);
   if (action === 'closeyes') return close(interaction);
   if (action === 'closeno') return interaction.update({ content: 'Abgebrochen.', components: [] });
+  if (action === 'purge') {
+    if (!isStaff(interaction.member)) return respond(interaction, err('Nur das Team darf das Archiv leeren.'));
+    await interaction.deferReply({ flags: EPHEMERAL });
+    return respond(interaction, ok(`${await purgeArchive(interaction.guild)} archivierte Tickets gelöscht.`));
+  }
 }
 
-module.exports = { setup, panelMessage, handleButton, onOpenModal, close };
+module.exports = { setup, panelMessage, handleButton, onOpenModal, close, setupArchive, purgeArchive, toArchive };

@@ -119,6 +119,7 @@ async function tick() {
     await tempvoice.processTimers(client);
     await autoposts.check(client);
     await freegames.check(client);
+    await require('./modules/events').processTimers(client);
   } catch (e) {
     console.error('[zeitplaner]', e);
   } finally {
@@ -155,6 +156,7 @@ client.on(Events.InteractionCreate, onInteraction);
 client.on(Events.MessageCreate, safe('message', async m => {
   if (!m.guild || m.author.bot) return;
   if (await automod.handle(m)) return;
+  if (await require('./modules/prefix').onMessage(m)) return;
   await counting.onMessage(m);
   await leveling.onMessage(m);
   await clips.onMessage(m);

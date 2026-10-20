@@ -61,7 +61,8 @@ function defaults() {
     // hubs: [{ id, category, nameTemplate, limit }] – "Kanal erstellen"-Sprachkanäle (im Dashboard einstellbar)
     tempvoice: { enabled: false, hubs: [], hub: null, category: null, panelChannel: null, nameTemplate: '🔊 {name}', limit: 0, panelInChat: true },
     temptext: { category: null },
-    tickets: { enabled: false, category: null, supportRoles: [], logChannel: null, counter: 0, maxOpen: 1 },
+    // archiveCategory: geschlossene Tickets werden dorthin verschoben (nur lesbar) statt gelöscht
+    tickets: { enabled: false, category: null, supportRoles: [], logChannel: null, counter: 0, maxOpen: 1, archiveCategory: null, archiveChannel: null },
     levels: {
       // formula: 'etc' = wie der bisherige ETC. Bot (Level L braucht insgesamt 100·L² XP), 'mee6' = MEE6-Kurve
       // style: 'embed' = „⬆️ Level Up!“-Karte mit Profilbild, 'text' = einfache Nachricht
@@ -89,6 +90,8 @@ function defaults() {
       failMessage: '❌ {user} hat sich verzählt – richtig wäre **{expected}** gewesen. Rekord: **{record}**. Wir fangen wieder bei **1** an!',
     },
     freegames: { enabled: false, channel: null, deleteExpired: true, role: null },
+    fun: { enabled: true },
+    prefix: { enabled: true, char: '!' }, // !createvoice / !createtext
     alert: { enabled: false, webhook: null, mentions: [], message: '🚨 **ETC. Bot ist offline!** Bitte nachsehen.' },
     backups: { enabled: true, keep: 7 },
     autoresponders: [],

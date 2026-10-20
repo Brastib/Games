@@ -645,6 +645,9 @@ const SECTIONS = [
       ['tickets.logChannel', 'channel', 'Kanal für Protokolle', TXT],
       ['tickets.maxOpen', 'number', 'Offene Tickets pro Person'],
     ] },
+    { title: '🗄️ Ticket-Archiv', custom: 'archive', note: 'Mit Archiv-Kategorie werden geschlossene Tickets dorthin verschoben statt gelöscht – nur das Team kann sie lesen. In #archiv-verwaltung löscht ein Knopf alle auf einmal.', fields: [
+      ['tickets.archiveCategory', 'channel', 'Archiv-Kategorie (leer = Tickets werden gelöscht)', [CT.category]],
+    ] },
   ] },
   { id: 'posts', label: 'Wochen-Posts', cards: [
     { title: '🐱🐶 Tierfoto', action: ['postAnimal', 'Jetzt posten (Test)'], note: 'Jede Woche ein zufälliges Tierfoto. „Eigener Sammel-Kanal“ nimmt Fotos aus einem Kanal, in den euer Server Tierbilder postet – mit Nennung, von wem es ist.', fields: [
@@ -673,6 +676,12 @@ const SECTIONS = [
       ['counting.welcome', 'textarea', 'Willkommensnachricht beim Start'],
       ['counting.failMessage', 'textarea', 'Meldung bei falscher Zahl', null, 'Platzhalter: {user} {expected} {number} {record}'],
     ] },
+    { title: '🎲 Spaß & Prefix-Befehle', note: 'Fun: /8ball, /ssp (Schere-Stein-Papier), /münze, /würfel. Prefix wie beim alten Bot: !createvoice [Name] (eigener Sprachkanal) und !createtext [Name] (Text-Kanal für 24 Std.).', fields: [
+      ['fun.enabled', 'toggle', 'Fun-Befehle an'],
+      ['prefix.enabled', 'toggle', 'Prefix-Befehle an'],
+      ['prefix.char', 'text', 'Prefix-Zeichen'],
+    ] },
+    { title: '📅 Events', custom: 'events', note: 'Events erstellt man in Discord mit /event erstellen (z. B. wann: „morgen 20:00“). Zusagen per Knopf, Erinnerung 15 Min. vorher.', fields: [] },
     { title: '🎮 Gratis-Spiele', action: ['freegamesNow', 'Jetzt prüfen und posten'], note: 'Kündigt kostenlose Spiele von Epic Games und Steam an (alle 3 Stunden geprüft) und löscht die Nachricht, sobald das Angebot vorbei ist.', fields: [
       ['freegames.enabled', 'toggle', 'Gratis-Spiele ankündigen'],
       ['freegames.channel', 'channel', 'Kanal', TXT],
@@ -834,6 +843,18 @@ function cardEl(card) {
 
 // ---------- Eigene Karten-Inhalte ----------
 const CUSTOM = {
+  archive() {
+    return h('div', { class: 'act', style: 'margin-top:12px' },
+      h('button', { class: 'btn small', onclick: e => action('archiveSetup', {}, e.currentTarget) }, 'Archiv einrichten'),
+      twoStep('Archiv jetzt leeren', 'Wirklich alle löschen?', () => action('archivePurge')));
+  },
+  events() {
+    const list = S.g.events || [];
+    if (!list.length) return h('p', { class: 'empty' }, 'Keine Events geplant.');
+    return h('ul', { class: 'hist' }, list.map(e => h('li', {}, '📅',
+      h('div', {}, `#${e.id} ${e.name}`, h('small', {}, `${new Date(e.at).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })} · ✅ ${e.going} Zusagen`)),
+      twoStep('Beenden', 'Wirklich?', () => action('eventEnd', { eventId: e.id })))));
+  },
   migration() {
     const m = S.g.migration;
     if (!m) return h('p', { class: 'empty' }, 'Noch keine Übernahme gemacht.');
@@ -1230,11 +1251,13 @@ function demoData() {
       freegames: { enabled: true, channel: byName('allgemein'), role: null, deleteExpired: true },
       alert: { enabled: false, webhook: null, mentions: [], message: '🚨 **ETC. Bot ist offline!** Bitte nachsehen.' },
       backups: { enabled: true, keep: 7 },
+      fun: { enabled: true }, prefix: { enabled: true, char: '!' },
       posts: {
         animal: { enabled: true, channel: byName('allgemein'), weekday: 0, time: '18:00', source: 'mixed', poolChannel: null, text: '🐱🐶 **Hier ist dein wöchentliches Tierfoto!**' },
         leaderboard: { enabled: true, channel: byName('allgemein'), weekday: 0, everyDays: 1, time: '12:00', text: '🏆 **Die aktuelle Bestenliste!** Wer schreibt sich diese Runde nach oben?' },
       },
     },
+    events: [{ id: 3, name: 'Among-Us-Abend', at: Date.now() + 2 * 86_400_000, going: 7 }, { id: 4, name: 'Minecraft-Turnier', at: Date.now() + 5 * 86_400_000, going: 12 }],
     migration: { at: Date.now() - 2 * 3_600_000, oldBot: 'Red-Sun-Bot#9965', source: 'Discord + altes Dashboard', removed: 2,
       done: ['👋 Willkommen – #willkommen · Auto-Rolle @Neu', '📈 XP & Statistik – 24 Mitglieder übernommen', '🏆 Bestenliste – #level · täglich 12:00', '🧮 Zählspiel – #counting · weiter ab 3'],
       failed: [], skipped: ['🎉 Fun- & Prefix-Befehle: kommen noch'] },
