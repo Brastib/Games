@@ -20,19 +20,21 @@ sudo tee /etc/systemd/system/etc-bot-tunnel.service >/dev/null <<UNIT
 Description=ETC. Bot Dashboard-Tunnel
 After=network-online.target etc-bot.service
 Wants=network-online.target
+# Nie aufgeben, aber Cloudflare nicht fluten (sonst Sperre „429“)
+StartLimitIntervalSec=0
 
 [Service]
 User=$(stat -c %U "$DIR")
 # --metrics: darüber fragt der Bot die aktuelle Adresse ab und schickt sie dir per DM
 ExecStart=$(command -v cloudflared) tunnel --no-autoupdate --metrics 127.0.0.1:20300 --url http://localhost:$PORT
 Restart=always
-RestartSec=10
+RestartSec=120
 
 [Install]
 WantedBy=multi-user.target
 UNIT
 sudo systemctl daemon-reload
-sudo systemctl enable --now etc-bot-tunnel
+sudo systemctl enable etc-bot-tunnel >/dev/null 2>&1
 sudo systemctl restart etc-bot-tunnel
 
 say "3/3 Laptop wach halten"
@@ -49,4 +51,11 @@ for _ in $(seq 1 30); do
   [ -n "$URL" ] && break; sleep 2
 done
 if [ -n "$URL" ]; then echo "🌐 Dashboard: https://$URL  (kommt auch per Discord-DM; bei Neustart neue Adresse)"
-else echo "Noch keine Adresse – in 1–2 Minuten kommt sie per Discord-DM, oder: journalctl -u etc-bot-tunnel | grep trycloudflare"; fi
+else
+  if journalctl -u etc-bot-tunnel -n 20 --no-pager 2>/dev/null | grep -q 'status 429'; then
+    echo "Cloudflare bremst gerade (429, zu viele Versuche). Der Tunnel versucht es alle 2 Minuten selbst neu –"
+    echo "die Adresse kommt per Discord-DM, sobald es klappt (meist nach 10–30 Minuten)."
+  else
+    echo "Noch keine Adresse – sie kommt per Discord-DM, oder: journalctl -u etc-bot-tunnel | grep trycloudflare"
+  fi
+fi
