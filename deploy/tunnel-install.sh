@@ -24,7 +24,7 @@ Wants=network-online.target
 [Service]
 User=$(stat -c %U "$DIR")
 # --metrics: darüber fragt der Bot die aktuelle Adresse ab und schickt sie dir per DM
-ExecStart=$(command -v cloudflared) tunnel --no-autoupdate --metrics 127.0.0.1:20241 --url http://localhost:$PORT
+ExecStart=$(command -v cloudflared) tunnel --no-autoupdate --metrics 127.0.0.1:20300 --url http://localhost:$PORT
 Restart=always
 RestartSec=10
 
@@ -45,7 +45,7 @@ echo "Rückgängig: sudo systemctl unmask sleep.target suspend.target hibernate.
 echo; echo "Warte auf die Dashboard-Adresse …"
 URL=""
 for _ in $(seq 1 30); do
-  URL=$(curl -s --max-time 2 http://127.0.0.1:20241/quicktunnel | grep -oP '"hostname":"\K[^"]+' || true)
+  URL=$(curl -s --max-time 2 http://127.0.0.1:20300/quicktunnel | grep -oP '"hostname":"\K[^"]+' || true)
   [ -n "$URL" ] && break; sleep 2
 done
 if [ -n "$URL" ]; then echo "🌐 Dashboard: https://$URL  (kommt auch per Discord-DM; bei Neustart neue Adresse)"

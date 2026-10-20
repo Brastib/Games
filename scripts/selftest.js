@@ -795,15 +795,19 @@ async function test(name, fn) {
   await test('Tunnel-Adresse wird erkannt und dem Besitzer per DM geschickt', async () => {
     const http = require('http');
     const srv = http.createServer((req, res) => { res.setHeader('content-type', 'application/json'); res.end(req.url === '/quicktunnel' ? '{"hostname":"rot-schwarz-test.trycloudflare.com"}' : '{}'); });
+    const realFetch = global.fetch; // /health der Tunnel-Adresse: muss „unser“ Bot sein
+    global.fetch = async (u, o) => (String(u).endsWith('trycloudflare.com/health') ? { ok: true, json: async () => ({ bot: 'ETC. Bot.#4740' }) } : realFetch(u, o));
     await new Promise(r => srv.listen(0, '127.0.0.1', r));
     process.env.TUNNEL_METRICS = `127.0.0.1:${srv.address().port}`;
     delete require.cache[require.resolve('../src/modules/tunnel')];
     const tunnel = require('../src/modules/tunnel');
     const dms = [];
-    const client = { application: { fetch: async () => ({ owner: { id: 'owner' } }) }, users: { fetch: async id => ({ id, send: async t => { dms.push(t); } }) } };
+    const fremd = { user: { tag: 'Anderer Bot#1' }, application: { fetch: async () => ({ owner: { id: 'owner' } }) }, users: { fetch: async id => ({ id, send: async t => { dms.push(t); } }) } };
+    assert.strictEqual(await tunnel.poll(fremd), null, 'Adresse eines anderen Bots wird ignoriert');
+    const client = { ...fremd, user: { tag: 'ETC. Bot.#4740' } };
     const url = await tunnel.poll(client);
     await tunnel.poll(client);
-    srv.close(); delete process.env.TUNNEL_METRICS;
+    srv.close(); delete process.env.TUNNEL_METRICS; global.fetch = realFetch;
     assert.strictEqual(url, 'https://rot-schwarz-test.trycloudflare.com');
     assert.strictEqual(dms.length, 1, 'nur einmal pro neuer Adresse');
     assert.match(dms[0], /rot-schwarz-test\.trycloudflare\.com/);

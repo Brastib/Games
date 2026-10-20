@@ -6,7 +6,8 @@
  */
 const store = require('../lib/store');
 
-const METRICS = process.env.TUNNEL_METRICS || '127.0.0.1:20241';
+// Eigener Port – 20241 ist der Standard von cloudflared und kann zu einem anderen Tunnel gehören (z. B. dem alten Bot)
+const METRICS = process.env.TUNNEL_METRICS || '127.0.0.1:20300';
 let current = null;
 
 async function poll(client) {
@@ -15,6 +16,9 @@ async function poll(client) {
   if (!host) return null;
   const url = `https://${host}`;
   if (url === current) return url;
+  // Nur übernehmen, wenn dahinter wirklich dieses Dashboard steckt
+  const check = await fetch(`${url}/health`, { signal: AbortSignal.timeout(8000) }).then(r => (r.ok ? r.json() : null)).catch(() => null);
+  if (!check || (client.user && check.bot !== client.user.tag)) return null;
   current = url;
   process.env.DASHBOARD_URL = url; // für Discord-Login-Links
   if (store.get('meta', 'tunnelUrl') !== url) {
