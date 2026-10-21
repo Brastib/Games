@@ -7,7 +7,7 @@
  * Wirklich austragen geht nur mit /mitglied entfernen.
  */
 const store = require('../lib/store');
-const { getConfig } = require('../lib/config');
+const { getConfig, saveConfig } = require('../lib/config');
 
 const COL = 'stammmitglieder';
 const key = (guildId, userId) => `${guildId}:${userId}`;
@@ -18,10 +18,25 @@ function roleOf(guild) {
   if (!cfg?.enabled) return null;
   if (cfg.role) return guild.roles.cache.get(cfg.role) || null;
   const hits = [...guild.roles.cache.values()].filter(r => !r.managed && /mitglied/i.test(r.name.normalize('NFKC')));
-  return hits.length === 1 ? hits[0] : null;
+  if (hits.length !== 1) return null;
+  // Gefundene Rolle fest merken – sonst würde eine später angelegte zweite „…Mitglied“-Rolle den Schutz still abschalten
+  cfg.role = hits[0].id;
+  saveConfig(guild.id);
+  return hits[0];
 }
 
 const isListed = (guildId, userId) => store.has(COL, key(guildId, userId));
+
+// Schutz gegen Endlosschleifen (z. B. ein anderer Bot nimmt die Rolle immer wieder weg): höchstens 3× in 10 Minuten
+const readds = new Map();
+function mayReadd(guildId, userId) {
+  const k = key(guildId, userId), now = Date.now();
+  const recent = (readds.get(k) || []).filter(t => now - t < 10 * 60_000);
+  if (recent.length >= 3) return false;
+  recent.push(now);
+  readds.set(k, recent);
+  return true;
+}
 
 function list(guildId) {
   return store.entries(COL).filter(([k]) => k.startsWith(`${guildId}:`)).map(([k, v]) => ({ userId: k.split(':')[1], ...v }));
@@ -41,8 +56,12 @@ async function check(member) {
   if (!role || member.user.bot) return;
   if (member.roles.cache.has(role.id)) return remember(member);
   if (!isListed(member.guild.id, member.id) || !role.editable) return;
+  if (!mayReadd(member.guild.id, member.id)) return console.warn(`[mitglied] ${member.user.tag}: Rolle wird ständig weggenommen – gebe sie vorerst nicht mehr zurück.`);
   await member.roles.add(role, 'Mitglieder-Rolle ist dauerhaft (/mitglied entfernen zum Austragen)')
     .catch(e => console.warn(`[mitglied] ${member.user.tag}: ${e.message}`));
+  // Hat die Regeln schon einmal akzeptiert → „nicht verifiziert“-Rolle (z. B. nach Wiederkommen) wieder weg
+  const unverified = getConfig(member.guild.id).verify?.unverifiedRole;
+  if (unverified && member.roles.cache.has(unverified)) await member.roles.remove(unverified, 'Stamm-Mitglied').catch(() => {});
 }
 
 /** Nach dem Start: alle mit der Rolle eintragen, Weggenommenes zurückgeben */

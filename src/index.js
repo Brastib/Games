@@ -201,7 +201,7 @@ client.on(Events.GuildMemberRemove, safe('memberRemove', async member => {
   await welcome.onLeave(member);
 }));
 client.on(Events.GuildMemberUpdate, safe('memberUpdate', async (o, n) => {
-  await logs.memberUpdate(o, n);
+  await logs.memberUpdate(o, n).catch(e => console.error('[log:memberUpdate]', e)); // Log-Fehler darf den Rollen-Schutz nicht stoppen
   await require('./modules/sticky').check(n);
 }));
 client.on(Events.VoiceStateUpdate, safe('voice', async (o, n) => {

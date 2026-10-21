@@ -302,6 +302,10 @@ module.exports = [
       if (i.user.id !== i.guild.ownerId && i.member.roles.highest.comparePositionTo(role) <= 0) return respond(i, err('Diese Rolle ist gleich hoch oder höher als deine höchste Rolle.'));
       try {
         if (i.options.getSubcommand() === 'add') { await member.roles.add(role, `Von ${i.user.tag}`); return respond(i, ok(`${member} hat jetzt ${role}.`)); }
+        const sticky = require('../modules/sticky');
+        if (sticky.roleOf(i.guild)?.id === role.id && sticky.isListed(i.guild.id, member.id)) {
+          return respond(i, err(`${role} ist dauerhaft – ich würde sie sofort zurückgeben. Zum Austragen: \`/mitglied entfernen\`.`));
+        }
         await member.roles.remove(role, `Von ${i.user.tag}`);
         return respond(i, ok(`${role} wurde ${member} weggenommen.`));
       } catch (e) { return respond(i, err(e.message)); }

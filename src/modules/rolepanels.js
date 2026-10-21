@@ -93,7 +93,8 @@ async function onButton(interaction, roleId) {
       return respond(interaction, ok(`Rolle ${role} entfernt.`));
     }
     if (panel?.unique) {
-      const others = panel.roles.map(r => r.roleId).filter(id => id !== roleId && member.roles.cache.has(id));
+      const keep = require('./sticky').roleOf(interaction.guild)?.id;
+      const others = panel.roles.map(r => r.roleId).filter(id => id !== roleId && id !== keep && member.roles.cache.has(id));
       if (others.length) await member.roles.remove(others, 'Rollen-Panel (nur eine erlaubt)');
     }
     await member.roles.add(roleId, 'Rollen-Panel');

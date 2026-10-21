@@ -948,6 +948,8 @@ async function test(name, fn) {
       return { id, guild, user: { bot: false, username: id, tag: id }, roles: { cache, add: async r => { cache.set(r.id || r, role); }, remove: async r => { cache.delete(r.id || r); } } };
     };
     assert.strictEqual(sticky.roleOf(guild)?.id, 'r-mit', 'Rolle mit „Mitglied“ im Namen wird erkannt');
+    guild.roles.cache.set('r-ex', { id: 'r-ex', name: 'Ex-Mitglied', managed: false });
+    assert.strictEqual(sticky.roleOf(guild)?.id, 'r-mit', 'zweite „Mitglied“-Rolle schaltet den Schutz nicht ab (fest gemerkt)');
     const a = mk('anna', true);
     guild.members.cache.set('anna', a);
     await sticky.sync(guild);
@@ -964,6 +966,9 @@ async function test(name, fn) {
     await rp.onButton(i, 'r-mit');
     assert(a.roles.cache.has('r-mit'), 'Rolle bleibt');
     assert(/schon/.test(replies[0].embeds[0].data.description));
+    // Endlosschleife: nach 3× zurückgeben in 10 Min. ist Schluss
+    for (let n = 0; n < 5; n++) { a.roles.cache.delete('r-mit'); await sticky.check(a); }
+    assert(!a.roles.cache.has('r-mit'), 'kein endloses Hin und Her');
     // Austragen
     sticky.forget('g-st', 'anna');
     a.roles.cache.delete('r-mit');
