@@ -30,7 +30,10 @@ const punished = new Map();  // guildId:userId -> timestamp
 
 function isTrusted(guild, userId) {
   if (userId === guild.ownerId || userId === guild.client.user.id) return true;
-  return getConfig(guild.id).antinuke.trusted.includes(userId);
+  const cfg = getConfig(guild.id).antinuke;
+  if (cfg.trusted.includes(userId)) return true;
+  // Ganze Rolle vertraut (z. B. Vize): wer sie hat, wird nicht bestraft
+  return !!cfg.trustedRoles?.length && !!guild.members.cache.get(userId)?.roles.cache.some(r => cfg.trustedRoles.includes(r.id));
 }
 
 /** Gelöschte Kanäle/Rollen kurz merken, damit sie wiederhergestellt werden können. */
@@ -73,6 +76,7 @@ async function onAuditEntry(entry, guild) {
   const cfg = getConfig(guild.id).antinuke;
   if (!cfg.enabled || !entry.executorId) return;
   const executorId = entry.executorId;
+  if (cfg.trustedRoles?.length && !guild.members.cache.has(executorId)) await guild.members.fetch(executorId).catch(() => null); // für vertraute Rollen
   if (isTrusted(guild, executorId)) return;
 
   // Fremder Bot wurde hinzugefügt
@@ -104,7 +108,9 @@ async function onAuditEntry(entry, guild) {
   if (entry.action === AuditLogEvent.MemberRoleUpdate) {
     const add = entry.changes.find(c => c.key === '$add');
     if (add?.new?.length) {
-      const dangerous = add.new.map(r => guild.roles.cache.get(r.id)).filter(r => r && (r.permissions.bitfield & DANGEROUS));
+      // Auch eine vertraute Rolle zählt: sonst könnte sich ein fremder Admin selbst „vertrauenswürdig“ machen
+      const trustedRoles = getConfig(guild.id).antinuke.trustedRoles || [];
+      const dangerous = add.new.map(r => guild.roles.cache.get(r.id)).filter(r => r && ((r.permissions.bitfield & DANGEROUS) || trustedRoles.includes(r.id)));
       if (dangerous.length) {
         const target = await guild.members.fetch(entry.targetId).catch(() => null);
         if (target) await target.roles.remove(dangerous.filter(r => r.editable), 'Anti-Nuke: gefährliche Rolle entfernt').catch(() => {});

@@ -54,7 +54,7 @@ function defaults() {
     },
     antinuke: {
       enabled: true, threshold: 4, seconds: 30, punishment: 'strip', restore: true, blockBots: false,
-      trusted: [],
+      trusted: [], trustedRoles: [], // Personen bzw. ganze Rollen, die Anti-Nuke nie bestraft
     },
     lockdown: { active: false, since: 0, until: 0, reason: '', by: null, backup: [], invitesPaused: false },
     // Beim Lockdown: Sirene + Durchsage in allen besetzten Sprachkanälen, Warnung im Chat; Grund, wenn keiner angegeben ist

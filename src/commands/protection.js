@@ -326,8 +326,9 @@ module.exports = [
           { name: 'Alle Rollen entfernen + Timeout (empfohlen)', value: 'strip' }, { name: 'Kicken', value: 'kick' }, { name: 'Bannen', value: 'ban' }))
         .addBooleanOption(o => o.setName('wiederherstellen').setDescription('Gelöschte Kanäle/Rollen wiederherstellen und Banns aufheben?'))
         .addBooleanOption(o => o.setName('bots_blockieren').setDescription('Neue Bots nur von vertrauenswürdigen Personen erlauben?')))
-      .addSubcommand(s => s.setName('trust').setDescription('Person als vertrauenswürdig markieren / entfernen (nur Inhaber)')
-        .addUserOption(o => o.setName('person').setDescription('Person oder Bot').setRequired(true))),
+      .addSubcommand(s => s.setName('trust').setDescription('Person oder ganze Rolle als vertrauenswürdig markieren / entfernen (nur Inhaber)')
+        .addUserOption(o => o.setName('person').setDescription('Person oder Bot'))
+        .addRoleOption(o => o.setName('rolle').setDescription('Ganze Rolle, z. B. Vize – alle mit dieser Rolle'))),
     async execute(i) {
       const cfg = getConfig(i.guild.id);
       const an = cfg.antinuke;
@@ -339,6 +340,7 @@ module.exports = [
           `**Strafe:** ${{ strip: 'Rollen entfernen + Timeout', kick: 'Kick', ban: 'Bann' }[an.punishment]}`,
           `**Wiederherstellen:** ${an.restore ? 'ja' : 'nein'} · **Bots blockieren:** ${an.blockBots ? 'ja' : 'nein'}`,
           `**Vertrauenswürdig:** <@${i.guild.ownerId}> (Inhaber) ${an.trusted.map(id => `<@${id}>`).join(' ')}`,
+          `**Vertraute Rollen:** ${(an.trustedRoles || []).map(id => `<@&${id}>`).join(' ') || '–'}`,
           '',
           '⚠️ Damit der Schutz greifen kann, muss **meine Rolle ganz oben** in der Rollenliste stehen.',
         ].join('\n')));
@@ -355,11 +357,18 @@ module.exports = [
         return respond(i, ok(`Anti-Nuke **${an.enabled ? 'an' : 'aus'}**: ab ${an.threshold} Aktionen in ${an.seconds} s → ${an.punishment}.`));
       }
       if (sub === 'trust') {
-        const u = i.options.getUser('person');
-        const idx = an.trusted.indexOf(u.id);
-        if (idx >= 0) an.trusted.splice(idx, 1); else an.trusted.push(u.id);
+        const u = i.options.getUser('person'), role = i.options.getRole('rolle');
+        if (!u && !role) return respond(i, err('Gib `person` oder `rolle` an.'));
+        const out = [];
+        const toggle = (list, id, name, what) => {
+          const idx = list.indexOf(id);
+          if (idx >= 0) list.splice(idx, 1); else list.push(id);
+          out.push(`${name} ist jetzt ${idx >= 0 ? '**nicht mehr** vertrauenswürdig' : `vertrauenswürdig – ${what} von Anti-Nuke nicht bestraft`}.`);
+        };
+        if (u) toggle(an.trusted, u.id, `${u}`, 'wird');
+        if (role) { an.trustedRoles ||= []; toggle(an.trustedRoles, role.id, `${role}`, 'alle mit dieser Rolle werden'); }
         saveConfig(i.guild.id);
-        return respond(i, ok(`${u} ist jetzt ${idx >= 0 ? '**nicht mehr**' : ''} vertrauenswürdig${idx >= 0 ? '' : ' und wird von Anti-Nuke nicht bestraft'}.`));
+        return respond(i, ok(out.join('\n')));
       }
     },
   },

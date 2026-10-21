@@ -534,6 +534,7 @@ const SECTIONS = [
       ['antinuke.restore', 'toggle', 'Gelöschtes wiederherstellen'],
       ['antinuke.blockBots', 'toggle', 'Fremde Bots blockieren'],
       ['antinuke.trusted', 'list', 'Vertrauenswürdige Nutzer-IDs', '123456789012345678'],
+      ['antinuke.trustedRoles', 'roles', 'Vertraute Rollen (alle mit dieser Rolle)'],
     ] },
   ] },
   { id: 'mod', label: 'Moderation', cards: [
@@ -1254,7 +1255,7 @@ function demoData() {
         mentions: { enabled: true, max: 5 }, caps: { enabled: false, percent: 70 }, badwords: { enabled: false, words: [], action: 'delete' },
         escalation: { enabled: true, timeoutAt: 3, timeoutMinutes: 60, kickAt: 5, banAt: 7, expireDays: 30 } },
       antiraid: { enabled: true, joins: 8, seconds: 10, action: 'lockdown', minutes: 15, pauseInvites: true, kickRaiders: false, minAccountDays: 3, accountAction: 'kick' },
-      antinuke: { enabled: true, threshold: 4, seconds: 30, punishment: 'strip', restore: true, blockBots: false, trusted: [] },
+      antinuke: { enabled: true, threshold: 4, seconds: 30, punishment: 'strip', restore: true, blockBots: false, trusted: [], trustedRoles: [] },
       lockdown: { active: false, since: 0, until: 0, reason: '' },
       tempvoice: { enabled: true, panelInChat: true, hubs: [{ id: byName('➕ Kanal erstellen'), category: vc.id, nameTemplate: '🔊 {name}', limit: 0 }, { id: byName('➕ Gaming-Kanal'), category: vc.id, nameTemplate: '🎮 {name}s Runde', limit: 5 }] },
       tickets: { enabled: true, supportRoles: ['501'], logChannel: byName('mod-log'), maxOpen: 1 },

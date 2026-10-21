@@ -917,6 +917,26 @@ async function test(name, fn) {
     assert(!store.has('antinukeUndo', 'g-an:vize'));
     assert(/Rückgängig gemacht/.test(log.at(-1)[1]));
   });
+  await test('Anti-Nuke: ganze Rolle vertrauen (z. B. Vize); fremder Admin kann sich die Rolle nicht selbst geben', async () => {
+    const an = require('../src/modules/antinuke');
+    const cfg = getConfig('g-tr');
+    cfg.antinuke.trustedRoles = ['r-vize'];
+    const { Collection: Col } = require('discord.js');
+    const mem = (id, roles) => ({ id, roles: { cache: new Col(roles.map(r => [r, { id: r }])) } });
+    const removed = [];
+    const vizeRole = { id: 'r-vize', editable: true, permissions: { bitfield: 0n } };
+    const members = new Map([['vize', mem('vize', ['r-vize'])], ['fremd', mem('fremd', [])]]);
+    const guild = { id: 'g-tr', ownerId: 'owner', client: { user: { id: 'bot' } }, roles: { cache: new Map([['r-vize', vizeRole]]) }, channels: { cache: new Map() },
+      members: { cache: members, fetch: async id => ({ ...members.get(id), roles: { ...members.get(id).roles, remove: async r => removed.push(...r.map(x => x.id)) } }) } };
+    assert(an.isTrusted(guild, 'vize'), 'wer die Rolle hat, ist vertraut');
+    assert(!an.isTrusted(guild, 'fremd'));
+    const { AuditLogEvent } = require('discord.js');
+    await an.onAuditEntry({ action: AuditLogEvent.MemberRoleUpdate, executorId: 'fremd', targetId: 'fremd', changes: [{ key: '$add', new: [{ id: 'r-vize' }] }] }, guild);
+    assert.deepStrictEqual(removed, ['r-vize'], 'selbst gegebene Vertrauens-Rolle wird wieder entfernt');
+    removed.length = 0;
+    await an.onAuditEntry({ action: AuditLogEvent.MemberRoleUpdate, executorId: 'vize', targetId: 'fremd', changes: [{ key: '$add', new: [{ id: 'r-vize' }] }] }, guild);
+    assert.deepStrictEqual(removed, [], 'der Vize darf Rollen vergeben');
+  });
   await test('Rollen-Panel: Knöpfe auf der Nachricht werden übernommen, nicht überschrieben', async () => {
     const rp = require('../src/modules/rolepanels');
     const { ButtonStyle: BS } = require('discord.js');
