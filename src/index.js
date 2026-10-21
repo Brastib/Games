@@ -149,6 +149,7 @@ client.once(Events.ClientReady, safe('ready', async c => {
   await alert.onReady(c).catch(e => console.error('[alarm]', e));
   require('./modules/health').start(c);
   require('./modules/tunnel').start(c);
+  require('./modules/databackup').start(c);
   setInterval(() => { clips.cleanup(); require('./modules/recap').cleanup(); }, 12 * 3_600_000).unref();
   setInterval(() => { try { require('./modules/recap').voiceTick(c); } catch (e) { console.error('[rückblick]', e); } }, 60_000).unref();
   // Mitgliederlisten laden (für Statistik, Bestenlisten, Schutz)

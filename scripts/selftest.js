@@ -1004,6 +1004,33 @@ async function test(name, fn) {
     }
     await assert.rejects(recap.payload({ ...guild, id: 'g-leer' }), /nichts zum Zurückblicken/);
   });
+  await test('Datensicherung: alles drin außer Anmeldungen, per DM + lokal, Einspielen setzt zurück', async () => {
+    const db = require('../src/modules/databackup');
+    const store = require('../src/lib/store');
+    store.set('levels', 'g-db:anna', { xp: 1234 });
+    store.set('sessions', 'geheim', { token: 'x' });
+    const snap = db.unpack(db.pack());
+    assert.strictEqual(snap.data.levels['g-db:anna'].xp, 1234);
+    assert(!snap.data.sessions, 'Dashboard-Anmeldungen sind nicht in der Sicherung');
+    assert.throws(() => db.unpack(Buffer.from('{"hallo":1}')), /keine Datensicherung/);
+    // per DM an den Besitzer + lokal
+    const dms = [];
+    const client = { application: { fetch: async () => ({ owner: { id: 'owner' } }) }, users: { fetch: async id => ({ id, send: async m => { dms.push(m); } }) } };
+    const r = await db.run(client);
+    assert.strictEqual(r.sent, 1);
+    assert(/etc-bot-datensicherung-.*\.json\.gz/.test(dms[0].files[0].name) && /Personen mit XP/.test(dms[0].content));
+    assert(fs.existsSync(r.file), 'Kopie auf dem Laptop');
+    for (let n = 0; n < 16; n++) db.saveLocal(Buffer.from('x'), `etc-bot-datensicherung-2000-01-${String(n + 1).padStart(2, '0')}.json.gz`);
+    assert(fs.readdirSync(db.DIR()).filter(f => f.endsWith('.json.gz')).length <= 14, 'höchstens 14 lokale Kopien');
+    // Einspielen: Stand von der Sicherung, andere Bereiche bleiben
+    store.set('levels', 'g-db:anna', { xp: 1 });
+    store.set('levels', 'g-db:neu', { xp: 5 });
+    store.set('recap', 'g-db:2026-10-21', { msgs: {}, voice: {}, xp: {} });
+    db.apply({ data: { levels: snap.data.levels } }, null);
+    assert.strictEqual(store.get('levels', 'g-db:anna').xp, 1234);
+    assert(!store.has('levels', 'g-db:neu'), 'was es in der Sicherung nicht gab, ist weg');
+    assert(store.has('recap', 'g-db:2026-10-21'), 'Bereiche, die nicht in der Sicherung sind, bleiben');
+  });
   await test('Rollen-Panel: Knöpfe auf der Nachricht werden übernommen, nicht überschrieben', async () => {
     const rp = require('../src/modules/rolepanels');
     const { ButtonStyle: BS } = require('discord.js');

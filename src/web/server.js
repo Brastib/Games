@@ -96,6 +96,7 @@ function start(client) {
     fehlende_intents: client.limitedIntents?.map(x => x.name) || [],
     dashboard_adresse: require('../modules/tunnel').url(),
     version: require('../lib/version'),
+    datensicherung: (d => (d ? { tag: d.day, kb: Math.round(d.size / 1024) } : null))(store.get('meta', 'lastDataBackup')),
     laptop: (({ temp, level, battery, load, memUsed }) => ({ temperatur: temp, zustand: level, akku: battery, last: load, ram_prozent: memUsed }))(require('../modules/health').status()),
   });
   app.get('/health', (req, res) => res.json(status()));

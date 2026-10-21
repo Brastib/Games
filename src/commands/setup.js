@@ -341,6 +341,25 @@ module.exports = [
     },
   },
   {
+    data: new SlashCommandBuilder().setName('datensicherung').setDescription('💾 Alle Bot-Daten sichern oder wiederherstellen (nur Bot-Besitzer)')
+      .setDefaultMemberPermissions(P.Administrator)
+      .addSubcommand(s => s.setName('jetzt').setDescription('Sicherung jetzt erstellen und per DM schicken'))
+      .addSubcommand(s => s.setName('einspielen').setDescription('Sicherungsdatei hochladen und alles darauf zurücksetzen')
+        .addAttachmentOption(o => o.setName('datei').setDescription('Die .json.gz-Datei aus der DM').setRequired(true))),
+    async execute(i) {
+      if (!(await require('../modules/migrate').isBotOwner(i.user, i.client))) return respond(i, err('Nur der Bot-Besitzer darf das.'));
+      const db = require('../modules/databackup');
+      await i.deferReply({ flags: 64 });
+      try {
+        if (i.options.getSubcommand() === 'jetzt') {
+          const r = await db.run(i.client, { reason: 'Datensicherung (von Hand)', to: i.user.id });
+          return respond(i, ok(`${r.sent ? 'Per DM geschickt' : '⚠️ DM ging nicht (zu groß oder DMs aus) – nur auf dem Laptop gespeichert'} · ${Math.round(r.size / 1024)} KB\n${r.summary}`));
+        }
+        return respond(i, await db.prepare(i.user.id, i.options.getAttachment('datei')));
+      } catch (e) { return respond(i, err(e.message)); }
+    },
+  },
+  {
     data: new SlashCommandBuilder().setName('update').setDescription('Neueste Version holen und neu starten (nur Bot-Besitzer)')
       .setDefaultMemberPermissions(P.Administrator),
     async execute(i) {

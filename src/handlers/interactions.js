@@ -77,6 +77,7 @@ async function onInteraction(i) {
         case 'sg': return await extras.onSuggestionButton(i, action);
         case 'ev': return await require('../modules/events').onButton(i, action, Number(value));
         case 'nb': return await require('../modules/migrate').handleButton(i, action, value);
+        case 'db': return await require('../modules/databackup').handleButton(i, action);
         case 'lb': return await i.update({ content: '', files: [], attachments: [], ...leaderboardPayload(i.guild, parseInt(value, 10) || 0, action) });
       }
       return;
