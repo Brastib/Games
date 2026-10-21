@@ -114,8 +114,10 @@ async function addXp(member, amount, opts = {}) {
   const d = getData(member.guild.id, member.id);
   if (opts.stat) d[opts.stat] = (d[opts.stat] || 0) + (opts.statAmount ?? 1);
   const before = levelFromXp(d.xp, member.guild.id).level;
+  const prevXp = d.xp;
   d.xp = Math.max(0, d.xp + Math.round(amount * (opts.ignoreMultiplier ? 1 : (cfg.multiplier || 1) * tagBoost(member, cfg))));
   store.set('levels', k, d);
+  if (d.xp > prevXp) require('./recap').bump(member.guild.id, member.id, 'xp', d.xp - prevXp); // für den Wochen-Rückblick
   const after = levelFromXp(d.xp, member.guild.id).level;
   if (after > before && !opts.silent && !getConfig(member.guild.id).quiet && cfg.announce !== false) {
     const roles = await applyRewards(member, after);

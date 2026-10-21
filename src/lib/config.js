@@ -112,6 +112,8 @@ function defaults() {
         enabled: false, channel: null, weekday: 0, everyDays: 7, time: '12:00',
         text: '🏆 **Die aktuelle Bestenliste!** Wer schreibt sich diese Runde nach oben?', lastRun: null,
       },
+      // Wochen-Rückblick (letzte 7 Tage); channel: null = Bestenlisten- bzw. Level-Kanal
+      recap: { enabled: true, channel: null, weekday: 0, everyDays: 7, time: '18:00', text: '📅 **Wochen-Rückblick**', lastRun: null },
     },
   };
 }

@@ -297,8 +297,8 @@ function start(client) {
         else await ch.send(tickets.panelMessage());
         cfg.tickets.enabled = true; saveConfig(g.id);
         message = `Ticket-Button in #${ch.name} gepostet.`;
-      } else if (type === 'postAnimal' || type === 'postLeaderboard') {
-        const ch = await require('../modules/autoposts').runNow(g, type === 'postAnimal' ? 'animal' : 'leaderboard');
+      } else if (type === 'postAnimal' || type === 'postLeaderboard' || type === 'postRecap') {
+        const ch = await require('../modules/autoposts').runNow(g, { postAnimal: 'animal', postLeaderboard: 'leaderboard', postRecap: 'recap' }[type]);
         message = `Gepostet in #${ch.name}.`;
       } else if (type === 'countingStart') {
         const ch = await require('../modules/counting').start(g, { resetTo: Number(req.body.resetTo) || 0 });

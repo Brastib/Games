@@ -109,9 +109,11 @@ async function postLeaderboard(guild, channel) {
 
 async function runNow(guild, type, channelOverride = null) {
   const p = getConfig(guild.id).posts[type];
-  const channel = channelOverride || guild.channels.cache.get(p.channel);
+  const recap = require('./recap');
+  const channel = channelOverride || (type === 'recap' ? recap.channelOf(guild) : guild.channels.cache.get(p.channel));
   if (!channel?.isTextBased()) throw new Error('Kein Kanal eingestellt.');
-  if (type === 'animal') await postAnimal(guild, channel);
+  if (type === 'recap') await channel.send(await recap.payload(guild));
+  else if (type === 'animal') await postAnimal(guild, channel);
   else await postLeaderboard(guild, channel);
   return channel;
 }
@@ -121,9 +123,12 @@ async function check(client) {
   const now = nowParts();
   for (const guild of client.guilds.cache.values()) {
     const cfg = getConfig(guild.id);
-    for (const type of ['animal', 'leaderboard']) {
+    for (const type of ['animal', 'leaderboard', 'recap']) {
       const p = cfg.posts[type];
-      if (!isDue(p, now)) continue;
+      if (!p) continue;
+      // Rückblick ohne eigenen Kanal: Bestenlisten- bzw. Level-Kanal
+      const due = type === 'recap' ? !cfg.quiet && isDue({ ...p, channel: require('./recap').channelOf(guild)?.id }, now) : isDue(p, now);
+      if (!due) continue;
       p.lastRun = now.day;
       saveConfig(guild.id);
       try { await runNow(guild, type); } catch (e) { console.warn(`[autopost:${type}] ${guild.name}: ${e.message}`); }

@@ -149,7 +149,8 @@ client.once(Events.ClientReady, safe('ready', async c => {
   await alert.onReady(c).catch(e => console.error('[alarm]', e));
   require('./modules/health').start(c);
   require('./modules/tunnel').start(c);
-  setInterval(() => clips.cleanup(), 12 * 3_600_000).unref();
+  setInterval(() => { clips.cleanup(); require('./modules/recap').cleanup(); }, 12 * 3_600_000).unref();
+  setInterval(() => { try { require('./modules/recap').voiceTick(c); } catch (e) { console.error('[rückblick]', e); } }, 60_000).unref();
   // Mitgliederlisten laden (für Statistik, Bestenlisten, Schutz)
   if (c.options.intents.has(I.GuildMembers)) for (const g of c.guilds.cache.values()) await g.members.fetch().catch(() => {});
   for (const g of c.guilds.cache.values()) await require('./modules/sticky').sync(g).catch(e => console.error('[mitglied]', e));
@@ -165,6 +166,7 @@ client.on(Events.MessageCreate, safe('message', async m => {
   if (!m.guild || m.author.bot) return;
   if (await automod.handle(m)) return;
   if (await require('./modules/prefix').onMessage(m)) return;
+  require('./modules/recap').bump(m.guild.id, m.author.id, 'msgs'); // Wochen-Rückblick (nach AutoMod: Gelöschtes zählt nicht)
   await counting.onMessage(m);
   await leveling.onMessage(m);
   await clips.onMessage(m);

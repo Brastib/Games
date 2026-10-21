@@ -222,4 +222,83 @@ async function leaderboardCard(entries, { title = 'ETC.', subtitle = 'BESTENLIST
   return canvas.encode('png');
 }
 
-module.exports = { welcomeCard, rankCard, leaderboardCard, available: () => !!C };
+/**
+ * Wochen-Rückblick als Bild: Kopf wie die Bestenliste, darunter 4 Kacheln (2×2) und eine Summen-Zeile.
+ * r: { range, totals, tiles: [{ label, name, avatar, value, runners[], empty }] }
+ */
+async function recapCard(r) {
+  if (!C) return null;
+  const S = 2;
+  const w = 600, pad = 16, head = 78, gap = 12, tileH = 150;
+  const tileW = (w - pad * 2 - gap) / 2;
+  const h = head + tileH * 2 + gap + 46;
+  const canvas = C.createCanvas(w * S, h * S);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(S, S);
+  ctx.fillStyle = '#050505';
+  ctx.fillRect(0, 0, w, h);
+
+  const icon = await C.loadImage(ICON).catch(() => null);
+  if (icon) {
+    ctx.save(); ctx.beginPath(); ctx.arc(pad + 20, 38, 20, 0, Math.PI * 2); ctx.clip();
+    ctx.drawImage(icon, pad, 18, 40, 40); ctx.restore();
+    ctx.strokeStyle = ACCENT; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(pad + 20, 38, 21, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.fillStyle = ACCENT;
+  ctx.font = '26px "Poppins ExtraBold"';
+  ctx.fillText('ETC.', pad + 52, 47);
+  const tw = ctx.measureText('ETC.').width;
+  ctx.fillStyle = DIM;
+  ctx.font = '15px "Poppins ExtraBold"';
+  ctx.fillText('WOCHEN-RÜCKBLICK', pad + 60 + tw, 46);
+  ctx.fillStyle = '#b80000';
+  ctx.font = '12px "Poppins Bold"';
+  ctx.textAlign = 'right';
+  ctx.fillText(r.range, w - pad, 46);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#1a0000';
+  ctx.fillRect(pad, head - 12, w - pad * 2, 2);
+
+  const avatars = await Promise.all(r.tiles.map(t => (t.empty ? null : loadUrl(t.avatar))));
+  r.tiles.slice(0, 4).forEach((t, i) => {
+    const x = pad + (i % 2) * (tileW + gap), y = head + Math.floor(i / 2) * (tileH + gap);
+    ctx.fillStyle = '#140000';
+    roundRect(ctx, x, y, tileW, tileH, 12); ctx.fill();
+    ctx.fillStyle = ACCENT; roundRect(ctx, x, y, 4, tileH, 2); ctx.fill();
+    ctx.fillStyle = '#b80000';
+    ctx.font = '11px "Poppins ExtraBold"';
+    ctx.fillText(t.label, x + 16, y + 24);
+    if (t.empty) {
+      ctx.fillStyle = '#5a5a5a';
+      ctx.font = '14px "Poppins Bold"';
+      ctx.fillText('Diese Woche noch niemand', x + 16, y + 80);
+      return;
+    }
+    const ax = x + 42, ay = y + 68, ar = 24;
+    ctx.save(); ctx.beginPath(); ctx.arc(ax, ay, ar, 0, Math.PI * 2); ctx.clip();
+    if (avatars[i]) ctx.drawImage(avatars[i], ax - ar, ay - ar, ar * 2, ar * 2);
+    else { ctx.fillStyle = TRACK; ctx.fillRect(ax - ar, ay - ar, ar * 2, ar * 2); }
+    ctx.restore();
+    ctx.strokeStyle = MEDALS[0]; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ax, ay, ar + 1.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = fitText(ctx, t.name, tileW - 90, 16, 'Poppins ExtraBold');
+    ctx.fillText(t.name, ax + 36, ay - 4);
+    ctx.fillStyle = ACCENT;
+    ctx.font = fitText(ctx, t.value, tileW - 90, 18, 'Poppins ExtraBold');
+    ctx.fillText(t.value, ax + 36, ay + 18);
+    ctx.fillStyle = '#8a8a8a';
+    (t.runners || []).forEach((line, n) => {
+      ctx.font = fitText(ctx, `${n + 2}. ${line}`, tileW - 32, 11, 'Poppins Bold');
+      ctx.fillText(`${n + 2}. ${line}`, x + 16, y + 116 + n * 16);
+    });
+  });
+
+  ctx.fillStyle = '#8c0000';
+  ctx.font = fitText(ctx, r.totals, w - pad * 2, 12, 'Poppins Bold');
+  ctx.textAlign = 'center';
+  ctx.fillText(r.totals, w / 2, h - 18);
+  ctx.textAlign = 'left';
+  return canvas.encode('png');
+}
+
+module.exports = { welcomeCard, rankCard, leaderboardCard, recapCard, available: () => !!C };

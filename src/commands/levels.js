@@ -36,6 +36,15 @@ function leaderboardPayload(guild, page, by = 'xp') {
 
 module.exports = [
   {
+    data: new SlashCommandBuilder().setName('rückblick').setDescription('📅 Wochen-Rückblick: die letzten 7 Tage (nur du siehst es)'),
+    async execute(i) {
+      await i.deferReply({ flags: 64 });
+      try {
+        return respond(i, await require('../modules/recap').payload(i.guild));
+      } catch (e) { return respond(i, err(e.message)); }
+    },
+  },
+  {
     data: new SlashCommandBuilder().setName('lvl').setDescription('📊 Dein Level, XP und Rang (im Level-Kanal)')
       .addUserOption(o => o.setName('mitglied').setDescription('Wessen Level?')),
     async execute(i) {

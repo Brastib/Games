@@ -158,6 +158,7 @@ const SCHEMA = {
   'posts.animal.source': v.oneOf('mixed', 'dogs', 'cats', 'pool'), 'posts.animal.poolChannel': v.channel([ChannelType.GuildText]), 'posts.animal.text': v.str(300, 1),
   'posts.leaderboard.enabled': v.bool(), 'posts.leaderboard.channel': v.channel(TEXT), 'posts.leaderboard.weekday': v.int(0, 6),
   'posts.leaderboard.time': v.time(), 'posts.leaderboard.text': v.str(300, 1), 'posts.leaderboard.everyDays': v.int(1, 30),
+  'posts.recap.enabled': v.bool(), 'posts.recap.channel': v.channel(TEXT), 'posts.recap.weekday': v.int(0, 6), 'posts.recap.time': v.time(), 'posts.recap.text': v.str(300, 1),
 
   quiet: v.bool(),
   'lockdownAlarm.voice': v.bool(), 'lockdownAlarm.chatChannel': v.channel(TEXT), 'lockdownAlarm.reason': v.str(200, 1),

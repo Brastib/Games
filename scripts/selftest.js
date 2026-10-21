@@ -977,6 +977,33 @@ async function test(name, fn) {
     getConfig('g-st').memberRole.enabled = false;
     assert.strictEqual(sticky.roleOf(guild), null, 'abschaltbar');
   });
+  await test('Wochen-Rückblick: zählt pro Tag, nimmt nur 7 Tage, malt ein Bild', async () => {
+    const recap = require('../src/modules/recap');
+    const store = require('../src/lib/store');
+    const { Collection: Col } = require('discord.js');
+    const day = d => require('../src/modules/autoposts').nowParts(d).day;
+    recap.bump('g-rb', 'anna', 'msgs', 30); recap.bump('g-rb', 'ben', 'msgs', 12); recap.bump('g-rb', 'cleo', 'msgs', 5);
+    recap.bump('g-rb', 'ben', 'voice', 95); recap.bump('g-rb', 'anna', 'xp', 400);
+    store.set('recap', `g-rb:${day(new Date(Date.now() - 9 * 86_400_000))}`, { msgs: { alt: 999 }, voice: {}, xp: {} }); // zu alt
+    store.set('clips', 'clip1', { guildId: 'g-rb', channelId: 'c', authorId: 'cleo', likes: 4, at: Date.now() - 3600_000 });
+    const s = recap.collect('g-rb');
+    assert.strictEqual(s.msgs.anna, 30);
+    assert(!s.msgs.alt, 'älter als 7 Tage zählt nicht');
+    const mk = (id, name) => ({ id, displayName: name, user: { id }, displayAvatarURL: () => null });
+    const guild = { id: 'g-rb', members: { cache: new Col([['anna', mk('anna', 'Anna')], ['ben', mk('ben', 'Ben')], ['cleo', mk('cleo', 'Cleo')]]), fetch: async () => null }, client: { users: { fetch: async () => null } } };
+    const r = await recap.build(guild);
+    assert.deepStrictEqual(r.tiles.map(t => t.name), ['Anna', 'Ben', 'Anna', 'Cleo']);
+    assert.strictEqual(r.tiles[1].value, '1 Std. 35 Min.');
+    assert.deepStrictEqual(r.tiles[0].runners, ['Ben · 12 Nachrichten', 'Cleo · 5 Nachrichten']);
+    const p = await recap.payload(guild);
+    assert(/Wochen-Rückblick/.test(p.content) && /<@cleo>/.test(p.content) && /channels\/g-rb\/c\/clip1/.test(p.content));
+    if (require('../src/lib/cards').available()) {
+      const png = p.files[0].attachment;
+      assert(png.length > 5000 && png.slice(1, 4).toString() === 'PNG', 'Bild erstellt');
+      fs.writeFileSync(path.join(os.tmpdir(), 'rueckblick-test.png'), png);
+    }
+    await assert.rejects(recap.payload({ ...guild, id: 'g-leer' }), /nichts zum Zurückblicken/);
+  });
   await test('Rollen-Panel: Knöpfe auf der Nachricht werden übernommen, nicht überschrieben', async () => {
     const rp = require('../src/modules/rolepanels');
     const { ButtonStyle: BS } = require('discord.js');
