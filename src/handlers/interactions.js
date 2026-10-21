@@ -59,6 +59,8 @@ async function onInteraction(i) {
       if (cmd?.autocomplete) return await cmd.autocomplete(i);
       return;
     }
+    // Knopf aus der Anti-Nuke-DM an den Inhaber (kommt ohne Server)
+    if (i.isButton() && i.customId.startsWith('an:undo:')) return await require('../modules/antinuke').handleUndo(i);
     if (!i.inGuild()) return;
     const [ns, action, value] = i.customId.split(':');
 

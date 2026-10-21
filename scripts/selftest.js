@@ -896,6 +896,38 @@ async function test(name, fn) {
     assert.strictEqual(alarmChannel(g, getConfig('g-chat')).id, 'regeln', 'ohne Chat: ein Kanal, den Mitglieder sehen');
     assert.strictEqual(alarmChannel(g, { ...getConfig('g-chat'), lockdownAlarm: { chatChannel: 'logs' } }).id, 'logs', 'eingestellter Kanal gewinnt');
   });
+  await test('Anti-Nuke: Mitglieder-Rolle mit @everyone-Ping ist kein Fehlalarm; Fehlalarm-Knopf gibt alles zurück', async () => {
+    const an = require('../src/modules/antinuke');
+    const { PermissionFlagsBits: PF } = require('discord.js');
+    assert(!(PF.MentionEveryone & an.DANGEROUS), '@everyone-Ping zählt nicht als gefährlich');
+    assert(PF.Administrator & an.DANGEROUS && PF.BanMembers & an.DANGEROUS);
+    const store = require('../src/lib/store');
+    store.set('antinukeUndo', 'g-an:vize', { roles: ['r-vize', 'r-game'], at: Date.now() });
+    const added = [], log = [];
+    let timeout = true;
+    const member = { roles: { cache: new Map(), add: async ids => { added.push(...ids); } }, isCommunicationDisabled: () => timeout, timeout: async v => { timeout = v; } };
+    const guild = { id: 'g-an', ownerId: 'owner', roles: { cache: new Map([['r-vize', { editable: true }], ['r-game', { editable: true }]]) }, members: { fetch: async () => member }, channels: { cache: new Map() } };
+    const mk = user => ({ customId: 'an:undo:g-an:vize', user: { id: user }, client: { guilds: { cache: new Map([['g-an', guild]]) } }, message: { content: '☢️ Nuke …\nZeile 2' }, reply: async m => log.push(['reply', m.content]), update: async m => log.push(['update', m.content]) });
+    await an.handleUndo(mk('fremd'));
+    assert.deepStrictEqual(added, [], 'nur der Inhaber darf');
+    await an.handleUndo(mk('owner'));
+    assert.deepStrictEqual(added, ['r-vize', 'r-game']);
+    assert.strictEqual(timeout, null, 'Timeout aufgehoben');
+    assert(getConfig('g-an').antinuke.trusted.includes('vize'), 'ab jetzt vertraut');
+    assert(!store.has('antinukeUndo', 'g-an:vize'));
+    assert(/Rückgängig gemacht/.test(log.at(-1)[1]));
+  });
+  await test('Rollen-Panel: Knöpfe auf der Nachricht werden übernommen, nicht überschrieben', async () => {
+    const rp = require('../src/modules/rolepanels');
+    const { ButtonStyle: BS } = require('discord.js');
+    const msg = { components: [{ components: [{ customId: 'rp:r1', label: 'Repo', style: BS.Danger, emoji: null }, { customId: 'rp:weg', label: 'Gelöscht', style: BS.Danger }, { customId: 'x:y' }] }] };
+    const guild = { roles: { cache: new Map([['r1', { name: 'Repo' }]]) }, channels: { cache: new Map([['c1', { messages: { fetch: async () => msg } }]]) } };
+    const panel = { channelId: 'c1', roles: [] };
+    await rp.adopt(guild, 'm1', panel);
+    assert.deepStrictEqual(panel.roles, [{ roleId: 'r1', label: 'Repo', emoji: null, style: 'rot' }]);
+    await rp.adopt(guild, 'm1', panel);
+    assert.strictEqual(panel.roles.length, 1, 'keine Doppelten');
+  });
   await test('Keine blauen/grünen Buttons und Embed-Farben (außer frei wählbaren Rollen-Buttons)', () => {
     const { COLORS } = require('../src/lib/embeds');
     for (const [k, c] of Object.entries(COLORS)) {

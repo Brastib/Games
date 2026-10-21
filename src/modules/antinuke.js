@@ -3,8 +3,9 @@
  * Anti-Nuke: Wenn jemand (auch ein gehackter Admin oder ein fremder Bot) in kurzer Zeit viele Kanäle/Rollen löscht,
  * massenhaft bannt/kickt oder Webhooks anlegt, wird er sofort entmachtet und der Schaden – soweit möglich – rückgängig gemacht.
  */
-const { AuditLogEvent, EmbedBuilder, PermissionsBitField, PermissionFlagsBits: P, ChannelType } = require('discord.js');
-const { getConfig } = require('../lib/config');
+const { AuditLogEvent, EmbedBuilder, PermissionsBitField, PermissionFlagsBits: P, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { getConfig, saveConfig } = require('../lib/config');
+const store = require('../lib/store');
 const { sendLog } = require('../lib/logger');
 const { COLORS } = require('../lib/embeds');
 
@@ -20,7 +21,8 @@ const WATCH = {
   [AuditLogEvent.EmojiDelete]: { w: 0.5, label: 'Emoji gelöscht' },
   [AuditLogEvent.StickerDelete]: { w: 0.5, label: 'Sticker gelöscht' },
 };
-const DANGEROUS = P.Administrator | P.BanMembers | P.KickMembers | P.ManageGuild | P.ManageRoles | P.ManageChannels | P.ManageWebhooks | P.MentionEveryone;
+// @everyone-Ping zählt bewusst nicht: Auf ETC. hat die normale Mitglieder-Rolle das Recht – sonst Fehlalarm bei jeder Rollenvergabe
+const DANGEROUS = P.Administrator | P.BanMembers | P.KickMembers | P.ManageGuild | P.ManageRoles | P.ManageChannels | P.ManageWebhooks;
 
 const actions = new Map();   // guildId:userId -> [{at, w, action, targetId}]
 const deleted = new Map();   // id -> {kind, guildId, data, at}
@@ -149,6 +151,7 @@ async function punish(guild, executorId, list) {
         lines.push('Täter **gekickt**');
       } else {
         const removable = member.roles.cache.filter(r => r.id !== guild.id && r.editable);
+        store.set('antinukeUndo', `${guild.id}:${executorId}`, { roles: [...removable.keys()], at: Date.now() }); // für „Fehlalarm“
         await member.roles.remove(removable, reason);
         lines.push(`Alle Rollen entfernt (${removable.size})`);
         if (member.moderatable) {
@@ -174,7 +177,33 @@ async function punish(guild, executorId, list) {
   await alert(guild, '☢️ NUKE-VERSUCH GESTOPPT',
     `**Täter:** <@${executorId}> (\`${executorId}\`)\n**Erkannt:** ${Object.entries(summary).map(([k, v]) => `${v}× ${k}`).join(', ')}\n\n${lines.map(l => `• ${l}`).join('\n')}`);
   const owner = await guild.fetchOwner().catch(() => null);
-  owner?.send(`☢️ Auf **${guild.name}** wurde ein Nuke-Versuch von <@${executorId}> gestoppt. Details stehen im Schutz-Log.`).catch(() => {});
+  const undo = store.has('antinukeUndo', `${guild.id}:${executorId}`);
+  owner?.send({
+    content: `☢️ Auf **${guild.name}** wurde ein Nuke-Versuch von <@${executorId}> gestoppt. Details stehen im Schutz-Log.${undo ? '\n-# War das ein Fehlalarm? Der Knopf gibt alle Rollen zurück, hebt den Timeout auf und vertraut der Person ab jetzt.' : ''}`,
+    components: undo ? [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`an:undo:${guild.id}:${executorId}`).setLabel('Fehlalarm – alles zurück').setEmoji('↩️').setStyle(ButtonStyle.Danger))] : [],
+  }).catch(() => {});
+}
+
+/** Knopf aus der DM: Fehlalarm rückgängig machen (nur der Server-Inhaber) */
+async function handleUndo(i) {
+  const [, , guildId, userId] = i.customId.split(':');
+  const guild = i.client.guilds.cache.get(guildId);
+  if (!guild) return i.reply({ content: 'Den Server finde ich nicht mehr.' });
+  if (i.user.id !== guild.ownerId) return i.reply({ content: 'Das darf nur der Server-Inhaber.' });
+  const key = `${guildId}:${userId}`;
+  const saved = store.get('antinukeUndo', key);
+  const member = await guild.members.fetch(userId).catch(() => null);
+  if (!member) return i.reply({ content: 'Die Person ist nicht mehr auf dem Server.' });
+  const lines = [];
+  const roles = (saved?.roles || []).filter(id => guild.roles.cache.get(id)?.editable && !member.roles.cache.has(id));
+  if (roles.length) await member.roles.add(roles, 'Anti-Nuke: Fehlalarm, Rollen zurück').then(() => lines.push(`${roles.length} Rollen zurückgegeben`)).catch(e => lines.push(`⚠️ Rollen: ${e.message}`));
+  if (member.isCommunicationDisabled()) await member.timeout(null, 'Anti-Nuke: Fehlalarm').then(() => lines.push('Timeout aufgehoben')).catch(e => lines.push(`⚠️ Timeout: ${e.message}`));
+  const cfg = getConfig(guildId);
+  if (!cfg.antinuke.trusted.includes(userId)) { cfg.antinuke.trusted.push(userId); saveConfig(guildId); }
+  lines.push('ab jetzt vertrauenswürdig (Anti-Nuke greift bei ihr/ihm nicht mehr)');
+  store.delete('antinukeUndo', key);
+  alert(guild, '↩️ Fehlalarm rückgängig gemacht', `<@${userId}>: ${lines.join(' · ')}`, COLORS.ok);
+  return i.update({ content: `${i.message.content.split('\n')[0]}\n✅ **Rückgängig gemacht:** ${lines.join(' · ')}`, components: [] });
 }
 
 async function restore(guild, list) {
@@ -220,4 +249,4 @@ async function restore(guild, list) {
   return out;
 }
 
-module.exports = { onAuditEntry, rememberChannel, rememberRole, isTrusted };
+module.exports = { onAuditEntry, rememberChannel, rememberRole, isTrusted, handleUndo, DANGEROUS };

@@ -46,9 +46,21 @@ async function refresh(guild, messageId) {
   await msg.edit({ embeds: [embed(panel)], components: components(panel) });
 }
 
+/** Knöpfe, die schon auf der Nachricht sind, aber (noch) nicht im Speicher stehen, übernehmen – sonst würden sie beim nächsten Ändern verschwinden */
+async function adopt(guild, messageId, panel) {
+  const msg = await guild.channels.cache.get(panel.channelId)?.messages.fetch(messageId).catch(() => null);
+  const byStyle = Object.fromEntries(Object.entries(STYLE).map(([k, v]) => [v, k]));
+  for (const c of (msg?.components || []).flatMap(row => row.components || [])) {
+    const roleId = c.customId?.startsWith('rp:') ? c.customId.slice(3) : null;
+    if (!roleId || panel.roles.some(r => r.roleId === roleId) || !guild.roles.cache.has(roleId)) continue;
+    panel.roles.push({ roleId, label: c.label || guild.roles.cache.get(roleId).name, emoji: c.emoji?.id ? null : c.emoji?.name || null, style: byStyle[c.style] || 'grau' });
+  }
+}
+
 async function addRole(guild, messageId, { role, label, emoji, style }) {
   const panel = store.get('rolepanels', messageId);
   if (!panel || panel.guildId !== guild.id) throw new Error('Unbekannte Panel-ID. Nimm die Nachrichten-ID des Panels (Rechtsklick/gedrückt halten → ID kopieren).');
+  await adopt(guild, messageId, panel);
   if (panel.roles.length >= 25) throw new Error('Maximal 25 Rollen pro Panel.');
   if (!role.editable) throw new Error(`Ich kann ${role} nicht vergeben – meine Rolle muss darüber stehen.`);
   panel.roles = panel.roles.filter(r => r.roleId !== role.id);
@@ -60,6 +72,7 @@ async function addRole(guild, messageId, { role, label, emoji, style }) {
 async function removeRole(guild, messageId, roleId) {
   const panel = store.get('rolepanels', messageId);
   if (!panel || panel.guildId !== guild.id) throw new Error('Unbekannte Panel-ID.');
+  await adopt(guild, messageId, panel);
   panel.roles = panel.roles.filter(r => r.roleId !== roleId);
   store.set('rolepanels', messageId, panel);
   await refresh(guild, messageId);
@@ -122,4 +135,4 @@ function latestIn(guildId, channelId) {
   return ids.sort((a, b) => (BigInt(a) < BigInt(b) ? 1 : -1))[0] || null;
 }
 
-module.exports = { create, addRole, removeRole, onButton, onSelect, latestIn, parseRoleList, STYLE };
+module.exports = { create, addRole, removeRole, adopt, embed, components, onButton, onSelect, latestIn, parseRoleList, STYLE };
