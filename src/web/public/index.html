@@ -562,6 +562,10 @@ const SECTIONS = [
       ['goodbye.channel', 'channel', 'Kanal', TXT],
       ['goodbye.message', 'textarea', 'Nachricht', null, 'Platzhalter: {username} {server} {count}'],
     ] },
+    { title: '🔒 Dauerhafte Mitglieder-Rolle', note: 'Wer die Rolle einmal hat, kommt auf eine Liste (gespeichert auf dem Laptop) und verliert sie nicht mehr – nimmt sie jemand weg, gibt der Bot sie sofort zurück, auch nach Verlassen und Wiederkommen. Der Regeln-Knopf gibt sie nur, nimmt sie nie weg. Austragen: /mitglied entfernen.', fields: [
+      ['memberRole.enabled', 'toggle', 'An'],
+      ['memberRole.role', 'role', 'Rolle (leer = die Rolle mit „Mitglied“ im Namen)'],
+    ] },
     { title: 'Regeln akzeptieren', action: ['postRules', 'Regeln posten / aktualisieren'], fields: [
       ['verify.channel', 'channel', 'Regel-Kanal', TXT],
       ['verify.role', 'role', 'Rolle nach dem Akzeptieren'],
@@ -1269,6 +1273,7 @@ function demoData() {
       stats: { enabled: false }, suggestions: { channel: null },
       counting: { enabled: true, channel: byName('allgemein'), current: 41, record: 128, resetOnFail: true, welcome: '🧮 **Zählspiel!** Schreibt nacheinander die nächste Zahl.', failMessage: '❌ {user} hat sich verzählt – richtig wäre **{expected}** gewesen.' },
       freegames: { enabled: true, channel: byName('allgemein'), role: null, deleteExpired: true },
+      memberRole: { enabled: true, role: null },
       alert: { enabled: false, webhook: null, mentions: [], message: '🚨 **ETC. Bot ist offline!** Bitte nachsehen.' },
       backups: { enabled: true, keep: 7 },
       lockdownAlarm: { voice: true, chatChannel: null, reason: 'Auf Befehl von Basti' },

@@ -152,6 +152,7 @@ client.once(Events.ClientReady, safe('ready', async c => {
   setInterval(() => clips.cleanup(), 12 * 3_600_000).unref();
   // Mitgliederlisten laden (für Statistik, Bestenlisten, Schutz)
   if (c.options.intents.has(I.GuildMembers)) for (const g of c.guilds.cache.values()) await g.members.fetch().catch(() => {});
+  for (const g of c.guilds.cache.values()) await require('./modules/sticky').sync(g).catch(e => console.error('[mitglied]', e));
   extras.updateStats(c).catch(() => {});
   const invite = `https://discord.com/oauth2/authorize?client_id=${c.user.id}&permissions=8&scope=bot%20applications.commands`;
   console.log(`[bot] Einladungslink: ${invite}`);
@@ -193,12 +194,16 @@ client.on(Events.GuildMemberAdd, safe('memberAdd', async member => {
   if (await antiraid.onJoin(member)) return;
   await verify.onJoin(member);
   await welcome.onJoin(member);
+  await require('./modules/sticky').check(member); // Stamm-Mitglied wieder da → Rolle zurück
 }));
 client.on(Events.GuildMemberRemove, safe('memberRemove', async member => {
   await logs.memberRemove(member);
   await welcome.onLeave(member);
 }));
-client.on(Events.GuildMemberUpdate, safe('memberUpdate', logs.memberUpdate));
+client.on(Events.GuildMemberUpdate, safe('memberUpdate', async (o, n) => {
+  await logs.memberUpdate(o, n);
+  await require('./modules/sticky').check(n);
+}));
 client.on(Events.VoiceStateUpdate, safe('voice', async (o, n) => {
   await tempvoice.onVoiceUpdate(o, n);
   await logs.voiceUpdate(o, n);

@@ -303,6 +303,29 @@ module.exports = [
     execute: i => dashboard.show(i),
   },
   {
+    data: new SlashCommandBuilder().setName('mitglied').setDescription('Dauerhafte Mitglieder-Rolle: Liste ansehen oder jemanden austragen')
+      .setDefaultMemberPermissions(P.ManageRoles)
+      .addSubcommand(s => s.setName('liste').setDescription('Wer steht auf der Liste? (gespeichert auf dem Laptop)'))
+      .addSubcommand(s => s.setName('entfernen').setDescription('Person austragen und Rolle wegnehmen')
+        .addUserOption(o => o.setName('person').setDescription('Wen?').setRequired(true))),
+    async execute(i) {
+      const sticky = require('../modules/sticky');
+      const role = sticky.roleOf(i.guild);
+      if (!role) return respond(i, err('Keine dauerhafte Mitglieder-Rolle eingestellt (Dashboard → 🔒 Dauerhafte Mitglieder-Rolle).'));
+      if (i.options.getSubcommand() === 'liste') {
+        const all = sticky.list(i.guild.id).sort((a, b) => a.since - b.since);
+        return respond(i, new EmbedBuilder().setColor(COLORS.brand).setTitle(`🔒 Dauerhaft ${role.name}: ${all.length}`)
+          .setDescription(`${all.slice(0, 150).map(e => `<@${e.userId}>`).join(' ') || 'Noch niemand.'}${all.length > 150 ? ` … und ${all.length - 150} weitere` : ''}\n\n-# Wer hier steht, bekommt ${role} automatisch zurück. Austragen: \`/mitglied entfernen\``));
+      }
+      const u = i.options.getUser('person');
+      const was = sticky.isListed(i.guild.id, u.id);
+      sticky.forget(i.guild.id, u.id); // erst austragen, sonst gibt der Bot die Rolle gleich zurück
+      const member = await i.guild.members.fetch(u.id).catch(() => null);
+      if (member?.roles.cache.has(role.id)) await member.roles.remove(role, `/mitglied entfernen von ${i.user.tag}`).catch(() => {});
+      return respond(i, ok(`${u} ${was ? 'ist ausgetragen' : 'stand nicht auf der Liste'}${member ? ` – ${role} wurde entfernt` : ''}.`));
+    },
+  },
+  {
     data: new SlashCommandBuilder().setName('tunnel').setDescription('Link zum Dashboard (vom Handy oder anderen PC aus)')
       .setDefaultMemberPermissions(P.ManageGuild),
     async execute(i) {

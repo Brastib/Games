@@ -937,6 +937,41 @@ async function test(name, fn) {
     await an.onAuditEntry({ action: AuditLogEvent.MemberRoleUpdate, executorId: 'vize', targetId: 'fremd', changes: [{ key: '$add', new: [{ id: 'r-vize' }] }] }, guild);
     assert.deepStrictEqual(removed, [], 'der Vize darf Rollen vergeben');
   });
+  await test('Dauerhafte Mitglieder-Rolle: wird gemerkt, kommt zurück, Regeln-Knopf nimmt sie nie weg', async () => {
+    const sticky = require('../src/modules/sticky');
+    const rp = require('../src/modules/rolepanels');
+    const { Collection: Col } = require('discord.js');
+    const role = { id: 'r-mit', name: 'ETC. Mitglied', managed: false, editable: true, toString: () => '@ETC. Mitglied' };
+    const guild = { id: 'g-st', name: 'Test', roles: { cache: new Col([['r-mit', role], ['r-x', { id: 'r-x', name: 'Repo', managed: false }]]) }, members: { cache: new Col() } };
+    const mk = (id, has) => {
+      const cache = new Col(has ? [['r-mit', role]] : []);
+      return { id, guild, user: { bot: false, username: id, tag: id }, roles: { cache, add: async r => { cache.set(r.id || r, role); }, remove: async r => { cache.delete(r.id || r); } } };
+    };
+    assert.strictEqual(sticky.roleOf(guild)?.id, 'r-mit', 'Rolle mit „Mitglied“ im Namen wird erkannt');
+    const a = mk('anna', true);
+    guild.members.cache.set('anna', a);
+    await sticky.sync(guild);
+    assert(sticky.isListed('g-st', 'anna'), 'beim Start eingetragen');
+    a.roles.cache.delete('r-mit');            // jemand nimmt die Rolle weg …
+    await sticky.check(a);
+    assert(a.roles.cache.has('r-mit'), '… der Bot gibt sie zurück');
+    const b = mk('ben', false);
+    await sticky.check(b);
+    assert(!b.roles.cache.has('r-mit'), 'wer nie Mitglied war, bekommt nichts');
+    // Regeln-Knopf: zweiter Klick nimmt die Rolle nicht weg
+    const replies = [];
+    const i = { guild, member: a, message: { id: 'kein-panel' }, replied: false, deferred: false, reply: async p => replies.push(p) };
+    await rp.onButton(i, 'r-mit');
+    assert(a.roles.cache.has('r-mit'), 'Rolle bleibt');
+    assert(/schon/.test(replies[0].embeds[0].data.description));
+    // Austragen
+    sticky.forget('g-st', 'anna');
+    a.roles.cache.delete('r-mit');
+    await sticky.check(a);
+    assert(!a.roles.cache.has('r-mit'), 'nach /mitglied entfernen bleibt sie weg');
+    getConfig('g-st').memberRole.enabled = false;
+    assert.strictEqual(sticky.roleOf(guild), null, 'abschaltbar');
+  });
   await test('Rollen-Panel: Knöpfe auf der Nachricht werden übernommen, nicht überschrieben', async () => {
     const rp = require('../src/modules/rolepanels');
     const { ButtonStyle: BS } = require('discord.js');

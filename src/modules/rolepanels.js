@@ -84,6 +84,10 @@ async function onButton(interaction, roleId) {
   const role = interaction.guild.roles.cache.get(roleId);
   if (!role) return respond(interaction, err('Diese Rolle gibt es nicht mehr.'));
   try {
+    // Dauerhafte Mitglieder-Rolle (Regeln-Knopf): nur einmal holen, nie wieder abgeben
+    if (member.roles.cache.has(roleId) && require('./sticky').roleOf(interaction.guild)?.id === roleId) {
+      return respond(interaction, ok(`Du hast ${role} schon – die Rolle bleibt dir dauerhaft.`));
+    }
     if (member.roles.cache.has(roleId)) {
       await member.roles.remove(roleId, 'Rollen-Panel');
       return respond(interaction, ok(`Rolle ${role} entfernt.`));
@@ -106,7 +110,8 @@ async function onSelect(interaction) {
   const all = panel.roles.map(r => r.roleId);
   const wanted = new Set(interaction.values);
   const add = all.filter(id => wanted.has(id) && !member.roles.cache.has(id));
-  const remove = all.filter(id => !wanted.has(id) && member.roles.cache.has(id));
+  const keep = require('./sticky').roleOf(interaction.guild)?.id; // dauerhafte Rolle nie abgeben
+  const remove = all.filter(id => !wanted.has(id) && member.roles.cache.has(id) && id !== keep);
   await interaction.deferReply({ flags: EPHEMERAL });
   try {
     if (add.length) await member.roles.add(add, 'Rollen-Panel');

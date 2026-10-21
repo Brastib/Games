@@ -128,7 +128,7 @@ const SCHEMA = {
   'antiraid.minAccountDays': v.int(0, 365), 'antiraid.accountAction': v.oneOf('kick', 'ban', 'timeout'),
 
   'antinuke.enabled': v.bool(), 'antinuke.threshold': v.int(2, 50), 'antinuke.seconds': v.int(5, 600),
-  'antinuke.punishment': v.oneOf('strip', 'kick', 'ban'), 'antinuke.restore': v.bool(), 'antinuke.blockBots': v.bool(), 'antinuke.trusted': v.users(), 'antinuke.trustedRoles': v.roles(),
+  'antinuke.punishment': v.oneOf('strip', 'kick', 'ban'), 'antinuke.restore': v.bool(), 'antinuke.blockBots': v.bool(), 'antinuke.trusted': v.users(), 'antinuke.trustedRoles': v.roles(), 'memberRole.enabled': v.bool(), 'memberRole.role': v.role(),
 
   'tempvoice.enabled': v.bool(), 'tempvoice.panelInChat': v.bool(), 'tempvoice.hubs': v.hubs(),
   'tickets.enabled': v.bool(), 'tickets.supportRoles': v.roles(), 'tickets.logChannel': v.channel(TEXT), 'tickets.maxOpen': v.int(1, 5),

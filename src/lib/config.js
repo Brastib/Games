@@ -93,6 +93,8 @@ function defaults() {
       failMessage: '❌ {user} hat sich verzählt – richtig wäre **{expected}** gewesen. Rekord: **{record}**. Wir fangen wieder bei **1** an!',
     },
     freegames: { enabled: false, channel: null, deleteExpired: true, role: null },
+    // Dauerhafte Mitglieder-Rolle: wer sie einmal hat, verliert sie nicht mehr (role: null = die Rolle mit „Mitglied“ im Namen)
+    memberRole: { enabled: true, role: null },
     fun: { enabled: true },
     prefix: { enabled: true, char: '!' }, // !createvoice / !createtext
     alert: { enabled: false, webhook: null, mentions: [], message: '🚨 **ETC. Bot ist offline!** Bitte nachsehen.' },
