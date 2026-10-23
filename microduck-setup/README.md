@@ -15,9 +15,10 @@ Auf Windows läuft es deshalb in WSL2 mit Ubuntu.
 | Befehlsoptionen `--agent.logger`, `--env.scene.num-envs`, `--checkpoint-file` | per `--help` geprüft |
 | PC (FliegeBOX, Windows 11 Build 26200): WSL 3.0.3 + Ubuntu 24.04 | installiert, nach WSL-Reparatur (siehe Fehlertabelle) |
 | PC: `setup-microduck.sh` komplett | ok: Treiber 617.42, `uv sync` 3,5 Min., GPU-Test auf RTX 4070 Ti SUPER bestanden |
-| PC: Training, Dauer, GPU-Speicher bei 4096 Umgebungen | **noch nicht getestet** |
+| PC: Training mit 4096 Umgebungen | läuft: ca. 3,3 s pro Iteration allein, ca. 8,5 s mit WARDOGS nebenbei, kein Speicherproblem. Erster Lauf `2026-10-23_17-36-43_velocity` bei Iteration 1133 (1:43 h) gestoppt, letzter Checkpoint `model_1000.pt` |
+| PC: `status.sh`, `train-watchdog.sh`, Viewer mit trainierter Ente | noch nicht getestet |
 
-Nächster Schritt: Training starten (Schritt 3).
+Nächster Schritt: `model_1000.pt` im Viewer anschauen, dann mit `train-watchdog.sh` weitertrainieren.
 
 ## Was du brauchst
 

@@ -51,7 +51,7 @@ Der Körper muss nur lernen, sicher dorthin zu laufen, wo das Verhalten hinwill.
 
 ## Meilensteine (Vorschlag)
 
-1. Laufen auf flachem Boden trainieren (läuft gerade, Iteration ~275 nach 13 Min., ca. 3,3 s pro Iteration).
+1. Laufen auf flachem Boden trainieren (erster Lauf bei Iteration 1133 gestoppt, Checkpoint `model_1000.pt`; Drehen deutlich besser, Geradeaus-Tempo noch ungenau).
 2. Mod-Grundgerüst: Enten-Pet ohne Physik (Modell, zähmen, folgen) für Loader/Version des Packs.
 3. Brücke Mod <-> Simulation auf Bastis PC: Ente läuft mit dem trainierten Gehirn in Minecraft (zuerst flach).
 4. Neue Trainingsaufgabe: Block-Gelände + Höhen-Scan. Danach Blöcke aus Minecraft in die Zwillingswelt.
