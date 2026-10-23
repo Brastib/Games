@@ -59,8 +59,16 @@ Der Körper muss nur lernen, sicher dorthin zu laufen, wo das Verhalten hinwill.
 6. Voice-Mod-Anbindung.
 7. Optional: echtes Kamerabild (Stufe B).
 
+## Entscheidungen (Antworten von Basti, 23.10.2026)
+
+- Modloader: **Fabric**.
+- Voice-Mod: **Simple Voice Chat**.
+- Die Ente soll **auf Sprache hören** (z. B. „Ente, komm her“) und **selbst Geräusche machen**.
+- Hosting: **Basti hostet auf seinem PC**. Dadurch kann die Simulation direkt neben dem Server laufen.
+  Tom braucht den Mod trotzdem auch (Modell und Animationen auf seiner Seite).
+
 ## Offene Fragen
 
-- Minecraft-Version und Modloader des Packs (Fabric / NeoForge / Forge)?
-- Welcher Voice-Mod (Simple Voice Chat / Plasmo Voice)? Was soll die Ente damit tun?
-- Wie spielt ihr zusammen (Basti hostet / gemieteter Server / Tom hostet)?
+- Genaue Minecraft-Version des Packs (steht in der Modrinth App im Profil, z. B. „Fabric 1.21.1“).
+- Spracherkennung: offline auf Bastis PC (z. B. Vosk oder Whisper). Noch nicht ausgewählt und nicht getestet.
+- Maßstab der Ente in Minecraft.
