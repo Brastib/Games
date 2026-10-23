@@ -1,7 +1,7 @@
 # MicroDuck-Training auf Windows (WSL2 + Ubuntu)
 
 Trainiert die Lauf-Policy von [pollen-robotics/microduck_rl](https://github.com/pollen-robotics/microduck_rl)
-auf deinem PC (RTX 4070 Super). Das Projekt braucht Linux und eine NVIDIA-GPU mit CUDA.
+auf deinem PC (RTX 4070 Ti Super, 16 GB). Das Projekt braucht Linux und eine NVIDIA-GPU mit CUDA.
 Auf Windows läuft es deshalb in WSL2 mit Ubuntu.
 
 ## Stand (23.10.2026)
@@ -13,9 +13,11 @@ Auf Windows läuft es deshalb in WSL2 mit Ubuntu.
 | CPU-Tests von microduck_rl im Container | 263 bestanden, 1 übersprungen |
 | `check_gpu.py`: Warp-Kernel + Importe, im Container auf CPU umgestellt | ok (auf GPU nicht getestet) |
 | Befehlsoptionen `--agent.logger`, `--env.scene.num-envs`, `--checkpoint-file` | per `--help` geprüft |
-| Alles auf deinem PC: WSL-Installation, GPU in WSL, Training, Dauer, GPU-Speicher | **noch nicht getestet** |
+| PC (FliegeBOX, Windows 11 Build 26200): WSL 3.0.3 + Ubuntu 24.04 | installiert, nach WSL-Reparatur (siehe Fehlertabelle) |
+| PC: `setup-microduck.sh` komplett | ok: Treiber 617.42, `uv sync` 3,5 Min., GPU-Test auf RTX 4070 Ti SUPER bestanden |
+| PC: Training, Dauer, GPU-Speicher bei 4096 Umgebungen | **noch nicht getestet** |
 
-Nächster Schritt: Schritt 1 unten auf dem PC ausführen.
+Nächster Schritt: Training starten (Schritt 3).
 
 ## Was du brauchst
 
@@ -84,7 +86,7 @@ Wichtig zu wissen:
 - **Checkpoints** kommen alle 250 Iterationen nach
   `~/microduck_rl/logs/rsl_rl/velocity/<Datum_Zeit>_velocity/model_<Iteration>.pt`.
   Beim Stoppen gehen höchstens die Iterationen seit dem letzten Checkpoint verloren.
-- **GPU-Speicher:** Ob 4096 Umgebungen in die 12 GB der 4070 Super passen, ist nicht getestet.
+- **GPU-Speicher:** Ob 4096 Umgebungen in die 16 GB der 4070 Ti Super passen, ist nicht getestet.
   Bei „out of memory“: `NUM_ENVS=2048 bash .../train-velocity.sh`.
 
 ## Danach: Policy ansehen und exportieren (ungetestet)
@@ -104,6 +106,7 @@ einen Web-Viewer (viser), den man im Windows-Browser öffnet. Beides ist auf dei
 
 | Meldung | Lösung |
 |---|---|
+| `wsl --install`: „WSL-Installation scheint beschädigt“ (`Wsl/CallMsi/Install/REGDB_E_CLASSNOTREG`) | Taste drücken, WSL repariert sich (bei Basti: Update auf 3.0.3). Mit `wsl --version` prüfen, PC neu starten, `wsl --install -d Ubuntu-24.04` erneut. Hilft das nicht: WSL-MSI von github.com/microsoft/WSL/releases installieren. |
 | `nvidia-smi` nicht gefunden / Fehler | Windows-NVIDIA-Treiber aktualisieren, in PowerShell `wsl --update` und `wsl --shutdown`, Ubuntu neu öffnen. |
 | `WSL1 erkannt` | In PowerShell: `wsl --set-version Ubuntu-24.04 2` |
 | `uv sync` bricht beim Download ab | Skript einfach erneut starten. Bereits geladene Pakete bleiben im Cache. |
