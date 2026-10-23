@@ -89,6 +89,32 @@ Wichtig zu wissen:
 - **GPU-Speicher:** Ob 4096 Umgebungen in die 16 GB der 4070 Ti Super passen, ist nicht getestet.
   Bei „out of memory“: `NUM_ENVS=2048 bash .../train-velocity.sh`.
 
+## Training überwachen
+
+**Kurzer Status** (ca. 10 Zeilen, ideal zum Kopieren in den Chat statt der ganzen Ausgabe):
+
+```bash
+bash ~/Games/microduck-setup/wsl/status.sh
+```
+
+Zeigt Iteration, ob das Training noch läuft, Belohnung, Episodenlänge, Sturz-Anteil,
+Tempo-Fehler (jeweils mit Trend), neuesten Checkpoint und GPU-Auslastung.
+Läuft das Training nicht mehr, zeigt es die letzten Zeilen der Trainingsausgabe
+(nur wenn mit dem Watchdog gestartet).
+
+**Automatisch weitermachen nach Absturz** (z. B. wenn ein Spiel nebenbei den Grafikspeicher braucht):
+
+```bash
+bash ~/Games/microduck-setup/wsl/train-watchdog.sh
+```
+
+Startet das Training beim neuesten Checkpoint (oder neu, wenn es keinen gibt). Stürzt es ab,
+wartet es 1, 2, 4, 8, 16 Minuten und setzt jeweils beim neuesten Checkpoint fort, höchstens
+5-mal (`MAX_RESTARTS=10` für mehr). `Strg+C` beendet alles. Die Ausgabe landet zusätzlich in
+`~/microduck_rl/logs/train-console.log`.
+
+Mit nachgebauten Logs im Container getestet; auf dem PC noch nicht.
+
 ## Danach: Policy ansehen und exportieren (ungetestet)
 
 Mit lokalem Checkpoint statt wandb (beide Skripte von microduck_rl/mjlab haben dafür `--checkpoint-file`):
@@ -119,3 +145,5 @@ einen Web-Viewer (viser), den man im Windows-Browser öffnet. Beides ist auf dei
 - `wsl/setup-microduck.sh`: Einrichtung in Ubuntu (Schritt 2).
 - `wsl/check_gpu.py`: GPU-Test, wird vom Setup-Skript aufgerufen.
 - `wsl/train-velocity.sh`: Training starten (Schritt 3).
+- `wsl/train-watchdog.sh`: Training starten und nach Absturz automatisch fortsetzen.
+- `wsl/status.sh` + `wsl/status.py`: kurzer Statusbericht zum Training.
