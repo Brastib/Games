@@ -1,0 +1,15 @@
+[Unit]
+Description=Wake-on-LAN Gmail-Ausloeser (WAKE-PC)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+ExecStart=/usr/bin/env python3 @LIBDIR@/gmail_trigger.py --config @CONFIG@ --state @STATE@
+Restart=always
+RestartSec=30
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
