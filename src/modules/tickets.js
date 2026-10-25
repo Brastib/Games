@@ -18,10 +18,10 @@ const { truncate } = require('../lib/util');
 function panelMessage(title, description) {
   return require('../lib/glasspanel').glassPanel({
     banner: { title: title || 'Support', icon: 'ticket', caption: 'Ein privater Kanal nur für dich und das Team' },
-    text: description || 'Du brauchst Hilfe oder möchtest etwas melden?\nTippe auf den Knopf – dann öffnet sich ein **privater Kanal** nur für dich und das Team.',
+    text: description || null,
     rows: [new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('tk:open').setLabel('Ticket öffnen').setEmoji('🎫').setStyle(ButtonStyle.Secondary))],
-    footer: 'ETC. Bot · Support',
+    hint: 'Hilfe, Fragen oder etwas melden – nur das Team liest mit',
   });
 }
 

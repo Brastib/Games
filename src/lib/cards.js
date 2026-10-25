@@ -319,7 +319,7 @@ async function recapCard(r) {
  * Animiert (GIF): Ein Schimmer läuft über den Titel wie bei „Zum Ausschalten streichen“, die Knopfkante atmet.
  * Ohne ffmpeg gibt es ein Standbild. Fertige GIFs liegen im Cache (DATA_DIR/banner-cache).
  */
-const BANNER_VERSION = 4;
+const BANNER_VERSION = 5;
 const BW = 1200, BH = 400;
 
 /** Icons im Stil von SF Symbols (24er-Raster, weiße Linien) */
@@ -417,8 +417,8 @@ function bannerFrame(opts, t, scale = 1) {
   tg.addColorStop(1, base);
   ctx.fillStyle = tg; ctx.fillText(title, tx, ty);
   // Hinweis darunter
-  ctx.letterSpacing = '0px'; ctx.fillStyle = 'rgba(214,170,176,0.62)';
-  ctx.font = fitText(ctx, caption, BW - 200, 23, 'Inter Medium');
+  ctx.letterSpacing = '0px'; ctx.fillStyle = 'rgba(222,180,186,0.72)';
+  ctx.font = fitText(ctx, caption, BW - 200, 28, 'Inter Medium'); // groß genug fürs Handy
   if (caption) ctx.fillText(caption, BW / 2, py + ph + 52);
   return canvas;
 }

@@ -37,13 +37,11 @@ function embed(panel) {
  */
 async function render(panel) {
   if (!panel.banner) return { embeds: [embed(panel)], components: components(panel) };
-  const lines = [];
-  if (panel.title && panel.title.toLowerCase() !== String(panel.banner.title).toLowerCase()) lines.push(`**${panel.title}**`);
-  lines.push(panel.description || 'Tippe auf einen Knopf, um die Rolle zu bekommen. Nochmal tippen = wieder weg.');
-  if (panel.unique) lines.push('-# Du kannst nur eine dieser Rollen gleichzeitig haben.');
+  // Das Banner sagt schon alles – Text nur, wenn beim Banner-Befehl ausdrücklich einer angegeben wurde
   return require('../lib/glasspanel').glassPanel({
-    banner: panel.banner, text: lines.join('\n'), rows: components(panel), color: panel.color,
-    footer: 'ETC. Bot · Rollen', emptyText: '*Noch keine Rollen. Füge welche mit `/rolepanel add` hinzu.*',
+    banner: panel.banner, text: panel.bannerText || null, rows: components(panel),
+    hint: panel.unique ? 'Nur eine Rolle gleichzeitig · nochmal tippen nimmt sie wieder weg' : 'Nochmal tippen nimmt die Rolle wieder weg',
+    emptyText: '*Noch keine Rollen. Füge welche mit `/rolepanel add` hinzu.*',
   });
 }
 
@@ -74,7 +72,7 @@ async function setBanner(guild, messageId, { title, caption, icon, text }) {
   if (!ch) throw new Error('Kanal des Panels nicht gefunden.');
   await adopt(guild, messageId, panel);
   panel.banner = { title, caption: caption || null, icon: icon || null }; // leer = passend zum Titel
-  if (text) { panel.description = text; panel.title = title; }
+  panel.bannerText = text || null;
   panel.bannerVersion = require('../lib/cards').BANNER_VERSION;
   const msg = await ch.send(await render(panel));
   store.set('rolepanels', msg.id, panel);

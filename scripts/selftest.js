@@ -1076,10 +1076,12 @@ async function test(name, fn) {
     assert.deepStrictEqual(deleted, ['alt'], 'alte Nachricht gelöscht');
     const p = sent[0];
     assert.strictEqual(p.flags, MF.IsComponentsV2);
-    const json = JSON.stringify(p.components[0].toJSON());
+    const json = JSON.stringify(p.components.map(c => c.toJSON()));
     assert(/attachment:\/\/banner\.(gif|png)/.test(json) === cards.available(), 'Banner-Bild oben');
+    assert(!json.includes('"description"'), 'kein ALT-Schild auf dem Banner');
     if (cards.available()) assert(json.includes('banner.gif'), 'animiert (ffmpeg ist da)');
-    assert(json.includes('rp:r1') && json.includes('Damit nicht alle gepingt werden') && json.includes('ETC. Bot · Rollen'), 'Knopf, alter Text und Fußzeile drin');
+    assert(json.includes('rp:r1') && json.includes('Nochmal tippen'), 'Knopf und leise Zeile drin');
+    assert(!json.includes('Damit nicht alle gepingt werden') && !json.includes('ETC. Bot · Rollen'), 'kein doppelter Text, keine Fußzeile');
     // Design-Änderung: Banner werden automatisch neu gezeichnet (einmal pro Version)
     let edits = 0;
     const neu = { components: [], edit: async () => { edits++; } };
@@ -1102,8 +1104,8 @@ async function test(name, fn) {
     const { MessageFlags: MF, ChannelType: CT, MessageFlagsBitField } = require('discord.js');
     const p = await tickets.panelMessage();
     assert.strictEqual(p.flags, MF.IsComponentsV2);
-    const json = JSON.stringify(p.components[0].toJSON());
-    assert(json.includes('tk:open') && json.includes('ETC. Bot · Support'));
+    const json = JSON.stringify(p.components.map(c => c.toJSON()));
+    assert(json.includes('tk:open') && json.includes('nur das Team liest mit'));
     const sent = [], deleted = [];
     const oldMsg = { author: { id: 'bot' }, flags: new MessageFlagsBitField(0), components: [{ components: [{ customId: 'tk:open' }] }], delete: async () => deleted.push(1) };
     const ch = { type: CT.GuildText, name: 'support', permissionsFor: () => ({ has: () => true }), messages: { fetch: async () => new Map([['m1', oldMsg]]) }, send: async x => sent.push(x) };
