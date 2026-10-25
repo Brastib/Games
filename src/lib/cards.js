@@ -322,36 +322,35 @@ function bannerCard({ title, kicker = 'ETC.' } = {}) {
   const g = ctx.createRadialGradient(cx, cy, 20, cx, cy, 760);
   g.addColorStop(0, '#3a0b12'); g.addColorStop(0.45, '#160709'); g.addColorStop(1, BG);
   ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-  // Uhr: 60 Striche, 12/3/6/9 in Rubin
-  ctx.lineCap = 'round';
+  // Uhr im Hintergrund (gedämpft): 60 Striche, 12/3/6/9 in Rubin, Zeiger auf 10:10
+  const hand = (deg, len, width, color, tail = 0) => {
+    const a = (deg * Math.PI) / 180, sx = Math.sin(a), sy = -Math.cos(a);
+    ctx.strokeStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(cx - sx * tail, cy - sy * tail); ctx.lineTo(cx + sx * len, cy + sy * len); ctx.stroke();
+  };
+  ctx.save();
+  ctx.globalAlpha = 0.55; ctx.lineCap = 'round';
   for (let i = 0; i < 60; i++) {
     const a = (i / 60) * Math.PI * 2, big = i % 5 === 0, quarter = i % 15 === 0, r2 = R - (big ? 30 : 14);
     ctx.strokeStyle = quarter ? ACCENT : big ? '#7a1f2a' : '#3d1219';
     ctx.lineWidth = big ? 7 : 4;
     ctx.beginPath(); ctx.moveTo(cx + Math.sin(a) * R, cy - Math.cos(a) * R); ctx.lineTo(cx + Math.sin(a) * r2, cy - Math.cos(a) * r2); ctx.stroke();
   }
-  // „ETC.“ wie ein Markenname auf dem Zifferblatt: oben zwischen den Zeigern (10:10 wie in jeder Uhren-Werbung)
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  let size = 80;
-  do { ctx.font = `${size}px "Orbitron"`; size -= 2; } while (ctx.measureText('ETC.').width > R * 0.82 && size > 24);
-  const ty = cy - R * 0.56;
-  const tg = ctx.createLinearGradient(0, ty - size / 2, 0, ty + size / 2);
-  tg.addColorStop(0, '#ff6b7d'); tg.addColorStop(1, ACCENT);
-  ctx.save(); ctx.shadowColor = 'rgba(224,52,79,0.6)'; ctx.shadowBlur = 26; ctx.fillStyle = tg; ctx.fillText('ETC.', cx, ty); ctx.restore();
-  ctx.fillStyle = tg; ctx.fillText('ETC.', cx, ty);
-  // Zeiger: Stunde, Minute (Rubin), Sekunde (hell, dünn, mit Gegengewicht), Mittelkappe
-  const hand = (deg, len, width, color, tail = 0) => {
-    const a = (deg * Math.PI) / 180, sx = Math.sin(a), sy = -Math.cos(a);
-    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(cx - sx * tail, cy - sy * tail); ctx.lineTo(cx + sx * len, cy + sy * len); ctx.stroke();
-  };
-  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 10;
-  hand(305, R * 0.5, 13, ACCENT);          // Stundenzeiger auf 10
-  hand(60, R * 0.76, 9, ACCENT);           // Minutenzeiger auf 2 (10:10)
-  hand(200, R * 0.84, 3, '#ff6b7d', 26);   // Sekundenzeiger
-  ctx.restore();
+  ctx.globalAlpha = 0.4;
+  hand(305, R * 0.5, 13, ACCENT);          // Stunde
+  hand(60, R * 0.78, 9, ACCENT);           // Minute
+  hand(200, R * 0.86, 3, '#ff6b7d', 26);   // Sekunde
   ctx.fillStyle = ACCENT; ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = BG; ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  // „ETC.“ groß in der Mitte der Uhr, davor und leuchtend
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  let size = 110;
+  do { ctx.font = `${size}px "Orbitron"`; size -= 2; } while (ctx.measureText('ETC.').width > R * 1.22 && size > 30);
+  const tg = ctx.createLinearGradient(0, cy - size / 2, 0, cy + size / 2);
+  tg.addColorStop(0, '#ff6b7d'); tg.addColorStop(1, ACCENT);
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 18; ctx.fillStyle = BG; ctx.fillText('ETC.', cx, cy + 4); ctx.restore(); // dunkler Rand, damit die Zeiger dahinter nicht stören
+  ctx.save(); ctx.shadowColor = 'rgba(224,52,79,0.6)'; ctx.shadowBlur = 34; ctx.fillStyle = tg; ctx.fillText('ETC.', cx, cy + 4); ctx.restore();
+  ctx.fillStyle = tg; ctx.fillText('ETC.', cx, cy + 4);
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   // Links: Untertitel (gesperrt) + Titel
   const maxW = cx - R - 110;
