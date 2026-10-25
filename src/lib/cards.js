@@ -319,7 +319,7 @@ async function recapCard(r) {
  * Animiert (GIF): Ein Schimmer läuft über den Titel wie bei „Zum Ausschalten streichen“, die Knopfkante atmet.
  * Ohne ffmpeg gibt es ein Standbild. Fertige GIFs liegen im Cache (DATA_DIR/banner-cache).
  */
-const BANNER_VERSION = 6;
+const BANNER_VERSION = 7;
 const BW = 1200, BH = 400;
 
 /** Icons im Stil von SF Symbols (24er-Raster, weiße Linien) */

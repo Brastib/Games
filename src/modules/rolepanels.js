@@ -9,9 +9,22 @@ const { chunk } = require('../lib/util');
 
 const STYLE = { blau: ButtonStyle.Primary, grau: ButtonStyle.Secondary, gruen: ButtonStyle.Success, rot: ButtonStyle.Danger };
 
-/** Knöpfe/Menü. glass: rote Knöpfe mit Glas-Icons (Panels mit Banner), emojis: roleId → eigenes Emoji */
+/**
+ * Knöpfe/Menü. glass (Panels mit Banner): ab 2 Rollen ein dunkles Auswahlmenü (an-/abwählen), bei einer Rolle ein grauer Knopf –
+ * Discords Knopf-Farben passen nicht zum Banner, das Menü schon. emojis: roleId → eigenes Glas-Emoji.
+ */
 function components(panel, { glass = false, emojis = {} } = {}) {
   if (!panel.roles.length) return [];
+  if (glass && panel.roles.length >= 2) {
+    const games = panel.banner?.icon === 'gamepad' || /spiel|game/i.test(panel.banner?.title || '');
+    const menu = new StringSelectMenuBuilder().setCustomId('rps:toggle').setPlaceholder(games ? 'Spiele auswählen …' : 'Rollen auswählen …')
+      .setMinValues(1).setMaxValues(panel.unique ? 1 : Math.min(25, panel.roles.length))
+      .addOptions(panel.roles.slice(0, 25).map(r => {
+        const emoji = r.emoji || emojis[r.roleId];
+        return { label: r.label.slice(0, 100), value: r.roleId, ...(emoji ? { emoji } : {}) };
+      }));
+    return [new ActionRowBuilder().addComponents(menu)];
+  }
   if (panel.mode === 'select') {
     const menu = new StringSelectMenuBuilder().setCustomId('rps:pick').setPlaceholder('Rollen auswählen …')
       .setMinValues(0).setMaxValues(panel.unique ? 1 : panel.roles.length)
@@ -19,7 +32,7 @@ function components(panel, { glass = false, emojis = {} } = {}) {
     return [new ActionRowBuilder().addComponents(menu)];
   }
   return chunk(panel.roles, 5).slice(0, 5).map(row => new ActionRowBuilder().addComponents(row.map(r => {
-    const b = new ButtonBuilder().setCustomId(`rp:${r.roleId}`).setLabel(r.label.slice(0, 80)).setStyle(glass ? ButtonStyle.Danger : STYLE[r.style] || ButtonStyle.Secondary);
+    const b = new ButtonBuilder().setCustomId(`rp:${r.roleId}`).setLabel(r.label.slice(0, 80)).setStyle(glass ? ButtonStyle.Secondary : STYLE[r.style] || ButtonStyle.Secondary);
     const emoji = r.emoji || emojis[r.roleId];
     if (emoji) b.setEmoji(emoji);
     return b;
@@ -49,7 +62,9 @@ async function render(panel, client = null) {
   // Das Banner sagt schon alles – Text nur, wenn beim Banner-Befehl ausdrücklich einer angegeben wurde
   return require('../lib/glasspanel').glassPanel({
     banner: panel.banner, text: panel.bannerText || null, rows: components(panel, { glass: true, emojis }),
-    hint: panel.unique ? 'Nur eine Rolle gleichzeitig · nochmal tippen nimmt sie wieder weg' : 'Nochmal tippen nimmt die Rolle wieder weg',
+    hint: panel.roles.length >= 2
+      ? (panel.unique ? 'Nur eine Rolle gleichzeitig · nochmal auswählen nimmt sie wieder weg' : 'Auswählen = Rolle bekommen · nochmal auswählen = wieder weg')
+      : 'Nochmal tippen nimmt die Rolle wieder weg',
     emptyText: '*Noch keine Rollen. Füge welche mit `/rolepanel add` hinzu.*',
   });
 }
@@ -96,6 +111,13 @@ async function adopt(guild, messageId, panel) {
   const byStyle = Object.fromEntries(Object.entries(STYLE).map(([k, v]) => [v, k]));
   const all = list => list.flatMap(c => [c, ...all(c.components || [])]); // auch Knöpfe im neuen Layout (in Containern)
   for (const c of all(msg?.components || [])) {
+    // Auswahlmenü im Glas-Panel: Optionen sind die Rollen
+    if (c.customId === 'rps:toggle') {
+      for (const o of c.options || []) {
+        if (!panel.roles.some(r => r.roleId === o.value) && guild.roles.cache.has(o.value)) panel.roles.push({ roleId: o.value, label: o.label, emoji: null, style: 'grau' });
+      }
+      continue;
+    }
     const roleId = c.customId?.startsWith('rp:') ? c.customId.slice(3) : null;
     if (!roleId || panel.roles.some(r => r.roleId === roleId) || !guild.roles.cache.has(roleId)) continue;
     panel.roles.push({ roleId, label: c.label || guild.roles.cache.get(roleId).name, emoji: c.emoji?.id ? null : c.emoji?.name || null, style: byStyle[c.style] || 'grau' });
@@ -187,6 +209,32 @@ async function onButton(interaction, roleId) {
   }
 }
 
+/** Auswahlmenü unter dem Banner: jede gewählte Rolle wird umgeschaltet (hast du sie → weg, sonst → bekommst du sie) */
+async function onToggle(interaction) {
+  const panel = store.get('rolepanels', interaction.message.id);
+  if (!panel) return respond(interaction, err('Dieses Panel ist nicht mehr gespeichert.'));
+  const member = interaction.member;
+  const keep = require('./sticky').roleOf(interaction.guild)?.id; // dauerhafte Rolle nie abgeben
+  const ids = panel.roles.map(r => r.roleId);
+  const picked = interaction.values.filter(id => ids.includes(id) && interaction.guild.roles.cache.has(id));
+  const add = picked.filter(id => !member.roles.cache.has(id));
+  let remove = picked.filter(id => member.roles.cache.has(id) && id !== keep);
+  if (panel.unique && add.length) remove = [...new Set([...remove, ...ids.filter(id => id !== add[0] && member.roles.cache.has(id) && id !== keep)])];
+  await interaction.deferReply({ flags: EPHEMERAL });
+  try {
+    if (add.length) await member.roles.add(add, 'Rollen-Panel');
+    if (remove.length) await member.roles.remove(remove, 'Rollen-Panel');
+  } catch (e) {
+    return respond(interaction, err(`Das hat nicht geklappt: ${e.message}`));
+  }
+  const now = ids.filter(id => (member.roles.cache.has(id) || add.includes(id)) && !remove.includes(id));
+  return respond(interaction, ok([
+    add.length ? `**Bekommen:** ${add.map(id => `<@&${id}>`).join(' ')}` : null,
+    remove.length ? `**Abgegeben:** ${remove.map(id => `<@&${id}>`).join(' ')}` : null,
+    `-# Du hast jetzt: ${now.map(id => `<@&${id}>`).join(' ') || 'keine davon'}`,
+  ].filter(Boolean).join('\n')));
+}
+
 async function onSelect(interaction) {
   const panel = store.get('rolepanels', interaction.message.id);
   if (!panel) return respond(interaction, err('Dieses Panel ist nicht mehr gespeichert.'));
@@ -224,4 +272,4 @@ function latestIn(guildId, channelId) {
   return ids.sort((a, b) => (BigInt(a) < BigInt(b) ? 1 : -1))[0] || null;
 }
 
-module.exports = { create, addRole, removeRole, adopt, migrateDesign, refreshBanners, setBanner, render, embed, components, onButton, onSelect, latestIn, parseRoleList, STYLE };
+module.exports = { create, addRole, removeRole, adopt, migrateDesign, refreshBanners, setBanner, onToggle, render, embed, components, onButton, onSelect, latestIn, parseRoleList, STYLE };

@@ -1080,7 +1080,7 @@ async function test(name, fn) {
     assert(/attachment:\/\/banner\.(gif|png)/.test(json) === cards.available(), 'Banner-Bild oben');
     assert(!json.includes('"description"'), 'kein ALT-Schild auf dem Banner');
     if (cards.available()) assert(json.includes('banner.gif'), 'animiert (ffmpeg ist da)');
-    assert(json.includes('rp:r1') && json.includes('Nochmal tippen'), 'Knopf und leise Zeile drin');
+    assert(json.includes('rp:r1') && json.includes('Nochmal tippen'), 'Knopf (eine Rolle) und leise Zeile drin');
     assert(!json.includes('Damit nicht alle gepingt werden') && !json.includes('ETC. Bot · Rollen'), 'kein doppelter Text, keine Fußzeile');
     // Design-Änderung: Banner werden automatisch neu gezeichnet (einmal pro Version)
     let edits = 0;
@@ -1135,12 +1135,28 @@ async function test(name, fn) {
     // Panel mit Banner: rote Knöpfe mit Icon
     const rp = require('../src/modules/rolepanels');
     const { ButtonStyle: BS } = require('discord.js');
-    const rows = rp.components({ roles: [{ roleId: 'r1', label: 'Repo', style: 'grau' }], mode: 'buttons' }, { glass: true, emojis: { r1: { id: '55', name: 'etc_t_re' } } });
+    // eine Rolle: grauer Knopf mit Icon
+    const rows = rp.components({ roles: [{ roleId: 'r1', label: 'Repo', style: 'rot' }], mode: 'buttons' }, { glass: true, emojis: { r1: { id: '55', name: 'etc_t_re' } } });
     const btn = rows[0].components[0].toJSON();
-    assert.strictEqual(btn.style, BS.Danger); assert.strictEqual(btn.emoji.id, '55');
+    assert.strictEqual(btn.style, BS.Secondary); assert.strictEqual(btn.emoji.id, '55');
+    // mehrere Rollen: dunkles Auswahlmenü mit Icons
+    const menu = rp.components({ banner: { title: 'Spiele-Rollen' }, roles: [{ roleId: 'r1', label: 'Repo' }, { roleId: 'r2', label: 'Rounds' }], mode: 'buttons' }, { glass: true, emojis: { r1: { id: '55', name: 'a' }, r2: { id: '56', name: 'b' } } })[0].components[0].toJSON();
+    assert.strictEqual(menu.custom_id, 'rps:toggle'); assert.strictEqual(menu.placeholder, 'Spiele auswählen …');
+    assert.strictEqual(menu.options[1].emoji.id, '56'); assert.strictEqual(menu.max_values, 2);
     const tk = await require('../src/modules/tickets').panelMessage(null, null, client);
     const tkBtn = tk.components.find(c => c.toJSON().type === 1).components[0].toJSON();
-    assert.strictEqual(tkBtn.style, BS.Danger);
+    assert.strictEqual(tkBtn.style, BS.Secondary);
+    // Umschalten: Repo hatte man schon (→ weg), Rounds nicht (→ bekommen)
+    const store = require('../src/lib/store');
+    store.set('rolepanels', 'mt', { guildId: 'g-t', channelId: 'c', roles: [{ roleId: 'r1', label: 'Repo' }, { roleId: 'r2', label: 'Rounds' }], banner: { title: 'Spiele-Rollen' } });
+    const { Collection: Col } = require('discord.js');
+    const has = new Col([['r1', {}]]), log = { add: [], remove: [] }, replies = [];
+    const i = { message: { id: 'mt' }, values: ['r1', 'r2'], guild: { id: 'g-t', roles: { cache: new Col([['r1', { name: 'Repo' }], ['r2', { name: 'Rounds' }]]) } },
+      member: { roles: { cache: has, add: async a => log.add.push(...a), remove: async a => log.remove.push(...a) } },
+      deferred: false, replied: false, deferReply: async () => { i.deferred = true; }, editReply: async p => replies.push(p) };
+    await rp.onToggle(i);
+    assert.deepStrictEqual(log, { add: ['r2'], remove: ['r1'] });
+    assert(/Bekommen/.test(replies[0].embeds[0].data.description) && /Abgegeben/.test(replies[0].embeds[0].data.description));
   });
   await test('Rollen-Panel: Knöpfe auf der Nachricht werden übernommen, nicht überschrieben', async () => {
     const rp = require('../src/modules/rolepanels');

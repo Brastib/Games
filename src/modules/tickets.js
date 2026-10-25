@@ -17,7 +17,7 @@ const { truncate } = require('../lib/util');
 /** Ticket-Panel im Glas-Look (Banner „Support“ mit Ticket-Icon, roter Knopf mit Glas-Ticket-Icon) */
 async function panelMessage(title, description, client = null) {
   const icon = client ? await require('../lib/appemojis').knob(client, { glyph: 'ticket' }) : null;
-  const button = new ButtonBuilder().setCustomId('tk:open').setLabel('Ticket öffnen').setStyle(ButtonStyle.Danger);
+  const button = new ButtonBuilder().setCustomId('tk:open').setLabel('Ticket öffnen').setStyle(ButtonStyle.Secondary);
   if (icon) button.setEmoji(icon);
   return require('../lib/glasspanel').glassPanel({
     banner: { title: title || 'Support', icon: 'ticket', caption: 'Ein privater Kanal nur für dich und das Team' },

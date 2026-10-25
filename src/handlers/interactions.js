@@ -83,7 +83,7 @@ async function onInteraction(i) {
       return;
     }
     if (i.isStringSelectMenu()) {
-      if (ns === 'rps') return await rolepanels.onSelect(i);
+      if (ns === 'rps') return action === 'toggle' ? await rolepanels.onToggle(i) : await rolepanels.onSelect(i);
       if (ns === 'tvu') return await tempvoice.handleSelect(i, action, value);
       if (ns === 'help') return await i.update(helpPayload(i.values[0]));
       if (ns === 'shop') return await economy.buy(i, i.values[0]);
