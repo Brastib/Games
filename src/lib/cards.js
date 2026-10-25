@@ -357,12 +357,12 @@ function bannerCard({ title, kicker = 'ETC.' } = {}) {
   const maxW = cx - R - 110;
   ctx.fillStyle = ROSE; ctx.letterSpacing = '8px';
   ctx.font = fitText(ctx, String(kicker).toUpperCase(), maxW, 24, 'Poppins ExtraBold');
-  ctx.fillText(String(kicker).toUpperCase(), 64, 176);
+  ctx.fillText(String(kicker).toUpperCase(), 64, 74);
   ctx.letterSpacing = '1px';
   const t = String(title || '').toUpperCase();
   ctx.font = fitText(ctx, t, maxW, 86, 'Poppins ExtraBold');
   let x = 60;
-  for (const part of t.split(/(-)/)) { ctx.fillStyle = part === '-' ? RED_TEXT : TEXT; ctx.fillText(part, x, 268); x += ctx.measureText(part).width; }
+  for (const part of t.split(/(-)/)) { ctx.fillStyle = part === '-' ? RED_TEXT : TEXT; ctx.fillText(part, x, 160); x += ctx.measureText(part).width; }
   ctx.letterSpacing = '0px';
   return canvas.encode('png');
 }
