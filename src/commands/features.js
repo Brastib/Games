@@ -172,7 +172,7 @@ module.exports = [
           const msg = await rolepanels.create(ch, { title: i.options.getString('titel'), description: i.options.getString('beschreibung'), mode: i.options.getString('modus') || 'buttons', unique: i.options.getBoolean('nur_eine') ?? false });
           const added = [], failed = [...list.missing.map(m => `„${m}“ nicht gefunden`)];
           for (const role of list.roles) {
-            await rolepanels.addRole(i.guild, msg.id, { role, style: 'rot' }).then(() => added.push(`${role}`)).catch(e => failed.push(e.message));
+            await rolepanels.addRole(i.guild, msg.id, { role, style: 'grau' }).then(() => added.push(`${role}`)).catch(e => failed.push(e.message));
           }
           return respond(i, ok([`Panel erstellt in ${ch}.`, added.length ? `**Knöpfe:** ${added.join(' ')}` : 'Weitere Rollen: `/rolepanel add rolle:…` (im Kanal des Panels)', failed.length ? `⚠️ ${failed.join(' · ')}` : null].filter(Boolean).join('\n')));
         }
@@ -184,13 +184,13 @@ module.exports = [
           const list = rolepanels.parseRoleList(i.guild, i.options.getString('rollen'));
           if (!single && !list.roles.length) return respond(i, err(list.missing.length ? `Nicht gefunden: ${list.missing.join(', ')}` : 'Gib `rolle` oder `rollen` an.'));
           if (!list.roles.length) {
-            await rolepanels.addRole(i.guild, id, { role: single, label: i.options.getString('beschriftung'), emoji: i.options.getString('emoji'), style: i.options.getString('farbe') || 'rot' });
+            await rolepanels.addRole(i.guild, id, { role: single, label: i.options.getString('beschriftung'), emoji: i.options.getString('emoji'), style: i.options.getString('farbe') || 'grau' });
             return respond(i, ok('Rolle hinzugefügt.'));
           }
           await i.deferReply({ flags: 64 });
           const added = [], failed = [...list.missing.map(m => `„${m}“ nicht gefunden`)];
           for (const role of [single, ...list.roles].filter((r, n, a) => r && a.findIndex(x => x?.id === r.id) === n)) {
-            await rolepanels.addRole(i.guild, id, { role, style: i.options.getString('farbe') || 'rot' }).then(() => added.push(`${role}`)).catch(e => failed.push(`${role.name}: ${e.message}`));
+            await rolepanels.addRole(i.guild, id, { role, style: i.options.getString('farbe') || 'grau' }).then(() => added.push(`${role}`)).catch(e => failed.push(`${role.name}: ${e.message}`));
           }
           return respond(i, (added.length ? ok : err)([added.length ? `**Hinzugefügt:** ${added.join(' ')}` : 'Keine Rolle hinzugefügt.', failed.length ? `⚠️ ${failed.join(' · ')}` : null].filter(Boolean).join('\n')));
         }

@@ -155,6 +155,7 @@ client.once(Events.ClientReady, safe('ready', async c => {
   // Mitgliederlisten laden (für Statistik, Bestenlisten, Schutz)
   if (c.options.intents.has(I.GuildMembers)) for (const g of c.guilds.cache.values()) await g.members.fetch().catch(() => {});
   for (const g of c.guilds.cache.values()) await require('./modules/sticky').sync(g).catch(e => console.error('[mitglied]', e));
+  await require('./modules/rolepanels').migrateDesign(c).catch(e => console.error('[rollen-panel]', e));
   extras.updateStats(c).catch(() => {});
   const invite = `https://discord.com/oauth2/authorize?client_id=${c.user.id}&permissions=8&scope=bot%20applications.commands`;
   console.log(`[bot] Einladungslink: ${invite}`);

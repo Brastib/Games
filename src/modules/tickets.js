@@ -19,7 +19,7 @@ function panelMessage(title, description) {
     embeds: [new EmbedBuilder().setColor(COLORS.brand).setTitle(title || '🎫 Support')
       .setDescription(description || 'Du brauchst Hilfe oder möchtest etwas melden?\nKlicke auf den Button – dann öffnet sich ein **privater Kanal** nur für dich und das Team.')],
     components: [new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('tk:open').setLabel('Ticket öffnen').setEmoji('🎫').setStyle(ButtonStyle.Danger))],
+      new ButtonBuilder().setCustomId('tk:open').setLabel('Ticket öffnen').setEmoji('🎫').setStyle(ButtonStyle.Secondary))],
   };
 }
 

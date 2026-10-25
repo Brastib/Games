@@ -59,7 +59,7 @@ function payload(e) {
     )
     .setFooter({ text: `Event #${e.id} · Erinnerung 15 Min. vorher an alle Zusagen` });
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`ev:yes:${e.id}`).setLabel('Bin dabei').setEmoji('✅').setStyle(ButtonStyle.Danger).setDisabled(!!e.ended),
+    new ButtonBuilder().setCustomId(`ev:yes:${e.id}`).setLabel('Bin dabei').setEmoji('✅').setStyle(ButtonStyle.Secondary).setDisabled(!!e.ended),
     new ButtonBuilder().setCustomId(`ev:no:${e.id}`).setLabel('Absagen').setStyle(ButtonStyle.Secondary).setDisabled(!!e.ended));
   return { embeds: [embed], components: [row], allowedMentions: { parse: [] } };
 }

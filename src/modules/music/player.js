@@ -283,7 +283,7 @@ class GuildPlayer {
     return {
       embeds: [e],
       components: [
-        new ActionRowBuilder().addComponents(b('pause', this.paused ? '▶️' : '⏸️', ButtonStyle.Danger), b('skip', '⏭️'), b('stop', '⏹️'), b('loop', '🔁', this.loop === 'off' ? ButtonStyle.Secondary : ButtonStyle.Danger), b('shuffle', '🔀')),
+        new ActionRowBuilder().addComponents(b('pause', this.paused ? '▶️' : '⏸️'), b('skip', '⏭️'), b('stop', '⏹️'), b('loop', '🔁', this.loop === 'off' ? ButtonStyle.Secondary : ButtonStyle.Danger), b('shuffle', '🔀')),
         new ActionRowBuilder().addComponents(b('back10', '⏪'), b('voldown', '🔉'), b('volup', '🔊'), b('fwd10', '⏩'), b('queue', '📜')),
       ],
     };

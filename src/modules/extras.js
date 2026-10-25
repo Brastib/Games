@@ -77,7 +77,7 @@ function suggestionPayload(s) {
   return {
     embeds: [e],
     components: [new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('sg:up').setEmoji('👍').setStyle(ButtonStyle.Danger).setDisabled(!open),
+      new ButtonBuilder().setCustomId('sg:up').setEmoji('👍').setStyle(ButtonStyle.Secondary).setDisabled(!open),
       new ButtonBuilder().setCustomId('sg:down').setEmoji('👎').setStyle(ButtonStyle.Secondary).setDisabled(!open),
       new ButtonBuilder().setCustomId('sg:accept').setLabel('Annehmen').setStyle(ButtonStyle.Secondary).setDisabled(!open),
       new ButtonBuilder().setCustomId('sg:decline').setLabel('Ablehnen').setStyle(ButtonStyle.Secondary).setDisabled(!open))],

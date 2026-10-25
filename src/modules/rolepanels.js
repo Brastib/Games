@@ -78,6 +78,25 @@ async function removeRole(guild, messageId, roleId) {
   await refresh(guild, messageId);
 }
 
+/** Einmalig nach dem Design-Wechsel (Rubin): rote Rollen-Knöpfe werden grau, alle Panels neu gezeichnet */
+async function migrateDesign(client) {
+  if (store.get('meta', 'design') === 'rubin') return 0;
+  let n = 0;
+  for (const [id, panel] of store.entries('rolepanels')) {
+    const guild = client.guilds.cache.get(panel.guildId);
+    if (!guild) continue;
+    try {
+      await adopt(guild, id, panel);
+      for (const r of panel.roles) if (r.style === 'rot') r.style = 'grau';
+      store.set('rolepanels', id, panel);
+      await refresh(guild, id);
+      n++;
+    } catch (e) { console.warn(`[rollen-panel] ${id}: ${e.message}`); }
+  }
+  store.set('meta', 'design', 'rubin');
+  return n;
+}
+
 async function onButton(interaction, roleId) {
   const panel = store.get('rolepanels', interaction.message.id);
   const member = interaction.member;
@@ -141,4 +160,4 @@ function latestIn(guildId, channelId) {
   return ids.sort((a, b) => (BigInt(a) < BigInt(b) ? 1 : -1))[0] || null;
 }
 
-module.exports = { create, addRole, removeRole, adopt, embed, components, onButton, onSelect, latestIn, parseRoleList, STYLE };
+module.exports = { create, addRole, removeRole, adopt, migrateDesign, embed, components, onButton, onSelect, latestIn, parseRoleList, STYLE };

@@ -1031,6 +1031,24 @@ async function test(name, fn) {
     assert(!store.has('levels', 'g-db:neu'), 'was es in der Sicherung nicht gab, ist weg');
     assert(store.has('recap', 'g-db:2026-10-21'), 'Bereiche, die nicht in der Sicherung sind, bleiben');
   });
+  await test('Design Rubin: Rollen-Knöpfe werden einmalig grau, Bilder ohne Dunkelrot-Schrift', async () => {
+    const rp = require('../src/modules/rolepanels');
+    const store = require('../src/lib/store');
+    const { ButtonStyle: BS } = require('discord.js');
+    let edited = null;
+    const msg = { components: [{ components: [{ customId: 'rp:r9', label: 'Rounds', style: BS.Danger }] }], edit: async p => { edited = p; } };
+    const guild = { id: 'g-ds', roles: { cache: new Map([['r9', { name: 'Rounds' }]]) }, channels: { cache: new Map([['c9', { messages: { fetch: async () => msg } }]]) } };
+    store.set('rolepanels', 'm9', { guildId: 'g-ds', channelId: 'c9', title: 'Spiele', roles: [], mode: 'buttons' });
+    store.delete('meta', 'design');
+    await rp.migrateDesign({ guilds: { cache: new Map([['g-ds', guild]]) } });
+    assert.strictEqual(store.get('rolepanels', 'm9').roles[0].style, 'grau');
+    assert.strictEqual(edited.components[0].components[0].data.style, BS.Secondary, 'Panel neu gezeichnet mit grauen Knöpfen');
+    edited = null;
+    await rp.migrateDesign({ guilds: { cache: new Map([['g-ds', guild]]) } });
+    assert.strictEqual(edited, null, 'nur einmal');
+    const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'lib', 'cards.js'), 'utf8');
+    assert(!/#(8c0000|b80000|fd0000)/i.test(src), 'keine Neon-/Dunkelrot-Farben mehr in den Bildern');
+  });
   await test('Rollen-Panel: Knöpfe auf der Nachricht werden übernommen, nicht überschrieben', async () => {
     const rp = require('../src/modules/rolepanels');
     const { ButtonStyle: BS } = require('discord.js');
