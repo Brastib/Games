@@ -1058,6 +1058,13 @@ async function test(name, fn) {
       const png = await cards.bannerCard({ title: 'Spiele-Rollen', kicker: 'ETC. · Selbst aussuchen' });
       assert(png.length > 20_000 && png.slice(1, 4).toString() === 'PNG');
       fs.writeFileSync(path.join(os.tmpdir(), 'banner-test.png'), png);
+      const t0 = Date.now();
+      const gif = await cards.bannerGif({ title: 'Spiele-Rollen', kicker: 'Selbst aussuchen' });
+      assert(gif && gif.slice(0, 6).toString() === 'GIF89a' && gif.length < 3 * 1024 * 1024, 'GIF erstellt, klein genug für Discord');
+      fs.writeFileSync(path.join(os.tmpdir(), 'banner-test.gif'), gif);
+      const t1 = Date.now();
+      assert.strictEqual((await cards.bannerGif({ title: 'Spiele-Rollen', kicker: 'Selbst aussuchen' })).length, gif.length);
+      assert(Date.now() - t1 < (t1 - t0) / 5, 'zweites Mal aus dem Cache');
     }
     const sent = [], deleted = [];
     const old = { components: [{ components: [{ customId: 'rp:r1', label: 'Repo', style: BS.Secondary }] }], delete: async () => deleted.push('alt') };
@@ -1070,7 +1077,8 @@ async function test(name, fn) {
     const p = sent[0];
     assert.strictEqual(p.flags, MF.IsComponentsV2);
     const json = JSON.stringify(p.components[0].toJSON());
-    assert(json.includes('attachment://banner.png') === cards.available(), 'Banner-Bild oben');
+    assert(/attachment:\/\/banner\.(gif|png)/.test(json) === cards.available(), 'Banner-Bild oben');
+    if (cards.available()) assert(json.includes('banner.gif'), 'animiert (ffmpeg ist da)');
     assert(json.includes('rp:r1') && json.includes('Damit nicht alle gepingt werden') && json.includes('ETC. Bot · Rollen'), 'Knopf, alter Text und Fußzeile drin');
     // Knöpfe im neuen Layout werden beim nächsten Ändern erkannt
     const panel = { channelId: 'c1', roles: [] };

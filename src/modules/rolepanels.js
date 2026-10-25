@@ -40,9 +40,13 @@ function embed(panel) {
  */
 async function render(panel) {
   if (!panel.banner) return { embeds: [embed(panel)], components: components(panel) };
-  const png = await require('../lib/cards').bannerCard(panel.banner);
+  // Animiert (GIF) wenn möglich, sonst Standbild
+  const cards = require('../lib/cards');
+  const gif = await cards.bannerGif(panel.banner).catch(() => null);
+  const png = gif ? null : await cards.bannerCard(panel.banner);
+  const file = gif ? { buf: gif, name: 'banner.gif' } : png ? { buf: png, name: 'banner.png' } : null;
   const box = new ContainerBuilder().setAccentColor(panel.color || COLORS.brand);
-  if (png) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://banner.png').setDescription(panel.banner.title)));
+  if (file) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(`attachment://${file.name}`).setDescription(panel.banner.title)));
   else box.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${panel.banner.title}`));
   const lines = [];
   if (panel.title && panel.title.toLowerCase() !== String(panel.banner.title).toLowerCase()) lines.push(`**${panel.title}**`);
@@ -54,7 +58,7 @@ async function render(panel) {
   if (rows.length) box.addActionRowComponents(...rows);
   else box.addTextDisplayComponents(new TextDisplayBuilder().setContent('*Noch keine Rollen. Füge welche mit `/rolepanel add` hinzu.*'));
   box.addTextDisplayComponents(new TextDisplayBuilder().setContent('-# ETC. Bot · Rollen'));
-  return { flags: MessageFlags.IsComponentsV2, components: [box], files: png ? [new AttachmentBuilder(png, { name: 'banner.png' })] : [] };
+  return { flags: MessageFlags.IsComponentsV2, components: [box], files: file ? [new AttachmentBuilder(file.buf, { name: file.name })] : [] };
 }
 
 async function create(channel, { title, description, mode, unique }) {
