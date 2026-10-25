@@ -156,7 +156,8 @@ client.once(Events.ClientReady, safe('ready', async c => {
   if (c.options.intents.has(I.GuildMembers)) for (const g of c.guilds.cache.values()) await g.members.fetch().catch(() => {});
   for (const g of c.guilds.cache.values()) await require('./modules/sticky').sync(g).catch(e => console.error('[mitglied]', e));
   await require('./modules/rolepanels').migrateDesign(c).catch(e => console.error('[rollen-panel]', e));
-  require('./modules/rolepanels').refreshBanners(c).catch(e => console.error('[rollen-panel]', e)); // läuft im Hintergrund (GIF rendern dauert)
+  require('./modules/rolepanels').refreshBanners(c).catch(e => console.error('[rollen-panel]', e)) // läuft im Hintergrund (GIF rendern dauert)
+    .then(() => require('./modules/tickets').upgradePanels(c)).catch(e => console.error('[tickets]', e));
   extras.updateStats(c).catch(() => {});
   const invite = `https://discord.com/oauth2/authorize?client_id=${c.user.id}&permissions=8&scope=bot%20applications.commands`;
   console.log(`[bot] Einladungslink: ${invite}`);

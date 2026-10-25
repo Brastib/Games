@@ -295,7 +295,7 @@ function start(client) {
         const tickets = require('../modules/tickets');
         const cfg = getConfig(g.id);
         if (!cfg.tickets.category || !g.channels.cache.has(cfg.tickets.category)) await tickets.setup(g, { panelChannel: ch });
-        else await ch.send(tickets.panelMessage());
+        else await ch.send(await tickets.panelMessage());
         cfg.tickets.enabled = true; saveConfig(g.id);
         message = `Ticket-Button in #${ch.name} gepostet.`;
       } else if (type === 'postAnimal' || type === 'postLeaderboard' || type === 'postRecap') {

@@ -1096,6 +1096,23 @@ async function test(name, fn) {
     await rp.adopt(guild, 'neu1', panel);
     assert.strictEqual(panel.roles[0]?.roleId, 'r1');
   });
+  await test('Ticket-Panel im Glas-Look; alte Ticket-Panels werden einmalig ersetzt', async () => {
+    const tickets = require('../src/modules/tickets');
+    const store = require('../src/lib/store');
+    const { MessageFlags: MF, ChannelType: CT, MessageFlagsBitField } = require('discord.js');
+    const p = await tickets.panelMessage();
+    assert.strictEqual(p.flags, MF.IsComponentsV2);
+    const json = JSON.stringify(p.components[0].toJSON());
+    assert(json.includes('tk:open') && json.includes('ETC. Bot · Support'));
+    const sent = [], deleted = [];
+    const oldMsg = { author: { id: 'bot' }, flags: new MessageFlagsBitField(0), components: [{ components: [{ customId: 'tk:open' }] }], delete: async () => deleted.push(1) };
+    const ch = { type: CT.GuildText, name: 'support', permissionsFor: () => ({ has: () => true }), messages: { fetch: async () => new Map([['m1', oldMsg]]) }, send: async x => sent.push(x) };
+    const client = { user: { id: 'bot' }, guilds: { cache: new Map([['g', { members: { me: {} }, channels: { cache: new Map([['c', ch]]) } }]]) } };
+    store.delete('meta', 'ticketPanelDesign');
+    assert.strictEqual(await tickets.upgradePanels(client), 1);
+    assert.strictEqual(sent.length, 1); assert.strictEqual(deleted.length, 1);
+    assert.strictEqual(await tickets.upgradePanels(client), 0, 'nur einmal pro Design');
+  });
   await test('Rollen-Panel: Knöpfe auf der Nachricht werden übernommen, nicht überschrieben', async () => {
     const rp = require('../src/modules/rolepanels');
     const { ButtonStyle: BS } = require('discord.js');

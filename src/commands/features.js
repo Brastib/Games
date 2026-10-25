@@ -122,7 +122,8 @@ module.exports = [
       const sub = i.options.getSubcommand();
       if (sub === 'panel') {
         if (!isStaff(i.member)) return respond(i, err('Nur das Team darf das.'));
-        await i.channel.send(tickets.panelMessage());
+        await i.deferReply({ flags: 64 });
+        await i.channel.send(await tickets.panelMessage());
         return respond(i, ok('Ticket-Button gepostet.'));
       }
       const t = store.get('tickets', i.channel.id);

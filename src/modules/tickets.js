@@ -5,7 +5,7 @@
  */
 const {
   ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder, ModalBuilder,
-  TextInputBuilder, TextInputStyle, PermissionFlagsBits: P,
+  TextInputBuilder, TextInputStyle, PermissionFlagsBits: P, MessageFlags,
 } = require('discord.js');
 const store = require('../lib/store');
 const { getConfig, saveConfig } = require('../lib/config');
@@ -14,13 +14,45 @@ const { isStaff } = require('../lib/perms');
 const { sendLog } = require('../lib/logger');
 const { truncate } = require('../lib/util');
 
+/** Ticket-Panel im Glas-Look (Banner „Support“ mit Ticket-Icon) */
 function panelMessage(title, description) {
-  return {
-    embeds: [new EmbedBuilder().setColor(COLORS.brand).setTitle(title || '🎫 Support')
-      .setDescription(description || 'Du brauchst Hilfe oder möchtest etwas melden?\nKlicke auf den Button – dann öffnet sich ein **privater Kanal** nur für dich und das Team.')],
-    components: [new ActionRowBuilder().addComponents(
+  return require('../lib/glasspanel').glassPanel({
+    banner: { title: title || 'Support', icon: 'ticket', caption: 'Ein privater Kanal nur für dich und das Team' },
+    text: description || 'Du brauchst Hilfe oder möchtest etwas melden?\nTippe auf den Knopf – dann öffnet sich ein **privater Kanal** nur für dich und das Team.',
+    rows: [new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('tk:open').setLabel('Ticket öffnen').setEmoji('🎫').setStyle(ButtonStyle.Secondary))],
-  };
+    footer: 'ETC. Bot · Support',
+  });
+}
+
+/**
+ * Nach einer Design-Änderung: alte Ticket-Panels des Bots (Kanäle durchsuchen, je die letzten 30 Nachrichten)
+ * im neuen Look ersetzen. Läuft einmal pro Banner-Version.
+ */
+async function upgradePanels(client) {
+  const version = require('../lib/cards').BANNER_VERSION;
+  if (store.get('meta', 'ticketPanelDesign') === version) return 0;
+  let n = 0;
+  for (const guild of client.guilds.cache.values()) {
+    for (const ch of guild.channels.cache.values()) {
+      if (ch.type !== ChannelType.GuildText || !ch.permissionsFor(guild.members.me)?.has([P.ViewChannel, P.ReadMessageHistory, P.SendMessages])) continue;
+      const msgs = await ch.messages.fetch({ limit: 30 }).catch(() => null);
+      for (const m of msgs?.values() || []) {
+        if (m.author.id !== client.user.id) continue;
+        const all = list => list.flatMap(c => [c, ...all(c.components || [])]);
+        if (!all(m.components).some(c => c.customId === 'tk:open')) continue;
+        try {
+          const payload = await panelMessage();
+          if (m.flags.has(MessageFlags.IsComponentsV2)) await m.edit({ ...payload, attachments: [] });
+          else { await ch.send(payload); await m.delete().catch(() => {}); } // altes Layout lässt sich nicht umbauen → neu posten
+          n++;
+        } catch (e) { console.warn(`[tickets] Panel in #${ch.name}: ${e.message}`); }
+      }
+    }
+  }
+  store.set('meta', 'ticketPanelDesign', version);
+  if (n) console.log(`[tickets] ${n} Ticket-Panel(s) im neuen Design.`);
+  return n;
 }
 
 async function setup(guild, { panelChannel, supportRole, category }) {
@@ -33,7 +65,7 @@ async function setup(guild, { panelChannel, supportRole, category }) {
   cfg.tickets.category = cat.id;
   if (supportRole) cfg.tickets.supportRoles = [supportRole.id];
   saveConfig(guild.id);
-  await panelChannel.send(panelMessage());
+  await panelChannel.send(await panelMessage());
   return cat;
 }
 
@@ -220,4 +252,4 @@ async function handleButton(interaction, action) {
   }
 }
 
-module.exports = { setup, panelMessage, handleButton, onOpenModal, close, setupArchive, purgeArchive, toArchive };
+module.exports = { setup, panelMessage, upgradePanels, handleButton, onOpenModal, close, setupArchive, purgeArchive, toArchive };

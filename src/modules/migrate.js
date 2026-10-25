@@ -359,7 +359,7 @@ function buildPlan(guild, d, x) {
       if (tRole && !t.supportRoles.includes(tRole.id)) t.supportRoles.push(tRole.id);
       const tickets = require('./tickets');
       if (!t.category || !guild.channels.cache.has(t.category)) await tickets.setup(guild, { panelChannel: tPanel, supportRole: tRole });
-      else await tPanel.send(tickets.panelMessage());
+      else await tPanel.send(await tickets.panelMessage());
     });
   }
   const arch = chan(c.support_archive_category_id);

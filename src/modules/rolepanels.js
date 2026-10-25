@@ -2,10 +2,7 @@
 /**
  * Rollen-Panels: Mitglieder holen sich Rollen per Button oder Auswahlmenü selbst.
  */
-const {
-  ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, StringSelectMenuBuilder,
-  ContainerBuilder, MediaGalleryBuilder, MediaGalleryItemBuilder, TextDisplayBuilder, SeparatorBuilder, AttachmentBuilder, MessageFlags,
-} = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, StringSelectMenuBuilder } = require('discord.js');
 const store = require('../lib/store');
 const { COLORS, ok, err, respond, EPHEMERAL } = require('../lib/embeds');
 const { chunk } = require('../lib/util');
@@ -40,25 +37,14 @@ function embed(panel) {
  */
 async function render(panel) {
   if (!panel.banner) return { embeds: [embed(panel)], components: components(panel) };
-  // Animiert (GIF) wenn möglich, sonst Standbild
-  const cards = require('../lib/cards');
-  const gif = await cards.bannerGif(panel.banner).catch(() => null);
-  const png = gif ? null : await cards.bannerCard(panel.banner);
-  const file = gif ? { buf: gif, name: 'banner.gif' } : png ? { buf: png, name: 'banner.png' } : null;
-  const box = new ContainerBuilder().setAccentColor(panel.color || COLORS.brand);
-  if (file) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(`attachment://${file.name}`).setDescription(panel.banner.title)));
-  else box.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${panel.banner.title}`));
   const lines = [];
   if (panel.title && panel.title.toLowerCase() !== String(panel.banner.title).toLowerCase()) lines.push(`**${panel.title}**`);
   lines.push(panel.description || 'Tippe auf einen Knopf, um die Rolle zu bekommen. Nochmal tippen = wieder weg.');
   if (panel.unique) lines.push('-# Du kannst nur eine dieser Rollen gleichzeitig haben.');
-  box.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
-  box.addSeparatorComponents(new SeparatorBuilder());
-  const rows = components(panel);
-  if (rows.length) box.addActionRowComponents(...rows);
-  else box.addTextDisplayComponents(new TextDisplayBuilder().setContent('*Noch keine Rollen. Füge welche mit `/rolepanel add` hinzu.*'));
-  box.addTextDisplayComponents(new TextDisplayBuilder().setContent('-# ETC. Bot · Rollen'));
-  return { flags: MessageFlags.IsComponentsV2, components: [box], files: file ? [new AttachmentBuilder(file.buf, { name: file.name })] : [] };
+  return require('../lib/glasspanel').glassPanel({
+    banner: panel.banner, text: lines.join('\n'), rows: components(panel), color: panel.color,
+    footer: 'ETC. Bot · Rollen', emptyText: '*Noch keine Rollen. Füge welche mit `/rolepanel add` hinzu.*',
+  });
 }
 
 async function create(channel, { title, description, mode, unique }) {
