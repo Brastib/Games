@@ -164,7 +164,7 @@ module.exports = [
         .addStringOption(o => o.setName('nachricht_id').setDescription('Nur nötig, wenn mehrere Panels im Kanal sind')))
       .addSubcommand(s => s.setName('banner').setDescription('Banner mit „ETC.“-Uhr über das Panel setzen (im Kanal des Panels, postet es neu)')
         .addStringOption(o => o.setName('titel').setDescription('Großer Titel, z. B. Spiele-Rollen').setRequired(true).setMaxLength(24))
-        .addStringOption(o => o.setName('untertitel').setDescription('Kleine Zeile darüber (Standard: ETC. · Selbst aussuchen)').setMaxLength(40))
+        .addStringOption(o => o.setName('untertitel').setDescription('Kleine Zeile über dem Titel (Standard: Selbst aussuchen)').setMaxLength(40))
         .addStringOption(o => o.setName('text').setDescription('Text unter dem Banner (leer = bisheriger Text)').setMaxLength(1000))
         .addStringOption(o => o.setName('nachricht_id').setDescription('Nur nötig, wenn mehrere Panels im Kanal sind'))),
     async execute(i) {

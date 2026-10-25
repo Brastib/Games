@@ -83,7 +83,7 @@ async function setBanner(guild, messageId, { title, kicker, text }) {
   const ch = guild.channels.cache.get(panel.channelId);
   if (!ch) throw new Error('Kanal des Panels nicht gefunden.');
   await adopt(guild, messageId, panel);
-  panel.banner = { title, kicker: kicker || 'ETC. · Selbst aussuchen' };
+  panel.banner = { title, kicker: kicker || 'Selbst aussuchen' };
   if (text) { panel.description = text; panel.title = title; }
   const msg = await ch.send(await render(panel));
   store.set('rolepanels', msg.id, panel);

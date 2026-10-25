@@ -311,58 +311,70 @@ async function recapCard(r) {
 }
 
 /**
- * Banner über Panels (Rollen, Regeln, Tickets …): links Untertitel + großer Titel, rechts die StandBy-Uhr mit „ETC.“ darin.
+ * Banner über Panels (Rollen, Regeln, Tickets …): eine große StandBy-Uhr gedimmt im ganzen Hintergrund,
+ * „ETC.“ (Orbitron, leuchtend) oben in der Mitte, darunter Untertitel + großer Titel, roter Strich.
  * Ein „-“ im Titel wird rot. 1200 × 400 (3:1), so zeigt Discord es oben im Panel.
  */
-function bannerCard({ title, kicker = 'ETC.' } = {}) {
+function bannerCard({ title, kicker = 'Selbst aussuchen' } = {}) {
   if (!C) return null;
-  const w = 1200, h = 400, R = 158, cx = w - 220, cy = h / 2;
+  const w = 1200, h = 400, cx = w / 2, cy = h / 2, R = 300;
   const canvas = C.createCanvas(w, h);
   const ctx = canvas.getContext('2d');
-  const g = ctx.createRadialGradient(cx, cy, 20, cx, cy, 760);
-  g.addColorStop(0, '#3a0b12'); g.addColorStop(0.45, '#160709'); g.addColorStop(1, BG);
+  // Hintergrund: Rubin-Schein in der Mitte, feines Korn, dunkle Ränder
+  const g = ctx.createRadialGradient(cx, cy, 10, cx, cy, 720);
+  g.addColorStop(0, '#36090f'); g.addColorStop(0.5, '#140608'); g.addColorStop(1, BG);
   ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-  // Uhr im Hintergrund (gedämpft): 60 Striche, 12/3/6/9 in Rubin, Zeiger auf 10:10
+  const img = ctx.getImageData(0, 0, w, h), px = img.data;
+  for (let i = 0; i < px.length; i += 4) { const n = (Math.random() - 0.5) * 10; px[i] += n; px[i + 1] += n; px[i + 2] += n; }
+  ctx.putImageData(img, 0, 0);
+  const v = ctx.createRadialGradient(cx, cy, h * 0.4, cx, cy, w * 0.75);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.fillStyle = v; ctx.fillRect(0, 0, w, h);
+  // Uhr im Hintergrund: 60 Striche (12/3/6/9 in Rubin), Zeiger auf 10:10
+  ctx.save(); ctx.lineCap = 'round'; ctx.globalAlpha = 0.32;
+  for (let i = 0; i < 60; i++) {
+    const a = (i / 60) * Math.PI * 2, big = i % 5 === 0, quarter = i % 15 === 0, r2 = R - (big ? R * 0.19 : R * 0.09);
+    ctx.strokeStyle = quarter ? ACCENT : big ? '#7a1f2a' : '#3d1219';
+    ctx.lineWidth = big ? R * 0.045 : R * 0.025;
+    ctx.beginPath(); ctx.moveTo(cx + Math.sin(a) * R, cy - Math.cos(a) * R); ctx.lineTo(cx + Math.sin(a) * r2, cy - Math.cos(a) * r2); ctx.stroke();
+  }
+  ctx.globalAlpha = 0.16;
   const hand = (deg, len, width, color, tail = 0) => {
     const a = (deg * Math.PI) / 180, sx = Math.sin(a), sy = -Math.cos(a);
     ctx.strokeStyle = color; ctx.lineWidth = width;
     ctx.beginPath(); ctx.moveTo(cx - sx * tail, cy - sy * tail); ctx.lineTo(cx + sx * len, cy + sy * len); ctx.stroke();
   };
-  ctx.save();
-  ctx.globalAlpha = 0.55; ctx.lineCap = 'round';
-  for (let i = 0; i < 60; i++) {
-    const a = (i / 60) * Math.PI * 2, big = i % 5 === 0, quarter = i % 15 === 0, r2 = R - (big ? 30 : 14);
-    ctx.strokeStyle = quarter ? ACCENT : big ? '#7a1f2a' : '#3d1219';
-    ctx.lineWidth = big ? 7 : 4;
-    ctx.beginPath(); ctx.moveTo(cx + Math.sin(a) * R, cy - Math.cos(a) * R); ctx.lineTo(cx + Math.sin(a) * r2, cy - Math.cos(a) * r2); ctx.stroke();
-  }
-  ctx.globalAlpha = 0.4;
-  hand(305, R * 0.5, 13, ACCENT);          // Stunde
-  hand(60, R * 0.78, 9, ACCENT);           // Minute
-  hand(200, R * 0.86, 3, '#ff6b7d', 26);   // Sekunde
-  ctx.fillStyle = ACCENT; ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2); ctx.fill();
+  hand(305, R * 0.5, R * 0.08, ACCENT);
+  hand(60, R * 0.78, R * 0.055, ACCENT);
+  hand(200, R * 0.86, R * 0.02, '#ff6b7d', R * 0.16);
+  ctx.fillStyle = ACCENT; ctx.beginPath(); ctx.arc(cx, cy, R * 0.07, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
-  // „ETC.“ groß in der Mitte der Uhr, davor und leuchtend
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  let size = 110;
-  do { ctx.font = `${size}px "Orbitron"`; size -= 2; } while (ctx.measureText('ETC.').width > R * 1.22 && size > 30);
-  const tg = ctx.createLinearGradient(0, cy - size / 2, 0, cy + size / 2);
-  tg.addColorStop(0, '#ff6b7d'); tg.addColorStop(1, ACCENT);
-  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 18; ctx.fillStyle = BG; ctx.fillText('ETC.', cx, cy + 4); ctx.restore(); // dunkler Rand, damit die Zeiger dahinter nicht stören
-  ctx.save(); ctx.shadowColor = 'rgba(224,52,79,0.6)'; ctx.shadowBlur = 34; ctx.fillStyle = tg; ctx.fillText('ETC.', cx, cy + 4); ctx.restore();
-  ctx.fillStyle = tg; ctx.fillText('ETC.', cx, cy + 4);
-  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-  // Links: Untertitel (gesperrt) + Titel
-  const maxW = cx - R - 110;
-  ctx.fillStyle = ROSE; ctx.letterSpacing = '8px';
-  ctx.font = fitText(ctx, String(kicker).toUpperCase(), maxW, 24, 'Poppins ExtraBold');
-  ctx.fillText(String(kicker).toUpperCase(), 64, 74);
-  ctx.letterSpacing = '1px';
+  // „ETC.“ oben in der Mitte: Orbitron, Verlauf hell → Rubin, dunkler Rand + Leuchten
+  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  let size = 90;
+  do { ctx.font = `${size}px "Orbitron"`; size -= 2; } while (ctx.measureText('ETC.').width > 150 && size > 20);
+  const ey = 92;
+  const tg = ctx.createLinearGradient(0, ey - size / 2, 0, ey + size / 2);
+  tg.addColorStop(0, '#ff7385'); tg.addColorStop(1, ACCENT);
+  ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 20; ctx.fillStyle = BG; ctx.fillText('ETC.', cx, ey + 3);
+  ctx.shadowColor = 'rgba(224,52,79,0.55)'; ctx.shadowBlur = 30; ctx.fillStyle = tg; ctx.fillText('ETC.', cx, ey + 3);
+  ctx.shadowBlur = 0; ctx.fillText('ETC.', cx, ey + 3);
+  ctx.restore();
+  // Untertitel (gesperrt) + Titel, mittig; „ETC. ·“ am Anfang weglassen – steht ja schon darüber
+  const k = String(kicker || '').replace(/^\s*ETC\.?\s*[·|-]\s*/i, '').toUpperCase();
   const t = String(title || '').toUpperCase();
-  ctx.font = fitText(ctx, t, maxW, 86, 'Poppins ExtraBold');
-  let x = 60;
-  for (const part of t.split(/(-)/)) { ctx.fillStyle = part === '-' ? RED_TEXT : TEXT; ctx.fillText(part, x, 160); x += ctx.measureText(part).width; }
-  ctx.letterSpacing = '0px';
+  const yMid = 236;
+  ctx.save(); ctx.textAlign = 'center'; ctx.fillStyle = ROSE; ctx.letterSpacing = '7px';
+  ctx.font = fitText(ctx, k, w - 200, 22, 'Poppins ExtraBold');
+  if (k) ctx.fillText(k, cx, yMid - 57);
+  ctx.letterSpacing = '1px';
+  ctx.font = fitText(ctx, t, w - 300, 92, 'Poppins ExtraBold');
+  const ts = parseInt(ctx.font, 10);
+  ctx.textAlign = 'left';
+  let x = cx - ctx.measureText(t).width / 2;
+  for (const part of t.split(/(-)/)) { ctx.fillStyle = part === '-' ? RED_TEXT : TEXT; ctx.fillText(part, x, yMid + ts * 0.36); x += ctx.measureText(part).width; }
+  ctx.fillStyle = ACCENT; ctx.fillRect(cx - 40, yMid + ts * 0.36 + 24, 80, 4);
+  ctx.restore();
   return canvas.encode('png');
 }
 
