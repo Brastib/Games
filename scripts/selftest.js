@@ -1080,6 +1080,16 @@ async function test(name, fn) {
     assert(/attachment:\/\/banner\.(gif|png)/.test(json) === cards.available(), 'Banner-Bild oben');
     if (cards.available()) assert(json.includes('banner.gif'), 'animiert (ffmpeg ist da)');
     assert(json.includes('rp:r1') && json.includes('Damit nicht alle gepingt werden') && json.includes('ETC. Bot · Rollen'), 'Knopf, alter Text und Fußzeile drin');
+    // Design-Änderung: Banner werden automatisch neu gezeichnet (einmal pro Version)
+    let edits = 0;
+    const neu = { components: [], edit: async () => { edits++; } };
+    ch.messages.fetch = async () => neu;
+    const client = { guilds: { cache: new Map([['g-bn', guild]]) } };
+    const pnl = store.get('rolepanels', 'neu1'); pnl.bannerVersion = 0; store.set('rolepanels', 'neu1', pnl);
+    assert.strictEqual(await rp.refreshBanners(client), 1);
+    assert.strictEqual(await rp.refreshBanners(client), 0, 'nur einmal pro Version');
+    assert.strictEqual(edits, 1);
+    ch.messages.fetch = async () => old;
     // Knöpfe im neuen Layout werden beim nächsten Ändern erkannt
     const panel = { channelId: 'c1', roles: [] };
     old.components = [{ components: [{ content: 'Text' }, { components: [{ customId: 'rp:r1', label: 'Repo', style: BS.Secondary }] }] }];

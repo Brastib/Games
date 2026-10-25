@@ -464,4 +464,4 @@ async function bannerGif(opts = {}) {
   return gif;
 }
 
-module.exports = { welcomeCard, rankCard, leaderboardCard, recapCard, bannerCard, bannerGif, available: () => !!C };
+module.exports = { welcomeCard, rankCard, leaderboardCard, recapCard, bannerCard, bannerGif, BANNER_VERSION, available: () => !!C };

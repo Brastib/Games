@@ -89,6 +89,7 @@ async function setBanner(guild, messageId, { title, caption, icon, text }) {
   await adopt(guild, messageId, panel);
   panel.banner = { title, caption: caption || null, icon: icon || null }; // leer = passend zum Titel
   if (text) { panel.description = text; panel.title = title; }
+  panel.bannerVersion = require('../lib/cards').BANNER_VERSION;
   const msg = await ch.send(await render(panel));
   store.set('rolepanels', msg.id, panel);
   store.delete('rolepanels', messageId);
@@ -145,6 +146,25 @@ async function migrateDesign(client) {
     } catch (e) { console.warn(`[rollen-panel] ${id}: ${e.message}`); }
   }
   store.set('meta', 'design', 'rubin');
+  return n;
+}
+
+/** Nach einer Design-Änderung (BANNER_VERSION): alle Panels mit Banner automatisch neu zeichnen */
+async function refreshBanners(client) {
+  const version = require('../lib/cards').BANNER_VERSION;
+  let n = 0;
+  for (const [id, panel] of store.entries('rolepanels')) {
+    if (!panel.banner || panel.bannerVersion === version) continue;
+    const guild = client.guilds.cache.get(panel.guildId);
+    if (!guild) continue;
+    try {
+      panel.bannerVersion = version;
+      store.set('rolepanels', id, panel);
+      await refresh(guild, id);
+      n++;
+    } catch (e) { console.warn(`[rollen-panel] Banner ${id}: ${e.message}`); }
+  }
+  if (n) console.log(`[rollen-panel] ${n} Banner im neuen Design neu gezeichnet.`);
   return n;
 }
 
@@ -211,4 +231,4 @@ function latestIn(guildId, channelId) {
   return ids.sort((a, b) => (BigInt(a) < BigInt(b) ? 1 : -1))[0] || null;
 }
 
-module.exports = { create, addRole, removeRole, adopt, migrateDesign, setBanner, render, embed, components, onButton, onSelect, latestIn, parseRoleList, STYLE };
+module.exports = { create, addRole, removeRole, adopt, migrateDesign, refreshBanners, setBanner, render, embed, components, onButton, onSelect, latestIn, parseRoleList, STYLE };
