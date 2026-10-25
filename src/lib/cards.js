@@ -319,7 +319,7 @@ async function recapCard(r) {
  * Animiert (GIF): Ein Schimmer läuft über den Titel wie bei „Zum Ausschalten streichen“, die Knopfkante atmet.
  * Ohne ffmpeg gibt es ein Standbild. Fertige GIFs liegen im Cache (DATA_DIR/banner-cache).
  */
-const BANNER_VERSION = 5;
+const BANNER_VERSION = 6;
 const BW = 1200, BH = 400;
 
 /** Icons im Stil von SF Symbols (24er-Raster, weiße Linien) */
@@ -423,6 +423,41 @@ function bannerFrame(opts, t, scale = 1) {
   return canvas;
 }
 
+/**
+ * Kleines Icon für eigene Emojis auf Discord-Knöpfen – wie der runde Knopf im Banner:
+ * dunkler Glas-Kreis, rote Leuchtkante, weißes Symbol (glyph) oder Kürzel (text). 128 × 128, transparent.
+ */
+async function knobIcon({ glyph, text } = {}) {
+  if (!C) return null;
+  const s = 128, cx = s / 2, cy = s / 2, r = 54;
+  const canvas = C.createCanvas(s, s);
+  const ctx = canvas.getContext('2d');
+  const f = ctx.createRadialGradient(cx - 16, cy - 20, 4, cx, cy, r);
+  f.addColorStop(0, '#4a171c'); f.addColorStop(1, '#1f080b');
+  ctx.fillStyle = f; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+  const rim = ctx.createLinearGradient(cx - r, cy - r, cx + r * 0.4, cy + r);
+  rim.addColorStop(0, 'rgba(255,110,120,0.35)'); rim.addColorStop(0.5, 'rgba(255,90,100,0.6)'); rim.addColorStop(1, 'rgba(255,120,130,1)');
+  ctx.save(); ctx.shadowColor = 'rgba(255,60,75,0.8)'; ctx.shadowBlur = 8; ctx.strokeStyle = rim; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.arc(cx, cy, r - 2, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  if (glyph) bannerIcon(ctx, glyph, cx, cy, 66);
+  else if (text) {
+    ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = fitText(ctx, text, 78, 50, 'Inter SemiBold');
+    ctx.fillText(text, cx, cy + 2);
+  }
+  return canvas.encode('png');
+}
+
+/** Kürzel für einen Rollennamen: „Deep Rock Galactic“ → DR, „Helldivers II“ → H2, „Repo“ → RE */
+function monogram(name) {
+  const ROMAN = { II: '2', III: '3', IV: '4', V: '5' };
+  const words = String(name).normalize('NFKC').replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
+  if (!words.length) return '?';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  const second = ROMAN[words[1].toUpperCase()] || words[1][0];
+  return (words[0][0] + second).toUpperCase();
+}
+
 /** Standbild (PNG) */
 async function bannerCard(opts = {}) {
   if (!C) return null;
@@ -464,4 +499,4 @@ async function bannerGif(opts = {}) {
   return gif;
 }
 
-module.exports = { welcomeCard, rankCard, leaderboardCard, recapCard, bannerCard, bannerGif, BANNER_VERSION, available: () => !!C };
+module.exports = { welcomeCard, rankCard, leaderboardCard, recapCard, bannerCard, bannerGif, knobIcon, monogram, BANNER_VERSION, available: () => !!C };

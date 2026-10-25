@@ -14,13 +14,15 @@ const { isStaff } = require('../lib/perms');
 const { sendLog } = require('../lib/logger');
 const { truncate } = require('../lib/util');
 
-/** Ticket-Panel im Glas-Look (Banner „Support“ mit Ticket-Icon) */
-function panelMessage(title, description) {
+/** Ticket-Panel im Glas-Look (Banner „Support“ mit Ticket-Icon, roter Knopf mit Glas-Ticket-Icon) */
+async function panelMessage(title, description, client = null) {
+  const icon = client ? await require('../lib/appemojis').knob(client, { glyph: 'ticket' }) : null;
+  const button = new ButtonBuilder().setCustomId('tk:open').setLabel('Ticket öffnen').setStyle(ButtonStyle.Danger);
+  if (icon) button.setEmoji(icon);
   return require('../lib/glasspanel').glassPanel({
     banner: { title: title || 'Support', icon: 'ticket', caption: 'Ein privater Kanal nur für dich und das Team' },
     text: description || null,
-    rows: [new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('tk:open').setLabel('Ticket öffnen').setEmoji('🎫').setStyle(ButtonStyle.Secondary))],
+    rows: [new ActionRowBuilder().addComponents(button)],
     hint: 'Hilfe, Fragen oder etwas melden – nur das Team liest mit',
   });
 }
@@ -42,7 +44,7 @@ async function upgradePanels(client) {
         const all = list => list.flatMap(c => [c, ...all(c.components || [])]);
         if (!all(m.components).some(c => c.customId === 'tk:open')) continue;
         try {
-          const payload = await panelMessage();
+          const payload = await panelMessage(null, null, client);
           if (m.flags.has(MessageFlags.IsComponentsV2)) await m.edit({ ...payload, attachments: [] });
           else { await ch.send(payload); await m.delete().catch(() => {}); } // altes Layout lässt sich nicht umbauen → neu posten
           n++;
@@ -65,7 +67,7 @@ async function setup(guild, { panelChannel, supportRole, category }) {
   cfg.tickets.category = cat.id;
   if (supportRole) cfg.tickets.supportRoles = [supportRole.id];
   saveConfig(guild.id);
-  await panelChannel.send(await panelMessage());
+  await panelChannel.send(await panelMessage(null, null, guild.client));
   return cat;
 }
 

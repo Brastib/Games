@@ -123,7 +123,7 @@ module.exports = [
       if (sub === 'panel') {
         if (!isStaff(i.member)) return respond(i, err('Nur das Team darf das.'));
         await i.deferReply({ flags: 64 });
-        await i.channel.send(await tickets.panelMessage());
+        await i.channel.send(await tickets.panelMessage(null, null, i.client));
         return respond(i, ok('Ticket-Button gepostet.'));
       }
       const t = store.get('tickets', i.channel.id);

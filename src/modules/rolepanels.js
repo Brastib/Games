@@ -9,7 +9,8 @@ const { chunk } = require('../lib/util');
 
 const STYLE = { blau: ButtonStyle.Primary, grau: ButtonStyle.Secondary, gruen: ButtonStyle.Success, rot: ButtonStyle.Danger };
 
-function components(panel) {
+/** Knöpfe/Menü. glass: rote Knöpfe mit Glas-Icons (Panels mit Banner), emojis: roleId → eigenes Emoji */
+function components(panel, { glass = false, emojis = {} } = {}) {
   if (!panel.roles.length) return [];
   if (panel.mode === 'select') {
     const menu = new StringSelectMenuBuilder().setCustomId('rps:pick').setPlaceholder('Rollen auswählen …')
@@ -18,8 +19,9 @@ function components(panel) {
     return [new ActionRowBuilder().addComponents(menu)];
   }
   return chunk(panel.roles, 5).slice(0, 5).map(row => new ActionRowBuilder().addComponents(row.map(r => {
-    const b = new ButtonBuilder().setCustomId(`rp:${r.roleId}`).setLabel(r.label.slice(0, 80)).setStyle(STYLE[r.style] || ButtonStyle.Secondary);
-    if (r.emoji) b.setEmoji(r.emoji);
+    const b = new ButtonBuilder().setCustomId(`rp:${r.roleId}`).setLabel(r.label.slice(0, 80)).setStyle(glass ? ButtonStyle.Danger : STYLE[r.style] || ButtonStyle.Secondary);
+    const emoji = r.emoji || emojis[r.roleId];
+    if (emoji) b.setEmoji(emoji);
     return b;
   })));
 }
@@ -35,11 +37,18 @@ function embed(panel) {
  * Nachricht fürs Panel. Mit Banner (panel.banner) im neuen Discord-Layout: Banner-Bild oben, Text, Trennlinie, Knöpfe, Fußzeile.
  * Ohne Banner klassisch als Embed.
  */
-async function render(panel) {
+async function render(panel, client = null) {
   if (!panel.banner) return { embeds: [embed(panel)], components: components(panel) };
+  // Jeder Knopf bekommt ein Glas-Icon mit dem Kürzel der Rolle (eigene Emojis des Bots)
+  const emojis = {};
+  if (client) {
+    const { knob } = require('../lib/appemojis');
+    const { monogram } = require('../lib/cards');
+    for (const r of panel.roles) if (!r.emoji) emojis[r.roleId] = await knob(client, { text: monogram(r.label) }) || undefined;
+  }
   // Das Banner sagt schon alles – Text nur, wenn beim Banner-Befehl ausdrücklich einer angegeben wurde
   return require('../lib/glasspanel').glassPanel({
-    banner: panel.banner, text: panel.bannerText || null, rows: components(panel),
+    banner: panel.banner, text: panel.bannerText || null, rows: components(panel, { glass: true, emojis }),
     hint: panel.unique ? 'Nur eine Rolle gleichzeitig · nochmal tippen nimmt sie wieder weg' : 'Nochmal tippen nimmt die Rolle wieder weg',
     emptyText: '*Noch keine Rollen. Füge welche mit `/rolepanel add` hinzu.*',
   });
@@ -57,7 +66,7 @@ async function refresh(guild, messageId) {
   const ch = guild.channels.cache.get(panel.channelId);
   const msg = await ch?.messages.fetch(messageId).catch(() => null);
   if (!msg) throw new Error('Panel-Nachricht nicht gefunden (gelöscht?)');
-  const payload = await render(panel);
+  const payload = await render(panel, guild.client);
   await msg.edit(panel.banner ? { ...payload, attachments: [] } : payload); // altes Banner-Bild ersetzen
 }
 
@@ -74,7 +83,7 @@ async function setBanner(guild, messageId, { title, caption, icon, text }) {
   panel.banner = { title, caption: caption || null, icon: icon || null }; // leer = passend zum Titel
   panel.bannerText = text || null;
   panel.bannerVersion = require('../lib/cards').BANNER_VERSION;
-  const msg = await ch.send(await render(panel));
+  const msg = await ch.send(await render(panel, guild.client));
   store.set('rolepanels', msg.id, panel);
   store.delete('rolepanels', messageId);
   await ch.messages.fetch(messageId).then(m => m.delete()).catch(() => {});

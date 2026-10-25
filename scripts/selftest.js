@@ -1115,6 +1115,33 @@ async function test(name, fn) {
     assert.strictEqual(sent.length, 1); assert.strictEqual(deleted.length, 1);
     assert.strictEqual(await tickets.upgradePanels(client), 0, 'nur einmal pro Design');
   });
+  await test('Rote Knöpfe mit Glas-Icons: Kürzel, eigene Emojis werden einmal hochgeladen und wiederverwendet', async () => {
+    const cards = require('../src/lib/cards');
+    const { ensure, knob } = require('../src/lib/appemojis');
+    assert.deepStrictEqual(['Deep Rock Galactic', 'Rocket  League', 'Repo', 'Helldivers II', 'Rounds', 'Arma Reforger'].map(cards.monogram), ['DR', 'RL', 'RE', 'H2', 'RO', 'AR']);
+    if (cards.available()) {
+      const png = await cards.knobIcon({ text: 'DR' });
+      assert(png.slice(1, 4).toString() === 'PNG' && png.length < 256 * 1024, 'Emoji-Bild klein genug');
+      fs.writeFileSync(path.join(os.tmpdir(), 'knob-test.png'), png);
+    }
+    const created = [];
+    const client = { application: { emojis: {
+      fetch: async () => new Map([['x', { id: '1', name: 'schon_da' }]]),
+      create: async ({ name }) => { created.push(name); return { id: String(100 + created.length), name }; },
+    } } };
+    assert.strictEqual((await ensure(client, 'schon_da', async () => Buffer.from('x'))).id, '1', 'vorhandenes wird benutzt');
+    const a = await knob(client, { text: 'DR' }), b = await knob(client, { text: 'DR' });
+    assert.strictEqual(a.id, b.id); assert.strictEqual(created.length, cards.available() ? 1 : 0, 'nur einmal hochgeladen');
+    // Panel mit Banner: rote Knöpfe mit Icon
+    const rp = require('../src/modules/rolepanels');
+    const { ButtonStyle: BS } = require('discord.js');
+    const rows = rp.components({ roles: [{ roleId: 'r1', label: 'Repo', style: 'grau' }], mode: 'buttons' }, { glass: true, emojis: { r1: { id: '55', name: 'etc_t_re' } } });
+    const btn = rows[0].components[0].toJSON();
+    assert.strictEqual(btn.style, BS.Danger); assert.strictEqual(btn.emoji.id, '55');
+    const tk = await require('../src/modules/tickets').panelMessage(null, null, client);
+    const tkBtn = tk.components.find(c => c.toJSON().type === 1).components[0].toJSON();
+    assert.strictEqual(tkBtn.style, BS.Danger);
+  });
   await test('Rollen-Panel: Knöpfe auf der Nachricht werden übernommen, nicht überschrieben', async () => {
     const rp = require('../src/modules/rolepanels');
     const { ButtonStyle: BS } = require('discord.js');
