@@ -14,6 +14,8 @@ try {
   C.GlobalFonts.registerFromPath(path.join(dir, 'Poppins-Bold.ttf'), 'Poppins Bold');
   C.GlobalFonts.registerFromPath(path.join(dir, 'Poppins-ExtraBold.ttf'), 'Poppins ExtraBold');
   C.GlobalFonts.registerFromPath(path.join(dir, 'Orbitron-Black.ttf'), 'Orbitron');
+  C.GlobalFonts.registerFromPath(path.join(dir, 'Inter-Medium.ttf'), 'Inter Medium');
+  C.GlobalFonts.registerFromPath(path.join(dir, 'Inter-SemiBold.ttf'), 'Inter SemiBold');
 } catch (e) {
   console.warn('[karten] Bild-Karten deaktiviert:', e.message);
   C = null;
@@ -312,128 +314,135 @@ async function recapCard(r) {
 
 // ---------------- Banner über Panels ----------------
 /*
- * Große StandBy-Uhr im Hintergrund mit leuchtendem Ring, „ETC.“ in Chrom-Rot (Orbitron), Titel mittig.
- * Animiert (GIF): Der Sekundenzeiger dreht sich endlos und zieht eine Radar-Spur hinter sich her, Funken pulsieren.
- * Ohne ffmpeg gibt es ein Standbild. Fertige GIFs liegen im Cache (DATA_DIR/banner-cache), weil das Rendern ~10 s dauert.
+ * „Liquid Glass“ wie das iPhone im roten Nachtmodus: weicher Rot-Schwarz-Verlauf, „ETC.“ in einer Dynamic Island,
+ * eine Glas-Kapsel mit rundem Knopf (rote Leuchtkante, Icon) und dem Titel, darunter ein leiser Hinweis.
+ * Animiert (GIF): Ein Schimmer läuft über den Titel wie bei „Zum Ausschalten streichen“, die Knopfkante atmet.
+ * Ohne ffmpeg gibt es ein Standbild. Fertige GIFs liegen im Cache (DATA_DIR/banner-cache).
  */
-const BANNER_VERSION = 3;
+const BANNER_VERSION = 4;
 const BW = 1200, BH = 400;
 
-function seeded(n) { let s = n; return () => ((s = (s * 16807) % 2147483647) / 2147483647); }
-
-function bannerLayers({ title, kicker }) {
-  const cx = BW / 2, cy = BH / 2, R = 300, rnd = seeded(7);
-  // Hintergrund: Rubin-Schein, feines Korn, leuchtender Ring, Striche, gedämpfte Zeiger auf 10:10
-  const bg = C.createCanvas(BW, BH), b = bg.getContext('2d');
-  const g = b.createRadialGradient(cx, cy - 20, 10, cx, cy, 760);
-  g.addColorStop(0, '#3d0a12'); g.addColorStop(0.42, '#16070a'); g.addColorStop(1, '#070708');
-  b.fillStyle = g; b.fillRect(0, 0, BW, BH);
-  const img = b.getImageData(0, 0, BW, BH), px = img.data;
-  for (let i = 0; i < px.length; i += 4) { const n = (rnd() - 0.5) * 9; px[i] += n; px[i + 1] += n; px[i + 2] += n; }
-  b.putImageData(img, 0, 0);
-  b.save(); b.strokeStyle = 'rgba(200,16,46,0.35)'; b.lineWidth = 2; b.shadowColor = 'rgba(224,52,79,0.6)'; b.shadowBlur = 18;
-  b.beginPath(); b.arc(cx, cy, R + 14, 0, Math.PI * 2); b.stroke(); b.restore();
-  b.save(); b.lineCap = 'round';
-  for (let i = 0; i < 60; i++) {
-    const a = (i / 60) * Math.PI * 2, big = i % 5 === 0, q = i % 15 === 0, r2 = R - (big ? R * 0.17 : R * 0.08);
-    b.globalAlpha = q ? 0.85 : big ? 0.5 : 0.28;
-    b.strokeStyle = q ? ACCENT : big ? '#8a2230' : '#4a141d'; b.lineWidth = big ? R * 0.04 : R * 0.018;
-    b.shadowColor = 'rgba(224,52,79,0.8)'; b.shadowBlur = q ? 16 : 0;
-    b.beginPath(); b.moveTo(cx + Math.sin(a) * R, cy - Math.cos(a) * R); b.lineTo(cx + Math.sin(a) * r2, cy - Math.cos(a) * r2); b.stroke();
+/** Icons im Stil von SF Symbols (24er-Raster, weiße Linien) */
+function bannerIcon(ctx, name, cx, cy, size) {
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(size / 24, size / 24); ctx.translate(-12, -12);
+  ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'; ctx.lineWidth = 2.3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const dot = (x, y, r = 1.05) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
+  ctx.beginPath();
+  if (name === 'gamepad') {
+    ctx.roundRect(2.2, 6.5, 19.6, 11.5, 5.75); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(6.2, 12.25); ctx.lineTo(10.2, 12.25); ctx.moveTo(8.2, 10.25); ctx.lineTo(8.2, 14.25); ctx.stroke();
+    dot(15.3, 13.4); dot(17.6, 11.1);
+  } else if (name === 'shield') {
+    ctx.moveTo(12, 2.8); ctx.lineTo(19.5, 5.6); ctx.lineTo(19.5, 11.2); ctx.bezierCurveTo(19.5, 16, 16.2, 19.6, 12, 21.2);
+    ctx.bezierCurveTo(7.8, 19.6, 4.5, 16, 4.5, 11.2); ctx.lineTo(4.5, 5.6); ctx.closePath(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(8.8, 12); ctx.lineTo(11.1, 14.3); ctx.lineTo(15.4, 9.8); ctx.stroke();
+  } else if (name === 'ticket') {
+    ctx.moveTo(3, 7); ctx.lineTo(21, 7); ctx.lineTo(21, 10); ctx.arc(21, 12, 2, -Math.PI / 2, Math.PI / 2, true); ctx.lineTo(21, 17);
+    ctx.lineTo(3, 17); ctx.lineTo(3, 14); ctx.arc(3, 12, 2, Math.PI / 2, -Math.PI / 2, true); ctx.closePath(); ctx.stroke();
+    ctx.setLineDash([1.6, 2.2]); ctx.beginPath(); ctx.moveTo(14, 8.6); ctx.lineTo(14, 15.6); ctx.stroke();
+  } else if (name === 'help') {
+    ctx.arc(12, 12, 9.2, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(9.4, 9.6); ctx.bezierCurveTo(9.4, 6.6, 14.8, 6.6, 14.8, 9.6); ctx.bezierCurveTo(14.8, 11.6, 12, 11.7, 12, 13.8); ctx.stroke();
+    dot(12, 16.9, 1.2);
+  } else { // Stern (allgemein)
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 ? 4.2 : 9, a = -Math.PI / 2 + (i * Math.PI) / 5;
+      ctx[i ? 'lineTo' : 'moveTo'](12 + Math.cos(a) * r, 12.6 + Math.sin(a) * r);
+    }
+    ctx.closePath(); ctx.stroke();
   }
-  b.restore();
-  b.save(); b.globalAlpha = 0.22; b.lineCap = 'round'; b.strokeStyle = ACCENT;
-  for (const [deg, len, w] of [[305, R * 0.5, R * 0.075], [60, R * 0.78, R * 0.05]]) {
-    const a = (deg * Math.PI) / 180; b.lineWidth = w;
-    b.beginPath(); b.moveTo(cx, cy); b.lineTo(cx + Math.sin(a) * len, cy - Math.cos(a) * len); b.stroke();
-  }
-  b.restore();
-
-  // Vordergrund: Schatten hinter dem Text, „ETC.“, Untertitel, Titel, Leuchtlinie, Vignette
-  const fg = C.createCanvas(BW, BH), f = fg.getContext('2d');
-  const shade = f.createRadialGradient(cx, 210, 20, cx, 210, 420);
-  shade.addColorStop(0, 'rgba(7,7,8,0.55)'); shade.addColorStop(1, 'rgba(7,7,8,0)');
-  f.fillStyle = shade; f.fillRect(0, 0, BW, BH);
-  f.textAlign = 'center'; f.textBaseline = 'middle'; f.font = '62px "Orbitron"';
-  const ey = 88, eg = f.createLinearGradient(0, ey - 32, 0, ey + 32);
-  eg.addColorStop(0, '#ffd0d6'); eg.addColorStop(0.35, '#ff5a6e'); eg.addColorStop(1, '#a50d26');
-  f.save(); f.shadowColor = 'rgba(224,52,79,0.9)'; f.shadowBlur = 40; f.fillStyle = eg; f.fillText('ETC.', cx, ey); f.restore();
-  f.fillStyle = eg; f.fillText('ETC.', cx, ey);
-  // „ETC. ·“ am Anfang des Untertitels weglassen – steht ja schon darüber
-  const k = String(kicker || '').replace(/^\s*ETC\.?\s*[·|-]\s*/i, '').toUpperCase();
-  f.letterSpacing = '9px'; f.fillStyle = ROSE;
-  f.font = fitText(f, k, BW - 200, 22, 'Poppins ExtraBold');
-  if (k) f.fillText(k, cx + 4, 172);
-  const t = String(title || '').toUpperCase();
-  f.letterSpacing = '2px'; f.textAlign = 'left'; f.textBaseline = 'alphabetic';
-  f.font = fitText(f, t, BW - 260, 96, 'Poppins ExtraBold');
-  const ty = 268, wg = f.createLinearGradient(0, ty - 72, 0, ty);
-  wg.addColorStop(0, '#ffffff'); wg.addColorStop(1, '#d9d2d3');
-  let x = cx - f.measureText(t).width / 2;
-  for (const part of t.split(/(-)/)) {
-    f.save();
-    if (part === '-') { f.fillStyle = '#ff3b55'; f.shadowColor = 'rgba(255,59,85,0.9)'; f.shadowBlur = 24; }
-    else { f.fillStyle = wg; f.shadowColor = 'rgba(0,0,0,0.7)'; f.shadowBlur = 18; f.shadowOffsetY = 4; }
-    f.fillText(part, x, ty); f.restore(); x += f.measureText(part).width;
-  }
-  const lg = f.createLinearGradient(cx - 140, 0, cx + 140, 0);
-  lg.addColorStop(0, 'rgba(200,16,46,0)'); lg.addColorStop(0.5, 'rgba(255,59,85,1)'); lg.addColorStop(1, 'rgba(200,16,46,0)');
-  f.save(); f.shadowColor = 'rgba(255,59,85,0.9)'; f.shadowBlur = 14; f.fillStyle = lg; f.fillRect(cx - 140, 296, 280, 3); f.restore();
-  const v = f.createRadialGradient(cx, cy, BH * 0.45, cx, cy, BW * 0.72);
-  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.6)');
-  f.fillStyle = v; f.fillRect(0, 0, BW, BH);
-
-  const sparks = Array.from({ length: 34 }, () => ({ x: rnd() * BW, y: rnd() * BH, r: 0.8 + rnd() * 2.2, a: 0.08 + rnd() * 0.25, p: rnd() * Math.PI * 2 }));
-  return { bg, fg, sparks, cx, cy, R };
+  ctx.restore();
 }
 
-/** Ein Bild: t = 0..1 ist eine volle Umdrehung des Sekundenzeigers. scale < 1 = kleiner (fürs GIF). */
-function bannerFrame(L, t, scale = 1) {
-  const { cx, cy, R } = L;
+/** Passendes Icon und Hinweis zum Titel, falls nichts angegeben ist */
+function bannerDefaults({ title = '', caption, kicker, icon } = {}) {
+  const t = String(title);
+  const guess = /spiel|game/i.test(t) ? 'gamepad' : /regel|rule|verif/i.test(t) ? 'shield' : /ticket|support/i.test(t) ? 'ticket' : /hilfe|help|befehl/i.test(t) ? 'help' : 'star';
+  const cap = caption || kicker || (guess === 'gamepad' ? 'Selbst aussuchen – nur deine Spiele werden gepingt' : 'Tippe unten auf einen Knopf');
+  return { title: t, caption: String(cap).replace(/^\s*ETC\.?\s*[·|-]\s*/i, ''), icon: icon || guess };
+}
+
+/** Ein Bild: t = 0..1 ist eine volle Schleife (Schimmer + Atmen). scale < 1 = kleiner (fürs GIF). */
+function bannerFrame(opts, t, scale = 1) {
+  const { title, caption, icon } = bannerDefaults(opts);
   const canvas = C.createCanvas(Math.round(BW * scale), Math.round(BH * scale));
   const ctx = canvas.getContext('2d');
   ctx.scale(scale, scale);
-  ctx.drawImage(L.bg, 0, 0);
-  const ang = t * Math.PI * 2;
-  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R - 4, 0, Math.PI * 2); ctx.clip();
-  const cg = ctx.createConicGradient(ang - Math.PI / 2 - Math.PI * 0.6, cx, cy); // Spur: 108° hinter dem Zeiger
-  cg.addColorStop(0, 'rgba(200,16,46,0)'); cg.addColorStop(0.3, 'rgba(224,52,79,0.32)'); cg.addColorStop(0.3001, 'rgba(0,0,0,0)'); cg.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = cg; ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
-  ctx.restore();
-  ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = '#ff5a6e'; ctx.lineWidth = 4; ctx.shadowColor = 'rgba(255,59,85,1)'; ctx.shadowBlur = 20;
-  const sx = Math.sin(ang), sy = -Math.cos(ang);
-  ctx.beginPath(); ctx.moveTo(cx - sx * 46, cy - sy * 46); ctx.lineTo(cx + sx * (R - 8), cy + sy * (R - 8)); ctx.stroke();
-  ctx.fillStyle = '#ff5a6e'; ctx.beginPath(); ctx.arc(cx, cy, 9, 0, Math.PI * 2); ctx.fill();
-  ctx.restore();
-  for (const s of L.sparks) {
-    ctx.globalAlpha = s.a * (0.6 + 0.4 * Math.sin(s.p + t * Math.PI * 2));
-    ctx.fillStyle = '#ff8090'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-  ctx.drawImage(L.fg, 0, 0);
+  const rr = (x, y, w, h, r) => { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); };
+  // Hintergrund: weicher Rot-Schwarz-Verlauf + roter Schein hinter der Kapsel
+  const bg = ctx.createLinearGradient(0, 0, BW * 0.6, BH * 1.4);
+  bg.addColorStop(0, '#2c070a'); bg.addColorStop(0.55, '#170405'); bg.addColorStop(1, '#0c0203');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, BW, BH);
+  const glow = ctx.createRadialGradient(BW / 2, 230, 10, BW / 2, 230, 520);
+  glow.addColorStop(0, 'rgba(150,18,32,0.30)'); glow.addColorStop(1, 'rgba(150,18,32,0)');
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, BW, BH);
+  // Dynamic Island mit „ETC.“
+  const iw = 260, ih = 54, ix = (BW - iw) / 2, iy = 22;
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 18; ctx.fillStyle = '#000'; rr(ix, iy, iw, ih, ih / 2); ctx.fill(); ctx.restore();
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1.5; rr(ix + 0.75, iy + 0.75, iw - 1.5, ih - 1.5, ih / 2); ctx.stroke();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '26px "Orbitron"';
+  ctx.save(); ctx.shadowColor = 'rgba(255,70,85,0.85)'; ctx.shadowBlur = 16; ctx.fillStyle = '#ff4d5e'; ctx.letterSpacing = '3px'; ctx.fillText('ETC.', BW / 2 + 2, iy + ih / 2 + 1); ctx.restore();
+  // Glas-Kapsel: Schatten, getönte Füllung, Kante, Glanz oben
+  const pw = 820, ph = 150, px = (BW - pw) / 2, py = 128, pr = ph / 2;
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 50; ctx.shadowOffsetY = 16; ctx.fillStyle = 'rgba(30,6,8,0.9)'; rr(px, py, pw, ph, pr); ctx.fill(); ctx.restore();
+  const fill = ctx.createLinearGradient(0, py, 0, py + ph);
+  fill.addColorStop(0, 'rgba(118,50,57,0.52)'); fill.addColorStop(1, 'rgba(74,26,31,0.52)');
+  ctx.fillStyle = fill; rr(px, py, pw, ph, pr); ctx.fill();
+  const rim = ctx.createLinearGradient(0, py, 0, py + ph);
+  rim.addColorStop(0, 'rgba(255,255,255,0.16)'); rim.addColorStop(0.5, 'rgba(255,255,255,0.04)'); rim.addColorStop(1, 'rgba(255,255,255,0.08)');
+  ctx.strokeStyle = rim; ctx.lineWidth = 1.5; rr(px + 0.75, py + 0.75, pw - 1.5, ph - 1.5, pr); ctx.stroke();
+  ctx.save(); rr(px, py, pw, ph, pr); ctx.clip();
+  const sheen = ctx.createLinearGradient(0, py, 0, py + ph * 0.55);
+  sheen.addColorStop(0, 'rgba(255,255,255,0.06)'); sheen.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = sheen; ctx.fillRect(px, py, pw, ph * 0.55); ctx.restore();
+  // Knopf mit roter Leuchtkante (unten rechts am hellsten, „atmet“ in der Animation)
+  const kr = 62, kx = px + 12 + kr, ky = py + ph / 2;
+  const kf = ctx.createRadialGradient(kx - 18, ky - 22, 4, kx, ky, kr);
+  kf.addColorStop(0, '#4a171c'); kf.addColorStop(1, '#250a0d');
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = 20; ctx.shadowOffsetY = 6; ctx.fillStyle = kf; ctx.beginPath(); ctx.arc(kx, ky, kr, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  const pulse = 0.75 + 0.25 * Math.sin(t * Math.PI * 2);
+  const kRim = ctx.createLinearGradient(kx - kr, ky - kr, kx + kr * 0.4, ky + kr);
+  kRim.addColorStop(0, 'rgba(255,90,100,0.08)'); kRim.addColorStop(0.55, 'rgba(255,90,100,0.35)'); kRim.addColorStop(1, `rgba(255,95,105,${0.95 * pulse})`);
+  ctx.save(); ctx.shadowColor = `rgba(255,60,75,${0.55 * pulse})`; ctx.shadowBlur = 14; ctx.strokeStyle = kRim; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(kx, ky, kr - 1.25, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  bannerIcon(ctx, icon, kx, ky, 72);
+  // Titel: zartes Rosa-Weiß, Schimmer läuft durch (in ~70 % der Schleife, dann kurze Pause)
+  const tx = kx + kr + (px + pw - (kx + kr)) / 2, ty = ky + 2;
+  ctx.letterSpacing = '-0.3px';
+  ctx.font = fitText(ctx, title, px + pw - (kx + kr) - 60, 56, 'Inter SemiBold');
+  const tw = ctx.measureText(title).width;
+  const tg = ctx.createLinearGradient(tx - tw / 2, 0, tx + tw / 2, 0);
+  const pos = -0.3 + t * 1.9, base = '#ecc4c9';
+  tg.addColorStop(0, base);
+  for (const [o, c] of [[pos - 0.18, base], [pos, '#ffffff'], [pos + 0.18, base]]) if (o > 0 && o < 1) tg.addColorStop(o, c);
+  tg.addColorStop(1, base);
+  ctx.fillStyle = tg; ctx.fillText(title, tx, ty);
+  // Hinweis darunter
+  ctx.letterSpacing = '0px'; ctx.fillStyle = 'rgba(214,170,176,0.62)';
+  ctx.font = fitText(ctx, caption, BW - 200, 23, 'Inter Medium');
+  if (caption) ctx.fillText(caption, BW / 2, py + ph + 52);
   return canvas;
 }
 
 /** Standbild (PNG) */
 async function bannerCard(opts = {}) {
   if (!C) return null;
-  return bannerFrame(bannerLayers(opts), 0.62).encode('png');
+  return bannerFrame(opts, 0.3).encode('png');
 }
 
-/** Animiertes Banner (GIF, 900 × 300, 60 Bilder, 4 s Endlosschleife). Ohne ffmpeg: null. */
+/** Animiertes Banner (GIF, 900 × 300, 48 Bilder, 3 s Endlosschleife). Ohne ffmpeg: null. */
 async function bannerGif(opts = {}) {
   if (!C) return null;
   const crypto = require('crypto');
   const fs = require('fs');
   const dir = path.join(process.env.DATA_DIR || path.join(process.cwd(), 'data'), 'banner-cache');
-  const file = path.join(dir, crypto.createHash('sha1').update(JSON.stringify([BANNER_VERSION, opts.title, opts.kicker])).digest('hex') + '.gif');
+  const file = path.join(dir, crypto.createHash('sha1').update(JSON.stringify([BANNER_VERSION, bannerDefaults(opts)])).digest('hex') + '.gif');
   if (fs.existsSync(file)) return fs.readFileSync(file);
   let ff;
   try { ff = require('ffmpeg-static'); } catch { return null; }
   if (!ff || !fs.existsSync(ff)) return null;
-  const L = bannerLayers(opts), N = 60, S = 0.75, w = BW * S, h = BH * S;
+  const N = 48, S = 0.75, w = BW * S, h = BH * S;
   const gif = await new Promise(resolve => {
-    const p = require('child_process').spawn(ff, ['-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${w}x${h}`, '-framerate', '15', '-i', 'pipe:0',
+    const p = require('child_process').spawn(ff, ['-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${w}x${h}`, '-framerate', '16', '-i', 'pipe:0',
       '-vf', 'split[a][b];[a]palettegen=max_colors=256:stats_mode=full[p];[b][p]paletteuse=dither=sierra2_4a:diff_mode=rectangle',
       '-loop', '0', '-f', 'gif', 'pipe:1'], { stdio: ['pipe', 'pipe', 'ignore'] });
     const chunks = [];
@@ -443,7 +452,7 @@ async function bannerGif(opts = {}) {
     p.stdin.on('error', () => {});
     (async () => {
       for (let i = 0; i < N; i++) {
-        const fr = bannerFrame(L, i / N, S);
+        const fr = bannerFrame(opts, i / N, S);
         const ok = p.stdin.write(Buffer.from(fr.getContext('2d').getImageData(0, 0, w, h).data.buffer));
         if (!ok) await new Promise(r => p.stdin.once('drain', r));
         if (i % 6 === 5) await new Promise(r => setTimeout(r, 0)); // Bot bleibt beim Rendern ansprechbar

@@ -164,7 +164,9 @@ module.exports = [
         .addStringOption(o => o.setName('nachricht_id').setDescription('Nur nötig, wenn mehrere Panels im Kanal sind')))
       .addSubcommand(s => s.setName('banner').setDescription('Banner mit „ETC.“-Uhr über das Panel setzen (im Kanal des Panels, postet es neu)')
         .addStringOption(o => o.setName('titel').setDescription('Großer Titel, z. B. Spiele-Rollen').setRequired(true).setMaxLength(24))
-        .addStringOption(o => o.setName('untertitel').setDescription('Kleine Zeile über dem Titel (Standard: Selbst aussuchen)').setMaxLength(40))
+        .addStringOption(o => o.setName('untertitel').setDescription('Leise Zeile unter der Kapsel (leer = passend zum Titel)').setMaxLength(70))
+        .addStringOption(o => o.setName('icon').setDescription('Icon im Knopf (leer = passend zum Titel)').addChoices(
+          { name: 'Gamepad', value: 'gamepad' }, { name: 'Schild (Regeln)', value: 'shield' }, { name: 'Ticket', value: 'ticket' }, { name: 'Fragezeichen (Hilfe)', value: 'help' }, { name: 'Stern', value: 'star' }))
         .addStringOption(o => o.setName('text').setDescription('Text unter dem Banner (leer = bisheriger Text)').setMaxLength(1000))
         .addStringOption(o => o.setName('nachricht_id').setDescription('Nur nötig, wenn mehrere Panels im Kanal sind'))),
     async execute(i) {
@@ -186,7 +188,7 @@ module.exports = [
         if (!id) return respond(i, err('In diesem Kanal gibt es kein Rollen-Panel. Geh in den Kanal mit dem Panel oder gib `nachricht_id` an.'));
         if (sub === 'banner') {
           await i.deferReply({ flags: 64 });
-          const msg = await rolepanels.setBanner(i.guild, id, { title: i.options.getString('titel'), kicker: i.options.getString('untertitel'), text: i.options.getString('text') });
+          const msg = await rolepanels.setBanner(i.guild, id, { title: i.options.getString('titel'), caption: i.options.getString('untertitel'), icon: i.options.getString('icon'), text: i.options.getString('text') });
           return respond(i, ok(`Banner gesetzt: ${msg.url}`));
         }
         if (sub === 'add') {

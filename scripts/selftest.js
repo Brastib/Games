@@ -1055,15 +1055,15 @@ async function test(name, fn) {
     const store = require('../src/lib/store');
     const { ButtonStyle: BS, MessageFlags: MF } = require('discord.js');
     if (cards.available()) {
-      const png = await cards.bannerCard({ title: 'Spiele-Rollen', kicker: 'ETC. · Selbst aussuchen' });
+      const png = await cards.bannerCard({ title: 'Spiele-Rollen' });
       assert(png.length > 20_000 && png.slice(1, 4).toString() === 'PNG');
       fs.writeFileSync(path.join(os.tmpdir(), 'banner-test.png'), png);
       const t0 = Date.now();
-      const gif = await cards.bannerGif({ title: 'Spiele-Rollen', kicker: 'Selbst aussuchen' });
+      const gif = await cards.bannerGif({ title: 'Spiele-Rollen' });
       assert(gif && gif.slice(0, 6).toString() === 'GIF89a' && gif.length < 3 * 1024 * 1024, 'GIF erstellt, klein genug für Discord');
       fs.writeFileSync(path.join(os.tmpdir(), 'banner-test.gif'), gif);
       const t1 = Date.now();
-      assert.strictEqual((await cards.bannerGif({ title: 'Spiele-Rollen', kicker: 'Selbst aussuchen' })).length, gif.length);
+      assert.strictEqual((await cards.bannerGif({ title: 'Spiele-Rollen' })).length, gif.length);
       assert(Date.now() - t1 < (t1 - t0) / 5, 'zweites Mal aus dem Cache');
     }
     const sent = [], deleted = [];

@@ -81,13 +81,13 @@ async function refresh(guild, messageId) {
  * Banner über ein bestehendes Panel setzen. Discord kann eine alte Nachricht nicht ins neue Layout umbauen,
  * deshalb wird das Panel neu gepostet (gleiche Knöpfe) und die alte Nachricht gelöscht.
  */
-async function setBanner(guild, messageId, { title, kicker, text }) {
+async function setBanner(guild, messageId, { title, caption, icon, text }) {
   const panel = store.get('rolepanels', messageId);
   if (!panel || panel.guildId !== guild.id) throw new Error('Unbekannte Panel-ID.');
   const ch = guild.channels.cache.get(panel.channelId);
   if (!ch) throw new Error('Kanal des Panels nicht gefunden.');
   await adopt(guild, messageId, panel);
-  panel.banner = { title, kicker: kicker || 'Selbst aussuchen' };
+  panel.banner = { title, caption: caption || null, icon: icon || null }; // leer = passend zum Titel
   if (text) { panel.description = text; panel.title = title; }
   const msg = await ch.send(await render(panel));
   store.set('rolepanels', msg.id, panel);
