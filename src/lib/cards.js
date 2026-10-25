@@ -13,6 +13,7 @@ try {
   C.GlobalFonts.registerFromPath(path.join(dir, 'Poppins-Regular.ttf'), 'Poppins');
   C.GlobalFonts.registerFromPath(path.join(dir, 'Poppins-Bold.ttf'), 'Poppins Bold');
   C.GlobalFonts.registerFromPath(path.join(dir, 'Poppins-ExtraBold.ttf'), 'Poppins ExtraBold');
+  C.GlobalFonts.registerFromPath(path.join(dir, 'Orbitron-Black.ttf'), 'Orbitron');
 } catch (e) {
   console.warn('[karten] Bild-Karten deaktiviert:', e.message);
   C = null;
@@ -309,4 +310,47 @@ async function recapCard(r) {
   return canvas.encode('png');
 }
 
-module.exports = { welcomeCard, rankCard, leaderboardCard, recapCard, available: () => !!C };
+/**
+ * Banner über Panels (Rollen, Regeln, Tickets …): links Untertitel + großer Titel, rechts die StandBy-Uhr mit „ETC.“ darin.
+ * Ein „-“ im Titel wird rot. 1200 × 400 (3:1), so zeigt Discord es oben im Panel.
+ */
+function bannerCard({ title, kicker = 'ETC.' } = {}) {
+  if (!C) return null;
+  const w = 1200, h = 400, R = 158, cx = w - 220, cy = h / 2;
+  const canvas = C.createCanvas(w, h);
+  const ctx = canvas.getContext('2d');
+  const g = ctx.createRadialGradient(cx, cy, 20, cx, cy, 760);
+  g.addColorStop(0, '#3a0b12'); g.addColorStop(0.45, '#160709'); g.addColorStop(1, BG);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  // Uhr: 60 Striche, 12/3/6/9 in Rubin
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 60; i++) {
+    const a = (i / 60) * Math.PI * 2, big = i % 5 === 0, quarter = i % 15 === 0, r2 = R - (big ? 30 : 14);
+    ctx.strokeStyle = quarter ? ACCENT : big ? '#7a1f2a' : '#3d1219';
+    ctx.lineWidth = big ? 7 : 4;
+    ctx.beginPath(); ctx.moveTo(cx + Math.sin(a) * R, cy - Math.cos(a) * R); ctx.lineTo(cx + Math.sin(a) * r2, cy - Math.cos(a) * r2); ctx.stroke();
+  }
+  // „ETC.“ in der Uhr: Orbitron, Verlauf hell → Rubin, leichtes Leuchten
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  let size = 110;
+  do { ctx.font = `${size}px "Orbitron"`; size -= 2; } while (ctx.measureText('ETC.').width > R * 1.22 && size > 30);
+  const tg = ctx.createLinearGradient(0, cy - size / 2, 0, cy + size / 2);
+  tg.addColorStop(0, '#ff6b7d'); tg.addColorStop(1, ACCENT);
+  ctx.save(); ctx.shadowColor = 'rgba(224,52,79,0.6)'; ctx.shadowBlur = 34; ctx.fillStyle = tg; ctx.fillText('ETC.', cx, cy + 4); ctx.restore();
+  ctx.fillStyle = tg; ctx.fillText('ETC.', cx, cy + 4);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  // Links: Untertitel (gesperrt) + Titel
+  const maxW = cx - R - 110;
+  ctx.fillStyle = ROSE; ctx.letterSpacing = '8px';
+  ctx.font = fitText(ctx, String(kicker).toUpperCase(), maxW, 24, 'Poppins ExtraBold');
+  ctx.fillText(String(kicker).toUpperCase(), 64, 222);
+  ctx.letterSpacing = '1px';
+  const t = String(title || '').toUpperCase();
+  ctx.font = fitText(ctx, t, maxW, 86, 'Poppins ExtraBold');
+  let x = 60;
+  for (const part of t.split(/(-)/)) { ctx.fillStyle = part === '-' ? RED_TEXT : TEXT; ctx.fillText(part, x, 314); x += ctx.measureText(part).width; }
+  ctx.letterSpacing = '0px';
+  return canvas.encode('png');
+}
+
+module.exports = { welcomeCard, rankCard, leaderboardCard, recapCard, bannerCard, available: () => !!C };

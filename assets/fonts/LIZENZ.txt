@@ -1,1 +1,2 @@
 Poppins von Indian Type Foundry, lizenziert unter der SIL Open Font License 1.1 (https://openfontlicense.org).
+Orbitron (Orbitron-Black.ttf, für das „ETC.“ in den Bannern): Copyright 2018 The Orbitron Project Authors (https://github.com/theleagueof/orbitron), with Reserved Font Name "Orbitron". Lizenziert unter der SIL Open Font License 1.1 – Lizenztext in OFL.txt.

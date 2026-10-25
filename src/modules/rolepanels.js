@@ -2,7 +2,10 @@
 /**
  * Rollen-Panels: Mitglieder holen sich Rollen per Button oder Auswahlmenü selbst.
  */
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, StringSelectMenuBuilder } = require('discord.js');
+const {
+  ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, StringSelectMenuBuilder,
+  ContainerBuilder, MediaGalleryBuilder, MediaGalleryItemBuilder, TextDisplayBuilder, SeparatorBuilder, AttachmentBuilder, MessageFlags,
+} = require('discord.js');
 const store = require('../lib/store');
 const { COLORS, ok, err, respond, EPHEMERAL } = require('../lib/embeds');
 const { chunk } = require('../lib/util');
@@ -31,6 +34,29 @@ function embed(panel) {
     (panel.unique ? '\n\n*Du kannst nur eine dieser Rollen gleichzeitig haben.*' : ''));
 }
 
+/**
+ * Nachricht fürs Panel. Mit Banner (panel.banner) im neuen Discord-Layout: Banner-Bild oben, Text, Trennlinie, Knöpfe, Fußzeile.
+ * Ohne Banner klassisch als Embed.
+ */
+async function render(panel) {
+  if (!panel.banner) return { embeds: [embed(panel)], components: components(panel) };
+  const png = await require('../lib/cards').bannerCard(panel.banner);
+  const box = new ContainerBuilder().setAccentColor(panel.color || COLORS.brand);
+  if (png) box.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL('attachment://banner.png').setDescription(panel.banner.title)));
+  else box.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${panel.banner.title}`));
+  const lines = [];
+  if (panel.title && panel.title.toLowerCase() !== String(panel.banner.title).toLowerCase()) lines.push(`**${panel.title}**`);
+  lines.push(panel.description || 'Tippe auf einen Knopf, um die Rolle zu bekommen. Nochmal tippen = wieder weg.');
+  if (panel.unique) lines.push('-# Du kannst nur eine dieser Rollen gleichzeitig haben.');
+  box.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
+  box.addSeparatorComponents(new SeparatorBuilder());
+  const rows = components(panel);
+  if (rows.length) box.addActionRowComponents(...rows);
+  else box.addTextDisplayComponents(new TextDisplayBuilder().setContent('*Noch keine Rollen. Füge welche mit `/rolepanel add` hinzu.*'));
+  box.addTextDisplayComponents(new TextDisplayBuilder().setContent('-# ETC. Bot · Rollen'));
+  return { flags: MessageFlags.IsComponentsV2, components: [box], files: png ? [new AttachmentBuilder(png, { name: 'banner.png' })] : [] };
+}
+
 async function create(channel, { title, description, mode, unique }) {
   const panel = { channelId: channel.id, guildId: channel.guild.id, title, description, mode, unique, roles: [] };
   const msg = await channel.send({ embeds: [embed(panel)], components: components(panel) });
@@ -43,14 +69,35 @@ async function refresh(guild, messageId) {
   const ch = guild.channels.cache.get(panel.channelId);
   const msg = await ch?.messages.fetch(messageId).catch(() => null);
   if (!msg) throw new Error('Panel-Nachricht nicht gefunden (gelöscht?)');
-  await msg.edit({ embeds: [embed(panel)], components: components(panel) });
+  const payload = await render(panel);
+  await msg.edit(panel.banner ? { ...payload, attachments: [] } : payload); // altes Banner-Bild ersetzen
+}
+
+/**
+ * Banner über ein bestehendes Panel setzen. Discord kann eine alte Nachricht nicht ins neue Layout umbauen,
+ * deshalb wird das Panel neu gepostet (gleiche Knöpfe) und die alte Nachricht gelöscht.
+ */
+async function setBanner(guild, messageId, { title, kicker, text }) {
+  const panel = store.get('rolepanels', messageId);
+  if (!panel || panel.guildId !== guild.id) throw new Error('Unbekannte Panel-ID.');
+  const ch = guild.channels.cache.get(panel.channelId);
+  if (!ch) throw new Error('Kanal des Panels nicht gefunden.');
+  await adopt(guild, messageId, panel);
+  panel.banner = { title, kicker: kicker || 'ETC. · Selbst aussuchen' };
+  if (text) { panel.description = text; panel.title = title; }
+  const msg = await ch.send(await render(panel));
+  store.set('rolepanels', msg.id, panel);
+  store.delete('rolepanels', messageId);
+  await ch.messages.fetch(messageId).then(m => m.delete()).catch(() => {});
+  return msg;
 }
 
 /** Knöpfe, die schon auf der Nachricht sind, aber (noch) nicht im Speicher stehen, übernehmen – sonst würden sie beim nächsten Ändern verschwinden */
 async function adopt(guild, messageId, panel) {
   const msg = await guild.channels.cache.get(panel.channelId)?.messages.fetch(messageId).catch(() => null);
   const byStyle = Object.fromEntries(Object.entries(STYLE).map(([k, v]) => [v, k]));
-  for (const c of (msg?.components || []).flatMap(row => row.components || [])) {
+  const all = list => list.flatMap(c => [c, ...all(c.components || [])]); // auch Knöpfe im neuen Layout (in Containern)
+  for (const c of all(msg?.components || [])) {
     const roleId = c.customId?.startsWith('rp:') ? c.customId.slice(3) : null;
     if (!roleId || panel.roles.some(r => r.roleId === roleId) || !guild.roles.cache.has(roleId)) continue;
     panel.roles.push({ roleId, label: c.label || guild.roles.cache.get(roleId).name, emoji: c.emoji?.id ? null : c.emoji?.name || null, style: byStyle[c.style] || 'grau' });
@@ -160,4 +207,4 @@ function latestIn(guildId, channelId) {
   return ids.sort((a, b) => (BigInt(a) < BigInt(b) ? 1 : -1))[0] || null;
 }
 
-module.exports = { create, addRole, removeRole, adopt, migrateDesign, embed, components, onButton, onSelect, latestIn, parseRoleList, STYLE };
+module.exports = { create, addRole, removeRole, adopt, migrateDesign, setBanner, render, embed, components, onButton, onSelect, latestIn, parseRoleList, STYLE };

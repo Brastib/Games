@@ -1049,6 +1049,35 @@ async function test(name, fn) {
     const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'lib', 'cards.js'), 'utf8');
     assert(!/#(8c0000|b80000|fd0000)/i.test(src), 'keine Neon-/Dunkelrot-Farben mehr in den Bildern');
   });
+  await test('Banner: „ETC.“-Uhr als Bild, Panel im neuen Layout mit gleichen Knöpfen neu gepostet', async () => {
+    const rp = require('../src/modules/rolepanels');
+    const cards = require('../src/lib/cards');
+    const store = require('../src/lib/store');
+    const { ButtonStyle: BS, MessageFlags: MF } = require('discord.js');
+    if (cards.available()) {
+      const png = await cards.bannerCard({ title: 'Spiele-Rollen', kicker: 'ETC. · Selbst aussuchen' });
+      assert(png.length > 20_000 && png.slice(1, 4).toString() === 'PNG');
+      fs.writeFileSync(path.join(os.tmpdir(), 'banner-test.png'), png);
+    }
+    const sent = [], deleted = [];
+    const old = { components: [{ components: [{ customId: 'rp:r1', label: 'Repo', style: BS.Secondary }] }], delete: async () => deleted.push('alt') };
+    const ch = { messages: { fetch: async () => old }, send: async p => { sent.push(p); return { id: 'neu1', url: 'https://discord.com/x' }; } };
+    const guild = { id: 'g-bn', roles: { cache: new Map([['r1', { name: 'Repo' }]]) }, channels: { cache: new Map([['c1', ch]]) } };
+    store.set('rolepanels', 'alt1', { guildId: 'g-bn', channelId: 'c1', title: 'Damit nicht alle gepingt werden', description: 'Tippe auf einen Knopf.', roles: [], mode: 'buttons' });
+    await rp.setBanner(guild, 'alt1', { title: 'Spiele-Rollen' });
+    assert(!store.has('rolepanels', 'alt1') && store.get('rolepanels', 'neu1').banner.title === 'Spiele-Rollen', 'Panel unter neuer Nachricht gespeichert');
+    assert.deepStrictEqual(deleted, ['alt'], 'alte Nachricht gelöscht');
+    const p = sent[0];
+    assert.strictEqual(p.flags, MF.IsComponentsV2);
+    const json = JSON.stringify(p.components[0].toJSON());
+    assert(json.includes('attachment://banner.png') === cards.available(), 'Banner-Bild oben');
+    assert(json.includes('rp:r1') && json.includes('Damit nicht alle gepingt werden') && json.includes('ETC. Bot · Rollen'), 'Knopf, alter Text und Fußzeile drin');
+    // Knöpfe im neuen Layout werden beim nächsten Ändern erkannt
+    const panel = { channelId: 'c1', roles: [] };
+    old.components = [{ components: [{ content: 'Text' }, { components: [{ customId: 'rp:r1', label: 'Repo', style: BS.Secondary }] }] }];
+    await rp.adopt(guild, 'neu1', panel);
+    assert.strictEqual(panel.roles[0]?.roleId, 'r1');
+  });
   await test('Rollen-Panel: Knöpfe auf der Nachricht werden übernommen, nicht überschrieben', async () => {
     const rp = require('../src/modules/rolepanels');
     const { ButtonStyle: BS } = require('discord.js');

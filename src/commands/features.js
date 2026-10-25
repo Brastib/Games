@@ -161,6 +161,11 @@ module.exports = [
         .addStringOption(o => o.setName('farbe').setDescription('Button-Farbe').addChoices({ name: 'Grau', value: 'grau' }, { name: 'Rot', value: 'rot' }, { name: 'Blau', value: 'blau' }, { name: 'Grün', value: 'gruen' })))
       .addSubcommand(s => s.setName('remove').setDescription('Rolle aus dem Panel entfernen (im Kanal des Panels)')
         .addRoleOption(o => o.setName('rolle').setDescription('Rolle').setRequired(true))
+        .addStringOption(o => o.setName('nachricht_id').setDescription('Nur nötig, wenn mehrere Panels im Kanal sind')))
+      .addSubcommand(s => s.setName('banner').setDescription('Banner mit „ETC.“-Uhr über das Panel setzen (im Kanal des Panels, postet es neu)')
+        .addStringOption(o => o.setName('titel').setDescription('Großer Titel, z. B. Spiele-Rollen').setRequired(true).setMaxLength(24))
+        .addStringOption(o => o.setName('untertitel').setDescription('Kleine Zeile darüber (Standard: ETC. · Selbst aussuchen)').setMaxLength(40))
+        .addStringOption(o => o.setName('text').setDescription('Text unter dem Banner (leer = bisheriger Text)').setMaxLength(1000))
         .addStringOption(o => o.setName('nachricht_id').setDescription('Nur nötig, wenn mehrere Panels im Kanal sind'))),
     async execute(i) {
       const sub = i.options.getSubcommand();
@@ -179,6 +184,11 @@ module.exports = [
         // Ohne ID: das neueste Rollen-Panel in diesem Kanal
         const id = i.options.getString('nachricht_id')?.trim() || rolepanels.latestIn(i.guild.id, i.channelId);
         if (!id) return respond(i, err('In diesem Kanal gibt es kein Rollen-Panel. Geh in den Kanal mit dem Panel oder gib `nachricht_id` an.'));
+        if (sub === 'banner') {
+          await i.deferReply({ flags: 64 });
+          const msg = await rolepanels.setBanner(i.guild, id, { title: i.options.getString('titel'), kicker: i.options.getString('untertitel'), text: i.options.getString('text') });
+          return respond(i, ok(`Banner gesetzt: ${msg.url}`));
+        }
         if (sub === 'add') {
           const single = i.options.getRole('rolle');
           const list = rolepanels.parseRoleList(i.guild, i.options.getString('rollen'));
